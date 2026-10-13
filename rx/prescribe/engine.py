@@ -58,6 +58,11 @@ class Rx:
     reading: Reading | None = None
     skip_short: str = ""
     example: str = ""
+    why_title: str = ""
+    why_tone: str = "none"
+    why_says: str = ""
+    diagnosis: str = ""
+    activity_why: str = ""
     what: str = ""
     how: list = field(default_factory=list)
     sleep: object = None
@@ -154,8 +159,11 @@ def build_rx(p: Profile, day: str | None = None) -> Rx:
     verdict = cap_verdict(verdict, sb.cap)
     if sb.state in ("owed", "debt", "deep_debt") or verdict != before or sb.no_technical:
         why.insert(1, sb.says)
-    sport = _pick_sport(verdict, p)
+    sport, chosen_kind, sport_reason, cap_mins = choose_activity(verdict, p, day)
     mins = _round5(_minutes(verdict, sport, p) * (sb.volume if verdict not in (REST, LIGHT) else 1.0))
+    if cap_mins:
+        mins = min(mins, cap_mins)
+    diag = diagnosis(verdict, p, day, reading, sb)
 
     if not p.ready:
         return Rx(day, verdict, HEADLINE[verdict], why,
@@ -168,7 +176,7 @@ def build_rx(p: Profile, day: str | None = None) -> Rx:
 
     z = p.zones
     steps: list[str] = []
-    kind = usual_kind(p, sport)
+    kind = chosen_kind or usual_kind(p, sport)
     verb = {"mountain bike": "Mountain bike", "road ride": "Road ride", "gravel ride": "Gravel ride",
             "trail run": "Trail run", "ski tour": "Skin"}.get(kind or "", None) or \
         {BIKE: "Ride", RUN: "Run", SKI: "Skin", WALK: "Walk"}.get(sport, LABEL[sport])
@@ -228,7 +236,9 @@ def build_rx(p: Profile, day: str | None = None) -> Rx:
                                          EASY: "tomorrow is easy only",
                                          LIGHT: "tomorrow is a stroll at most",
                                          REST: "tomorrow is a day off"}[cap]))
-    rx.example = example_ride(p, sport, verdict, mins, ceiling)
+    rx.example = example_ride(p, sport, verdict, mins, ceiling, kind)
+    rx.diagnosis, rx.activity_why = diag, sport_reason
+    rx.why_title, rx.why_tone, rx.why_says = why_lead(verdict, p, day, reading)
     rx.what, rx.how = what_how(rx, kind, mins, low, ceiling, steps)
     rx.scenarios = scenarios(p, rx)
     rx.if_skip, rx.if_overdo = consequences(p, rx)
@@ -419,11 +429,12 @@ def usual_kind(p: Profile, sport: str) -> str | None:
     return max(set(kinds), key=kinds.count) if kinds else None
 
 
-def example_ride(p: Profile, sport: str, verdict: str, mins: int, ceiling: int | None) -> str:
+def example_ride(p: Profile, sport: str, verdict: str, mins: int, ceiling: int | None,
+                 kind: str | None = None) -> str:
     """Point at a real ride from your history that fits today, and say how today differs."""
     if verdict in (REST, LIGHT) or ceiling is None:
         return ""
-    kind = usual_kind(p, sport)
+    kind = kind or usual_kind(p, sport)
     cutoff = (date.fromisoformat(p.as_of) - timedelta(days=180)).isoformat()
     pool = [a for a in p.activities if a.sport == sport and a.date >= cutoff and a.date < p.as_of
             and a.moving_s and 0.7 * mins <= a.moving_s / 60 <= 1.3 * mins
@@ -489,3 +500,135 @@ def what_how(rx: Rx, kind: str | None, mins: int, low, ceiling, steps) -> tuple[
     if rx.example:
         how.insert(1, rx.example)
     return what, how
+
+
+def _mix(p: Profile, day: str, days: int) -> dict[str, float]:
+    cut = (date.fromisoformat(day) - timedelta(days=days)).isoformat()
+    out: dict[str, float] = {}
+    for a in p.activities:
+        if cut <= a.date < day:
+            out[a.sport] = out.get(a.sport, 0.0) + (a.moving_s or 0) / 3600
+    return out
+
+
+def choose_activity(verdict: str, p: Profile, day: str) -> tuple[str, str | None, str, int | None]:
+    """Which activity, and why that one. Returns (sport, kind, reason, max minutes or None).
+
+    Easy days: pick what you can't overdo and what balances the last two weeks.
+    Mountain biking forces heart-rate spikes on climbs, so easy riding goes to road, gravel or
+    the trainer. A mostly-cycling fortnight gets an easy run (different muscles, and bone
+    loading cycling doesn't give), kept short if you haven't been running."""
+    mix14 = _mix(p, day, 14)
+    tot = sum(v for k, v in mix14.items() if k != WALK) or 0.0
+    bike_share = mix14.get(BIKE, 0.0) / tot if tot else 0.0
+    cut30 = (date.fromisoformat(day) - timedelta(days=30)).isoformat()
+    runs30 = sum(1 for a in p.activities if a.sport == RUN and cut30 <= a.date < day)
+    skied14 = mix14.get(SKI, 0.0) > 0
+    road_kinds = [SUBTYPE.get(a.raw_type or "") for a in p.activities if a.sport == BIKE and a.date >= cut30]
+    has_road = any(k in ("road ride", "gravel ride", "trainer ride") for k in road_kinds)
+    pct = f"{bike_share * 100:.0f}%"
+
+    if verdict == REST:
+        return WALK, "walk", "Rest is the session today. Walking keeps you loose without adding anything to recover from.", None
+    if verdict == LIGHT:
+        return WALK, "walk", ("A walk moves blood through tired legs and speeds recovery without adding load. "
+                              "Anything with a climb or a pace would."), None
+
+    if verdict == EASY:
+        if bike_share >= 0.7 and runs30 >= 2:
+            return RUN, "run", (f"Run instead of ride: {pct} of your last two weeks was on the bike. A run works "
+                                f"different muscles and loads your bones, which cycling doesn't. Flat ground makes "
+                                f"it easy to keep your heart rate where it belongs."), 50
+        if bike_share >= 0.7:
+            return WALK, "hike", (f"Hike instead of ride: {pct} of your last two weeks was on the bike. A hike gives "
+                                  f"your legs a different job without the pounding of a run you haven't been doing."), 90
+        if has_road:
+            return BIKE, "road ride", ("Ride the road or gravel bike, not the mountain bike. Trail climbs force your "
+                                       "heart rate up whether you like it or not; flat roads let you stay easy."), None
+        return BIKE, "mountain bike", ("If you ride the mountain bike, pick the flattest loop you have. Steep climbs "
+                                       "make an easy day impossible."), None
+
+    if verdict == STEADY:
+        if skied14:
+            return SKI, "ski tour", "You've been skiing: a steady skin is perfect aerobic time.", None
+        if bike_share >= 0.85 and runs30 >= 2:
+            return BIKE, None, (f"Ride, but notice the mix: {pct} of your last two weeks was on the bike. "
+                                f"Make your next easy day a run."), None
+        return BIKE if bike_share >= 0.5 or not runs30 else RUN, None, \
+            "Your main sport. Long steady time is where your aerobic engine grows.", None
+
+    # HARD
+    return BIKE, None, ("Do the hard efforts on a steady climb or a flat road where you control the effort. "
+                        "Technical trail breaks intervals into spikes and rests."), None
+
+
+def _hm_short(h: float) -> str:
+    hh, mm = int(h), int(round((h - int(h)) * 60))
+    return f"{hh}h {mm:02d}m" if hh else f"{mm} minutes"
+
+
+def why_lead(verdict: str, p: Profile, day: str, reading) -> tuple[str, str, str]:
+    """The headline of the Why: whatever actually drove today's call."""
+    y = p.yesterday
+    if y and y.ctl > 5 and verdict in (REST, LIGHT, EASY) and getattr(reading, "tone", "") == "good":
+        ratio = y.atl / y.ctl
+        if ratio > 1.15:
+            return ("Too much, too fast", "bad" if ratio > 1.5 else "ok",
+                    f"Your last 7 days are {(ratio - 1) * 100:.0f}% above your 6-week normal. Recovery looks fine "
+                    f"this morning, but a spike that size shows up as fatigue a day or two later.")
+        big = p.daily_load.get((date.fromisoformat(day) - timedelta(days=1)).isoformat(), 0.0)
+        return ("Absorbing yesterday", "ok",
+                f"You recovered well overnight, but yesterday was {big / max(y.ctl, 1):.1f}× a normal day. "
+                f"Easy today is how it turns into fitness instead of fatigue.")
+    return (getattr(reading, "title", ""), getattr(reading, "tone", "none"), getattr(reading, "says", ""))
+
+
+def diagnosis(verdict: str, p: Profile, day: str, reading, sb) -> str:
+    """The prescription's first line: what you need today, and the specific reason."""
+    d0 = date.fromisoformat(day)
+    y = (d0 - timedelta(days=1)).isoformat()
+    avg = sum(p.daily_load.get((d0 - timedelta(days=n)).isoformat(), 0.0) for n in range(1, 29)) / 28
+    ld = p.daily_load.get(y, 0.0)
+    causes = []
+    if avg and ld > 1.5 * avg:
+        acts = sorted([a for a in p.activities if a.date == y], key=lambda a: p.session_load.get(a.id, 0), reverse=True)
+        if acts:
+            a = acts[0]
+            h, m = divmod(round(a.moving_s / 60), 60)
+            dur = f"{h}h {m:02d}m" if h else f"{m} minutes"
+            label = (a.name or a.sport).strip()
+            causes.append(f"yesterday's {label} ({dur}) was {ld / avg:.1f}× a normal day")
+        else:
+            causes.append(f"yesterday was {ld / avg:.1f}× a normal day")
+    last = sb.nights[-1] if sb and sb.nights else None
+    if last and last.slept is not None and last.slept < last.need - 1.0:
+        h, m = int(last.slept), round((last.slept - int(last.slept)) * 60)
+        sc = f", score {last.score:.0f}" if last.score else ""
+        causes.append(f"you slept {h}h {m:02d}m")
+    elif last and last.score is not None and last.score < 60:
+        causes.append(f"last night's sleep scored {last.score:.0f}")
+    if sb and sb.state in ("owed", "debt", "deep_debt") and not any(c.startswith(("you slept", "last night")) for c in causes):
+        causes.append(f"you're {_hm_short(sb.balance)} behind on sleep")
+    key = getattr(reading, "key", "")
+    if key in ("trending_low", "not_absorbing"):
+        causes.append("your HRV has been below your normal range all week")
+    elif key in ("illness",):
+        causes.append("resting HR is up and HRV is down, which can mean you're fighting something")
+    elif key == "rhr_up":
+        causes.append("your resting heart rate is up")
+    elif key == "saturation":
+        causes.append("you're carrying heavy fatigue even though HRV looks high")
+    elif key == "one_off_dip":
+        causes.append("HRV dropped last night with no training reason")
+
+    need = {REST: "Day off today", LIGHT: "Light day today: a walk, nothing more", EASY: "Easy day today",
+            STEADY: "Steady day today: aerobic time, no intervals", HARD: "Hard day today"}[verdict]
+    if verdict == HARD:
+        return "You're ready for a hard day: you're recovered and nothing hard in the last two days."
+    if not causes:
+        if verdict == STEADY:
+            return "You need a steady day today. You're recovered, but you've worked hard recently: build aerobic time, not intensity."
+        return f"{need}."
+    causes = causes[:3]
+    because = causes[0] if len(causes) == 1 else ", ".join(causes[:-1]) + " and " + causes[-1]
+    return f"{need}. {because[:1].upper()}{because[1:]}."

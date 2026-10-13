@@ -33,6 +33,9 @@
   .rxv b.good { color:var(--good); } .rxv b.ok { color:var(--warn); } .rxv b.bad { color:var(--bad); }
   .rxl.over .rxk { color:var(--ceiling); }
   .rxl .steps { margin:0; font-size:18px; }
+  .diag { font-size:clamp(22px, 2.4vw, 28px); line-height:1.3; font-weight:600; letter-spacing:-0.01em;
+          margin:28px 0 0; max-width:34ch; text-wrap:pretty; }
+  .actwhy { margin:10px 0 0; font-size:17px; line-height:1.45; color:var(--lichen); max-width:52ch; }
   .rxlist { margin:0; padding-left:18px; font-size:18px; line-height:1.45; max-width:54ch; }
   .rxlist li { margin:0 0 8px; }
   .rxlist.facts { font-size:15px; color:var(--lichen); margin-top:8px; }
@@ -188,13 +191,15 @@
       <form method="post" action="/sync" class="syncf"><button type="submit">Sync now</button></form>{% endif %}
     </div>
     <h1 class="verdict">{{ rx.headline }}</h1>
+    {% if rx.diagnosis %}<p class="diag">{{ rx.diagnosis }}</p>{% endif %}
     <div class="pad">
       <div class="rxl"><span class="rxk">What</span>
-        <p class="rxv strong">{{ rx.what or rx.do }}</p></div>
+        <div class="rxv"><p class="rxv strong">{{ rx.what or rx.do }}</p>
+        {% if rx.activity_why %}<p class="actwhy">{{ rx.activity_why }}</p>{% endif %}</div></div>
       <div class="rxl"><span class="rxk">How</span>
         <ul class="rxlist">{% for h in rx.how %}<li>{{ h }}</li>{% endfor %}</ul></div>
       {% if rx.reading %}<div class="rxl"><span class="rxk">Why</span>
-        <div class="rxv"><p class="whyhead"><b class="{{ rx.reading.tone }}">{{ rx.reading.title }}.</b> {{ rx.reading.says.split('. ')[0] }}.</p>
+        <div class="rxv"><p class="whyhead"><b class="{{ rx.why_tone }}">{{ rx.why_title }}.</b> {{ rx.why_says }}</p>
           <ul class="rxlist facts">{% for e in rx.reading.evidence[:4] %}<li><b>{{ e.name }}</b> {{ e.line.split('. ')[0].rstrip('.') }}.</li>{% endfor %}
           {% if rx.sleep and rx.sleep.state not in ('even', 'unknown', 'surplus') %}{% set sd = rx.sleep.says.split('. ')[0].rstrip('.') %}<li><b>Sleep debt</b> {{ sd[:1] | upper }}{{ sd[1:] }}.</li>{% endif %}</ul></div></div>{% endif %}
       {% if rx.skip_short %}<div class="rxl"><span class="rxk">Skip it</span><p class="rxv">{{ rx.skip_short }}</p></div>{% endif %}
