@@ -231,6 +231,15 @@ def zones(request: Request):
     return _page(request, "zones.html", hr=hr, pw=pw, trend=dist.trend_chart)
 
 
+@app.get("/you", response_class=HTMLResponse)
+def you_page(request: Request):
+    from .. import benchmarks as bm
+    store = open_store()
+    p, rx = today_rx(store)
+    rows, est, vo2, vr = cached(store, "bench", rx.date, lambda: bm.build(store, p))
+    return _page(request, "you.html", rows=rows, est=est, vo2=vo2, scale=bm.scale, age=bm.AGE)
+
+
 @app.get("/data", response_class=HTMLResponse)
 def data_page(request: Request):
     """What Ceiling actually received, day by day. For checking a missing night."""

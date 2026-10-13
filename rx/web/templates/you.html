@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block head %}
+<style>
+  main.narrow { max-width:1100px; }
+  .yh1 { font-size:clamp(36px, 6vw, 84px); margin:24px 0 18px; }
+  .lede { font-size:clamp(20px, 2.2vw, 26px); font-weight:600; line-height:1.3; max-width:40ch; margin:0 0 6px; }
+  .sub { color:var(--lichen); margin:0 0 40px; max-width:70ch; }
+  .vo2 { border-top:2px solid var(--ink); padding:28px 0 8px; display:grid; grid-template-columns:300px 1fr; gap:40px; }
+  .vo2 .big { font-size:clamp(64px, 9vw, 120px); font-weight:600; font-stretch:125%; line-height:1; }
+  .vo2 .big small { font-size:18px; font-weight:600; color:var(--lichen); letter-spacing:0; margin-left:6px; }
+  .est { list-style:none; padding:0; margin:0; }
+  .est li { padding:12px 0; border-bottom:1px solid var(--rule); }
+  .est b { display:inline-block; min-width:56px; font-size:20px; font-weight:600; font-stretch:125%; }
+  .est span { color:var(--lichen); font-size:14px; display:block; margin-top:2px; }
+  .brow { display:grid; grid-template-columns:300px 1fr; gap:40px; padding:26px 0; border-top:1px solid var(--rule); align-items:center; }
+  .brow h3 { margin:0; font-size:17px; }
+  .brow .v { font-size:30px; font-weight:600; font-stretch:125%; display:block; margin:4px 0; }
+  .brow .v small { font-size:15px; color:var(--lichen); font-weight:500; letter-spacing:0; margin-left:4px; font-stretch:100%; }
+  .brow p { margin:0; font-size:15px; line-height:1.45; }
+  .brow .note { color:var(--lichen); font-size:13px; margin-top:6px; }
+  .bscale { display:block; width:100%; height:auto; font-family:var(--face); overflow:visible; }
+  .bscale .axis { stroke:var(--rule); stroke-width:2; }
+  .bscale .popb { fill:var(--frost2); } .bscale .popm { stroke:var(--lichen); stroke-width:2; }
+  .bscale .athb { fill:var(--z2); opacity:.35; }
+  .bscale .you { fill:var(--ink); stroke:#fff; stroke-width:3; }
+  .bscale .youl { fill:var(--ink); font-size:17px; font-weight:700; }
+  .bscale .lbl { fill:var(--lichen); font-size:14px; } .bscale .lbl.ath { fill:#1f7a4a; }
+  .key { display:flex; gap:20px; flex-wrap:wrap; color:var(--lichen); font-size:14px; margin:-24px 0 30px; }
+  .key i { display:inline-block; width:18px; height:10px; border-radius:2px; margin-right:7px; vertical-align:0; }
+  @media (max-width: 760px) {
+    .vo2, .brow { grid-template-columns:1fr; gap:14px; }
+    .bscale .youl { font-size:30px; } .bscale .lbl { font-size:26px; }
+  }
+</style>
+{% endblock %}
+{% block body %}
+<h1 class="yh1">You vs your age.</h1>
+<p class="lede">Every number against men in their 40s, and against endurance athletes your age.</p>
+<p class="sub">Men 40–49 from large published datasets; athletes from masters endurance studies. Sources are listed under each row.</p>
+<p class="key"><span><i style="background:var(--frost2)"></i>Middle half of men your age</span><span><i style="background:var(--z2);opacity:.45"></i>Endurance athletes your age</span><span><i style="background:var(--ink);border-radius:50%"></i>You</span></p>
+
+{% if vo2 %}
+<section class="vo2">
+  <div><h3 style="margin:0;font-size:17px">VO2max, estimated</h3>
+    <span class="big">{{ '%.0f' % vo2 }}<small>ml/kg/min</small></span></div>
+  <ul class="est">{% for name, v, how in est %}<li><b>{{ '%.0f' % v }}</b> {{ name }}<span>{{ how }}</span></li>{% endfor %}</ul>
+</section>
+{% endif %}
+
+{% for b in rows %}
+<div class="brow">
+  <div><h3>{{ b.name }}</h3><span class="v">{{ b.shown }}<small>{{ b.unit }}</small></span>
+    <p>{{ b.says }}</p>{% if b.note %}<p class="note">{{ b.note }}</p>{% endif %}</div>
+  <div>{{ scale(b) | safe }}</div>
+</div>
+{% endfor %}
+<p class="sub" style="margin-top:32px">Sources: FRIEND registry (Kaminsky 2022), Cooper Institute, HUNT3 (Loe 2013), Fitbit resting HR (Quer 2020), WHOOP HRV by age, Tanaka 2001, CDC NHIS, Uth–Sørensen 2004, ACSM. Details in the project's research notes.</p>
+{% endblock %}
