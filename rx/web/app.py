@@ -50,7 +50,7 @@ async def sign_in_gate(request: Request, call_next):
     """Health data is private. Fails closed: with no accounts configured, nothing opens.
     The home page is the sign-in page until you're signed in."""
     path = request.url.path
-    if path in ("/", "/healthz", "/login", "/logout") or path.startswith("/static/") or _signed_in(request):
+    if path in ("/", "/healthz", "/login", "/logout", "/plan.ics") or path.startswith("/static/") or _signed_in(request):
         return await call_next(request)
     if path.startswith("/api/"):
         return Response("Sign in required.", status_code=401)
@@ -221,6 +221,33 @@ def today(request: Request, d: str | None = None):
                  sleep_chart=sleepmod.chart(rx.sleep) if rx.sleep else "",
                  base_need=sleepmod._hm(rx.sleep.base) if rx.sleep else "",
                  day_label=when.strftime("%A, %B %-d"))
+
+
+@app.get("/plan", response_class=HTMLResponse)
+def plan_page(request: Request):
+    from ..prescribe import plan as planmod
+    store = open_store()
+    p, rx = today_rx(store)
+    pl = cached(store, "plan", rx.date, lambda: planmod.build(p, rx))
+    email = auth.verify("session", request.cookies.get(auth.COOKIE)) if auth.enabled() else None
+    feed = None
+    if email:
+        tok = auth.sign("cal", email, 10 * 365 * 24 * 3600)
+        feed = f"{request.url.netloc}/plan.ics?k={tok}"
+    return _page(request, "plan.html", plan=pl, feed=feed, date=date)
+
+
+@app.get("/plan.ics")
+def plan_ics(k: str = ""):
+    """Calendar subscription. Calendar apps can't sign in, so the link carries a long-lived signed key."""
+    from ..prescribe import plan as planmod
+    if not (os.getenv("RX_OPEN") == "1" or (auth.enabled() and auth.verify("cal", k))):
+        return Response("Not found.", status_code=404)
+    store = open_store()
+    p, rx = today_rx(store)
+    pl = cached(store, "plan", rx.date, lambda: planmod.build(p, rx))
+    return Response(planmod.ics(pl), media_type="text/calendar; charset=utf-8",
+                    headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/zones", response_class=HTMLResponse)

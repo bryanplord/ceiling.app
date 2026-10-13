@@ -13,7 +13,7 @@ def test_pages_render(tmp_path, monkeypatch):
     demo.seed(Store(tmp_path / "rx.db"), days=90, end=date.today())
     from rx.web.app import app
     c = TestClient(app)
-    for path in ("/", "/yesterday", "/recovery", "/progress", "/zones", "/trends", "/data", "/you", "/profile"):
+    for path in ("/", "/plan", "/yesterday", "/recovery", "/progress", "/zones", "/trends", "/data", "/you", "/profile"):
         r = c.get(path)
         assert r.status_code == 200, path
         assert "<h1" in r.text
@@ -72,3 +72,19 @@ def test_sync_button(tmp_path, monkeypatch):
     c = TestClient(app)
     r = c.post("/sync", follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"].startswith("/")
+
+
+def test_calendar_feed_needs_a_signed_key(tmp_path, monkeypatch):
+    monkeypatch.setenv("RX_DATA_DIR", str(tmp_path))
+    monkeypatch.delenv("RX_OPEN", raising=False)
+    monkeypatch.setenv("RX_SECRET", "x" * 40)
+    from rx.web import auth
+    monkeypatch.setenv("RX_USERS", "bryan@example.com=" + auth.hash_password("pw"))
+    demo.seed(Store(tmp_path / "rx.db"), days=90, end=date.today())
+    from rx.web.app import app
+    c = TestClient(app)
+    assert c.get("/plan.ics").status_code == 404
+    assert c.get("/plan.ics?k=nonsense").status_code == 404
+    r = c.get("/plan.ics?k=" + auth.sign("cal", "bryan@example.com", 3600))
+    assert r.status_code == 200 and "BEGIN:VEVENT" in r.text
+    assert c.get("/plan.ics?k=" + auth.sign("session", "bryan@example.com", 3600)).status_code == 404

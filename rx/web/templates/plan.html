@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block head %}
+<style>
+  .plan-h { font-size:clamp(40px, 6vw, 72px); margin:12px 0 0; }
+  .plan-note { color:var(--lichen); font-size:18px; line-height:1.5; max-width:62ch; margin:20px 0 0; text-wrap:pretty; }
+  .week { display:grid; grid-template-columns:repeat({{ plan.days|length or 1 }}, minmax(0, 1fr)); gap:0;
+          margin-top:44px; border-top:2px solid var(--ink); }
+  .day { padding:18px 16px 22px; border-right:1px solid var(--rule); min-height:300px; display:flex; flex-direction:column; }
+  .day:last-child { border-right:0; }
+  .day .wd { font-size:14px; font-weight:600; color:var(--lichen); }
+  .day .dn { font-size:34px; font-weight:600; font-stretch:125%; line-height:1.1; margin-top:2px; font-variant-numeric:tabular-nums; }
+  .day .dh, .day .db { display:flex; flex-direction:column; } .day .db { flex:1; }
+  .day .vbar { display:block; height:6px; margin:14px 0 12px; }
+  .day .kind { font-size:14px; font-weight:700; }
+  .day .ttl { font-size:16px; line-height:1.4; margin:4px 0 0; }
+  .day .why { font-size:13px; color:var(--lichen); margin:8px 0 0; line-height:1.4; }
+  .day .conf { margin-top:auto; padding-top:16px; font-size:12px; color:var(--lichen); }
+  .day.today .wd { color:var(--ink); }
+  .day.sketch { opacity:.55; }
+  .day details { margin-top:8px; }
+  .day summary { cursor:pointer; font-size:13px; color:var(--lichen); list-style:none; }
+  .day summary::-webkit-details-marker { display:none; }
+  .day details p { font-size:14px; line-height:1.45; margin:6px 0 0; }
+  .v-rest { background:#c9c9cd; } .v-light { background:#b3a6dc; } .v-easy { background:#7fa7d9; }
+  .v-steady { background:#46b07f; } .v-hard { background:#ec9550; }
+  .sub { margin-top:56px; padding-top:28px; border-top:1px solid var(--rule); max-width:640px; }
+  .sub h2 { color:var(--ink); font-size:20px; margin:0 0 8px; }
+  .sub p { color:var(--lichen); margin:0 0 16px; }
+  .sub .btns { display:flex; flex-wrap:wrap; gap:10px; }
+  .sub a.btn { text-decoration:none; font-size:15px; font-weight:600; padding:10px 16px; border:1px solid var(--ink); border-radius:8px; }
+  .sub a.btn:hover { background:var(--ink); color:#fff; }
+  .sub input { width:100%; font:inherit; font-size:13px; padding:10px 12px; border:1px solid var(--rule); border-radius:8px; margin-top:14px; color:var(--lichen); }
+  @media (max-width: 900px) {
+    .week { grid-template-columns:1fr; }
+    .day { min-height:0; border-right:0; border-bottom:1px solid var(--rule); flex-direction:row; gap:18px; padding:16px 0; }
+    .day .dh { width:56px; flex:none; }
+    .day .vbar { width:40px; margin:8px 0 0; }
+    .day .conf { padding-top:8px; }
+  }
+</style>
+{% endblock %}
+{% block body %}
+<h1 class="plan-h">The next {{ plan.horizon }} days</h1>
+<p class="plan-note">{{ plan.note }}</p>
+
+<div class="week">
+{% for d in plan.days %}{% set dd = date.fromisoformat(d.date) %}
+  <div class="day{{ ' today' if d.confidence == 'Today' }}{{ ' sketch' if d.confidence == 'Sketch' }}">
+    <div class="dh"><span class="wd">{{ 'Today' if d.confidence == 'Today' else dd.strftime('%a') }}</span>
+      <span class="dn">{{ dd.day }}</span><span class="vbar v-{{ d.verdict }}"></span></div>
+    <div class="db">{% set kind = {'rest':'Day off','light':'Walk','easy':'Easy','steady':'Steady','hard':'Hard'}[d.verdict] %}
+      <span class="kind">{{ kind }}</span>
+      {% if d.title != kind %}<p class="ttl">{{ d.title }}</p>{% endif %}
+      {% if d.reason and d.confidence != 'Today' %}<p class="why">{{ d.reason }}</p>{% endif %}
+      {% if d.verdict != 'rest' %}<details><summary>Details</summary><p>{{ d.detail }}</p></details>{% endif %}
+      <span class="conf">{{ d.confidence }}</span></div>
+  </div>
+{% endfor %}
+</div>
+
+<section class="sub">
+  <h2>Put it on your calendar</h2>
+  {% if feed %}
+  <p>Subscribe once and the plan shows up as all-day events. It changes when the plan changes. Apple Calendar checks about every hour; Google Calendar can take up to a day.</p>
+  <div class="btns">
+    <a class="btn" href="webcal://{{ feed }}">Apple Calendar</a>
+    <a class="btn" href="https://calendar.google.com/calendar/r?cid={{ ('webcal://' ~ feed) | urlencode }}" target="_blank" rel="noopener">Google Calendar</a>
+  </div>
+  <input readonly value="https://{{ feed }}" onclick="this.select()" aria-label="Calendar link">
+  <p style="margin-top:10px;font-size:14px">The link is private to you. Anyone with it can see your plan, so don't share it.</p>
+  {% else %}
+  <p>Sign in to get your private calendar link.</p>
+  {% endif %}
+</section>
+{% endblock %}
