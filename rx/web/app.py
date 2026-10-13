@@ -231,6 +231,34 @@ def zones(request: Request):
     return _page(request, "zones.html", hr=hr, pw=pw, trend=dist.trend_chart)
 
 
+@app.get("/data", response_class=HTMLResponse)
+def data_page(request: Request):
+    """What Ceiling actually received, day by day. For checking a missing night."""
+    import json as _json
+    store = open_store()
+    since = (local_today() - timedelta(days=9)).isoformat()
+    rows = []
+    for r in store.wellness_raw(since):
+        raw = {}
+        try:
+            raw = _json.loads(r["raw"]) if r["raw"] else {}
+        except ValueError:
+            pass
+        rows.append({"date": r["date"], "source": r["source"], "hrv": r["hrv"], "rhr": r["rhr"],
+                     "score": r["sleep_score"],
+                     "sleep": (f"{int(r['sleep_secs'] // 3600)}h {int(r['sleep_secs'] % 3600 // 60):02d}m"
+                               if r["sleep_secs"] else None),
+                     "updated": raw.get("updated"),
+                     "fields": ", ".join(sorted(k for k, v in raw.items() if v not in (None, "", [], 0)))})
+    have = {r["date"] for r in rows}
+    days = [(local_today() - timedelta(days=i)).isoformat() for i in range(10)]
+    last = store.get_meta("last_sync")
+    return _page(request, "data.html", rows=rows, missing=[d for d in days if d not in have],
+                 today=local_today().isoformat(), state=store.get_meta("sync_state") or "",
+                 progress=store.get_meta("sync_progress") or "",
+                 last=int((time.time() - float(last)) / 60) if last and float(last) > 0 else None)
+
+
 @app.get("/trends", response_class=HTMLResponse)
 def trends_page(request: Request):
     from .. import trends as tr

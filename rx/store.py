@@ -223,6 +223,12 @@ class Store:
         )
         self.db.commit()
 
+    def wellness_raw(self, since: str) -> list:
+        """Every source's row as received, for the Data page."""
+        return list(self.db.execute(
+            "SELECT date, source, hrv, rhr, sleep_score, sleep_secs, raw FROM wellness WHERE date >= ? "
+            "ORDER BY date DESC, source", (since,)))
+
     # -- reads ----------------------------------------------------------
     def activities(self, since: str | None = None) -> list[Activity]:
         q = "SELECT * FROM activities"

@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block head %}
+<style>
+  main.narrow { max-width:1100px; }
+  .dt { width:100%; border-collapse:collapse; font-size:15px; font-variant-numeric:tabular-nums; }
+  .dt th { text-align:left; color:var(--lichen); font-weight:600; padding:10px 12px 10px 0; border-bottom:2px solid var(--ink); }
+  .dt td { padding:12px 12px 12px 0; border-bottom:1px solid var(--rule); vertical-align:top; }
+  .dt td.f { color:var(--lichen); font-size:13px; max-width:380px; }
+  .no { color:var(--bad); font-weight:650; }
+  .ok { color:var(--good); font-weight:650; }
+  .note { font-size:17px; max-width:64ch; }
+  .scroll { overflow-x:auto; }
+</style>
+{% endblock %}
+{% block body %}
+<h1>Data</h1>
+<p class="note">What Ceiling has received from intervals.icu for the last 10 days. Last sync {{ 'never' if last is none else (last ~ ' min ago') }}: {{ state }}{% if progress %} ({{ progress }}){% endif %}.</p>
+{% set t = rows | selectattr('date', 'equalto', today) | list %}
+{% if not t or not (t[0].sleep or t[0].hrv) %}
+<p class="note no">Nothing for last night yet ({{ today }}). If last night shows on intervals.icu's Wellness page, the API isn't passing it to Ceiling. If it isn't on intervals.icu either, Garmin hasn't sent it there yet.</p>
+{% else %}
+<p class="note ok">Last night is in: {{ t[0].sleep or 'no duration' }}, HRV {{ t[0].hrv or '—' }}, resting HR {{ t[0].rhr or '—' }}.</p>
+{% endif %}
+<div class="scroll">
+<table class="dt">
+  <tr><th>Morning of</th><th>Source</th><th>Sleep</th><th>Score</th><th>HRV</th><th>Resting HR</th><th>Updated at source</th><th>Fields received</th></tr>
+  {% for r in rows %}
+  <tr><td>{{ r.date }}</td><td>{{ r.source }}</td><td>{{ r.sleep or '—' }}</td><td>{{ r.score or '—' }}</td>
+      <td>{{ r.hrv or '—' }}</td><td>{{ r.rhr or '—' }}</td><td>{{ r.updated or '—' }}</td><td class="f">{{ r.fields }}</td></tr>
+  {% endfor %}
+  {% for d in missing %}<tr><td>{{ d }}</td><td colspan="7" class="no">No row received</td></tr>{% endfor %}
+</table>
+</div>
+{% endblock %}
