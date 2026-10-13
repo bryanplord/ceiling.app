@@ -88,11 +88,11 @@ def _refresh_in_background() -> None:
             from ..sources import intervals
             store = open_store()
             last = float(store.get_meta("last_sync") or 0)
-            if time.time() - last < REFRESH_EVERY_S:
-                return
             # Backfill a year until a backfill has actually brought data in; an empty
-            # pull (source not ready yet) must not mark history as done.
+            # pull (source not ready yet) must not mark history as done or wait an hour.
             backfilled = store.get_meta("backfilled") == "1"
+            if backfilled and time.time() - last < REFRESH_EVERY_S:
+                return
             days = 3 if backfilled else 365
             store.set_meta("sync_state", f"running since {int(time.time())}")
             client = intervals.IntervalsClient(key, os.getenv("INTERVALS_ATHLETE_ID", "0"))
