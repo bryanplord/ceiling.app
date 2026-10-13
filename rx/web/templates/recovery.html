@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block body %}
+{% set last = days[-1] %}
+<h1>{% if last.reds %}Not recovered.{% elif last.ambers %}Partly recovered.{% elif last.known %}Recovered.{% else %}No data yet.{% endif %}</h1>
+
+<h2>Last night</h2>
+{% for s in last.signals %}
+<div class="row"><span><span class="dot {{ s.status }}"></span>{{ s.name }}</span><span class="muted">{{ s.detail }}</span></div>
+{% endfor %}
+
+<h2>Last 30 days</h2>
+{% for r in days | reverse %}
+<div class="row num">
+  <span>{{ r.date }}</span>
+  <span>{% for s in r.signals %}<span class="dot {{ s.status }}" title="{{ s.name }}: {{ s.detail }}"></span>{% endfor %}</span>
+</div>
+{% endfor %}
+<p class="muted">Dots: HRV, resting HR, sleep. Each judged against your own 60-day normal.</p>
+{% endblock %}

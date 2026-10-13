@@ -1,0 +1,51 @@
+# Rx
+
+A daily training prescription built from your own data: what to do today, how well you did it, whether you're recovering, and what tomorrow looks like.
+
+Read [docs/SPEC.md](docs/SPEC.md) first.
+
+## Layout
+```
+rx/
+  config.py           settings from .env
+  store.py            SQLite store (activities, HR streams, wellness)
+  sources/
+    intervals.py      intervals.icu API (personal API key)
+    garmin.py         python-garminconnect (unofficial; personal use only)
+  analysis/
+    hr.py             stream cleaning, credible max HR, threshold HR, zones
+    load.py           TRIMP, fatigue / fitness / form
+    recovery.py       HRV, resting HR, sleep vs personal baseline
+  prescribe/
+    engine.py         verdict + five-part prescription + if/then
+    score.py          how well a session followed the prescription
+  web/
+    app.py            FastAPI web app (Today, Yesterday, Recovery, Profile)
+    templates/        Jinja templates, no build step
+  cli.py              sync / profile / today / score / serve
+tests/                pytest, synthetic data only
+```
+
+## Setup
+```
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e ".[garmin,dev]"
+cp .env.example .env      # add your intervals.icu API key
+```
+
+## Use
+```
+rx sync --days 365        # pull from intervals.icu
+rx garmin-login           # optional, personal only: one-time Garmin login (you type your password)
+rx sync --source garmin --days 60
+rx profile                # max HR, threshold, zones, baselines
+rx today                  # today's prescription
+rx score <activity_id>    # how well a session followed the prescription
+rx serve                  # web app at http://127.0.0.1:8000
+pytest
+```
+
+## Ground rules
+- Every physiological number is derived from the athlete's data. No device zones, no age formulas.
+- The engine is deterministic and tested. Copy may be LLM-polished later; numbers never.
+- Never commit `.env`, `data/`, or Garmin tokens.

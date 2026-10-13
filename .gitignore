@@ -1,0 +1,9 @@
+.env
+data/
+*.db
+.garminconnect/
+garmin_tokens.json
+__pycache__/
+*.egg-info/
+.venv/
+.pytest_cache/

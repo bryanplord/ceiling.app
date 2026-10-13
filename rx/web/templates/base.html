@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rx</title>
+<style>
+  :root { --fg:#111; --muted:#6e6e73; --line:#e5e5ea; --bg:#fff;
+          --green:#1f9d55; --amber:#c27c0e; --red:#d0342c; --unknown:#aeaeb2; }
+  @media (prefers-color-scheme: dark) {
+    :root { --fg:#f5f5f7; --muted:#98989d; --line:#2c2c2e; --bg:#000; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font:17px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif; }
+  nav { display:flex; gap:24px; padding:20px 24px; font-size:15px; }
+  nav a { color:var(--muted); text-decoration:none; }
+  nav a.on { color:var(--fg); font-weight:600; }
+  main { max-width:760px; margin:0 auto; padding:48px 24px 96px; }
+  h1 { font-size:clamp(48px, 11vw, 96px); line-height:1.02; letter-spacing:-0.035em;
+       font-weight:800; margin:0 0 40px; text-wrap:balance; }
+  h2 { font-size:13px; text-transform:uppercase; letter-spacing:0.08em; color:var(--muted);
+       font-weight:600; margin:48px 0 8px; }
+  .big { font-size:clamp(24px, 5vw, 32px); line-height:1.25; font-weight:600;
+         letter-spacing:-0.015em; text-wrap:pretty; margin:0; }
+  .muted { color:var(--muted); }
+  .row { display:flex; justify-content:space-between; gap:16px; padding:14px 0;
+         border-bottom:1px solid var(--line); }
+  .dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:8px; }
+  .green{background:var(--green)} .amber{background:var(--amber)}
+  .red{background:var(--red)} .unknown{background:var(--unknown)}
+  ul { padding-left:20px; margin:8px 0 0; } li { margin:4px 0; }
+  .num { font-variant-numeric:tabular-nums; }
+</style>
+</head>
+<body>
+<nav>
+  <a href="/" class="{{ 'on' if active=='today' }}">Today</a>
+  <a href="/yesterday" class="{{ 'on' if active=='yesterday' }}">Yesterday</a>
+  <a href="/recovery" class="{{ 'on' if active=='recovery' }}">Recovery</a>
+  <a href="/profile" class="{{ 'on' if active=='profile' }}">Profile</a>
+</nav>
+<main>{% block body %}{% endblock %}</main>
+</body>
+</html>

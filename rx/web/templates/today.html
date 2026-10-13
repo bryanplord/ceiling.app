@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>{{ rx.headline }}</h1>
+
+<h2>Do</h2>
+<p class="big">{{ rx.do }}</p>
+{% if rx.steps %}<ul>{% for s in rx.steps %}<li>{{ s }}</li>{% endfor %}</ul>{% endif %}
+
+<h2>Don't</h2>
+<p class="big">{{ rx.dont }}</p>
+
+<h2>Why</h2>
+{% for w in rx.why %}<p>{{ w }}</p>{% endfor %}
+
+<h2>Tonight</h2>
+<p>{{ rx.tonight }}</p>
+
+{% if rx.scenarios %}
+<h2>If / then</h2>
+{% for s in rx.scenarios %}<p>{{ s }}</p>{% endfor %}
+{% endif %}
+
+{% for n in rx.notes %}<p class="muted">{{ n }}</p>{% endfor %}
+{% endblock %}

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block body %}
+{% if sessions %}
+  {% set best = sessions | selectattr(1) | map(attribute=1) | map(attribute='score') | list %}
+  <h1>{{ best | max if best else '—' }}%</h1>
+{% else %}
+  <h1>No sessions.</h1>
+{% endif %}
+
+<h2>Prescribed</h2>
+<p class="big">{{ rx.do }}</p>
+
+{% for a, s in sessions %}
+<h2>{{ a.name or a.sport }}</h2>
+{% if s %}
+  <p class="big">{{ s.summary }}</p>
+  <p>{{ s.cost }}</p>
+{% else %}
+  <p class="muted">No heart-rate data for this session.</p>
+{% endif %}
+{% endfor %}
+<p class="muted">{{ day }}</p>
+{% endblock %}
