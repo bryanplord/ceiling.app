@@ -18,7 +18,7 @@ from .. import dashboard, story as storymod
 from ..analysis import sleep as sleepmod
 from ..analysis import distribution as dist
 from .. import profile as prof
-from ..service import current_owner, owner_of, cached, peek, plan_history, plan_with_changes, open_store, profile_for, recovery_history, scored_day, today_rx
+from ..service import today_after, current_owner, owner_of, cached, peek, plan_history, plan_with_changes, open_store, profile_for, recovery_history, scored_day, today_rx
 from ..clock import local_today
 from . import auth
 
@@ -139,7 +139,14 @@ def _refresh_in_background(force: bool = False, owner: str | None = None) -> Non
             backfilled = store.get_meta("backfilled") == "1"
             # Mornings: until last night's sleep/HRV has landed, check every 10 minutes.
             # Garmin only uploads it once the watch syncs to the phone.
-            every = REFRESH_EVERY_S if _have_last_night(store) else MORNING_EVERY_S
+            # Daytime (6 AM to 10 PM): every 15 minutes, so a workout shows up soon after
+            # your watch syncs. Overnight: hourly. Mornings: every 10 until last night lands.
+            from datetime import datetime as _dt
+            from zoneinfo import ZoneInfo as _Z
+            from ..config import settings as _settings
+            hour = _dt.now(_Z(_settings().tz)).hour
+            every = (MORNING_EVERY_S if not _have_last_night(store)
+                     else 15 * 60 if 6 <= hour < 22 else REFRESH_EVERY_S)
             if backfilled and not force and time.time() - last < every:
                 return
             days = 3 if backfilled else 365
@@ -267,7 +274,12 @@ def today(request: Request, d: str | None = None):
     mins_ago = int((time.time() - float(last)) / 60) if last and float(last) > 0 else None
     lk = _sync_locks.get(current_owner.get())
     syncing = bool(lk and lk.locked())   # only a sync actually in progress; never a stale flag
+    from .. import journal as jr
+    entry = jr.load(store, rx.date)
+    after = today_after(store, p, rx)
+    pats = cached(store, "patterns", rx.date, lambda: jr.patterns(store, p.wellness))
     return _page(request, "today.html", rx=rx, waiting=not _have_last_night(store), updated=mins_ago,
+                 after=after, entry=entry, entry_tags=jr.label(entry["tags"]) if entry else [], patterns=pats,
                  syncing=syncing, d=dash, p=p, recent=recent,
                  spark=dashboard.spark, room=dashboard.room(rx, p, *cached(store, "hrhist", rx.date, lambda: dist.hr_histogram(store, p))),
                  st=st, hist=storymod.history_chart(st),
@@ -378,6 +390,16 @@ def data_page(request: Request, msg: str | None = None):
                  owner=owner, connected=connected, msg=msg,
                  athlete=store.get_meta("intervals_athlete") or "",
                  empty=not (store.counts()["activities"] or store.counts()["wellness"]))
+
+
+@app.post("/journal")
+async def journal_save(request: Request):
+    from .. import journal as jr
+    form = parse_qs((await request.body()).decode())
+    text = (form.get("text", [""])[0] or "").strip()
+    if text:
+        jr.save(open_store(), local_today().isoformat(), text)
+    return RedirectResponse("/#journal", status_code=303)
 
 
 @app.post("/connect")

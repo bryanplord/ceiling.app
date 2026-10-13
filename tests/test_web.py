@@ -127,3 +127,17 @@ def test_api_keys_are_sealed(monkeypatch):
     sealed = auth.seal("my-secret-key")
     assert "my-secret-key" not in sealed and auth.unseal(sealed) == "my-secret-key"
     assert auth.unseal(sealed[:-2] + "AA") == ""
+
+
+def test_journal_changes_tomorrow(tmp_path, monkeypatch):
+    monkeypatch.setenv("RX_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("RX_OPEN", "1")
+    monkeypatch.delenv("INTERVALS_API_KEY", raising=False)
+    demo.seed(Store(tmp_path / "rx.db"), days=90, end=date.today())
+    from rx.web.app import app
+    c = TestClient(app)
+    r = c.post("/journal", content="text=4+IPAs+and+pizza", headers={"Content-Type": "application/x-www-form-urlencoded"})
+    assert r.status_code in (200, 303)
+    page = c.get("/").text
+    assert "4 drinks" in page and "Ate poorly" in page
+    assert "Tomorrow" in page

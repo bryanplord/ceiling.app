@@ -223,3 +223,44 @@ def plan_history(store: Store, days: int = 7):
                    head=head)
         out.append(row)
     return out
+
+
+def today_after(store: Store, p, rx) -> dict | None:
+    """Once today's session has synced: what you did against what was prescribed, and
+    tomorrow re-decided from what you actually did (and tonight's journal)."""
+    from .prescribe import engine as eng
+    from .prescribe.score import score
+    from .workouts import grade, zone_minutes, bands
+    from . import journal as jr
+    acts = [a for a in p.activities if a.date == rx.date and (a.moving_s or 0) >= 10 * 60]
+    entry = jr.load(store, rx.date)
+    cap, note = jr.effect(entry["tags"]) if entry else (None, "")
+    if not acts and not cap:
+        return None
+    out = {"sessions": [], "journal_note": note}
+    load = 0.0
+    for a in acts:
+        load += p.session_load.get(a.id, 0.0) or eng._est_load(p, (a.moving_s or 0) / 60, a.avg_hr or 0)
+        h, m = divmod(round((a.moving_s or 0) / 60), 60)
+        row = {"name": a.name or a.sport.capitalize(), "dur": f"{h}h {m:02d}m" if h else f"{m} min",
+               "avg": round(a.avg_hr) if a.avg_hr else None, "grade": None}
+        st = store.stream(a.id) if a.sport != "walk" else None
+        if st:
+            sc = score(rx, st[0], st[1], a.sport)
+            g, tone = grade(sc.score)
+            mins = zone_minutes(p, st[0], st[1])
+            tot = sum(mins) or 1
+            row.update(grade=g, tone=tone, summary=sc.summary, cost=sc.cost,
+                       zones=[(n, c, round(mm), mm / tot * 100) for (n, c, _, _), mm in zip(bands(p), mins)])
+        out["sessions"].append(row)
+    nxt = (date.fromisoformat(rx.date) + timedelta(days=1)).isoformat()
+    planned = eng._next_verdict(p, rx, eng._rx_load(p, rx))
+    now = eng._next_verdict(p, rx, load) if acts else planned
+    why = ""
+    if cap and eng.ORDER.index(now) > eng.ORDER.index(cap):
+        now, why = cap, "because of what you logged tonight"
+    elif acts and now != planned:
+        why = "because of what you actually did today"
+    out.update(tomorrow=eng._session_short(p, now, nxt), changed=now != planned, why=why,
+               was=eng._session_short(p, planned, nxt) if now != planned else "", done=bool(acts))
+    return out
