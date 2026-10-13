@@ -40,6 +40,17 @@
   .tmr .t-bad { border-left-color:var(--ceiling); } .tmr .t-bad dt { color:var(--ceiling); }
   .tmr .t-muted dt { color:var(--lichen); }
   .rxl .steps { margin:0; font-size:18px; }
+  .rowd { border-bottom:1px solid var(--rule); }
+  .rowd > summary { display:grid; grid-template-columns:110px 1fr 18px; gap:20px; padding:16px 0; cursor:pointer; list-style:none; align-items:start; }
+  .rowd > summary::-webkit-details-marker { display:none; }
+  .rowd .chev { width:8px; height:8px; margin-top:12px; border-right:1.5px solid #b9b9be; border-bottom:1.5px solid #b9b9be;
+                transform:rotate(45deg); transition:transform .15s; justify-self:end; }
+  .rowd[open] .chev { transform:rotate(-135deg); margin-top:16px; }
+  .rowd > summary:hover .chev { border-color:var(--ink); }
+  .rowb { padding:0 38px 18px 130px; }
+  .rowb > :first-child { margin-top:0; }
+  @media (max-width:900px) { .rowd > summary { grid-template-columns:1fr 18px; gap:6px 12px; } .rowd > summary .rxk { grid-column:1 / -1; }
+    .rowb { padding:0 0 18px; } }
   .more { margin-top:8px; }
   .more summary { cursor:pointer; font-size:15px; font-weight:600; color:var(--lichen); list-style:none; display:inline-flex; gap:6px; align-items:center; }
   .more summary::-webkit-details-marker { display:none; }
@@ -205,24 +216,19 @@
     <h1 class="verdict">{{ rx.headline }}</h1>
     {% if rx.diagnosis %}<p class="diag">{{ rx.diagnosis }}</p>{% endif %}
     <div class="pad">
-      <div class="rxl"><span class="rxk">What</span>
-        <div class="rxv"><p class="rxv strong">{{ rx.what or rx.do }}</p>
-        {% if rx.activity_why %}<details class="more"><summary>Why this activity</summary><p class="actwhy">{{ rx.activity_why }}</p></details>{% endif %}</div></div>
-      <div class="rxl"><span class="rxk">How</span>
-        <div class="rxv"><p class="rxv">{{ rx.how_short }}</p>
-        {% if rx.how_more %}<details class="more"><summary>More</summary><ul class="rxlist">{% for h in rx.how_more %}<li>{{ h }}</li>{% endfor %}</ul></details>{% endif %}</div></div>
-      {% if rx.reading %}{% set ws = rx.why_says.split('. ') %}<div class="rxl"><span class="rxk">Why</span>
-        <div class="rxv"><p class="rxv"><b>{{ rx.why_need }}</b> {{ rx.why_story }}</p>
-          <details class="more"><summary>The numbers</summary><p class="whyhead rest"><b class="{{ rx.why_tone }}">{{ rx.why_title }}.</b> {{ rx.why_says }}</p>
+      <details class="rowd"><summary><span class="rxk">What</span><p class="rxv strong">{{ rx.what or rx.do }}</p><i class="chev" aria-hidden="true"></i></summary>
+        <div class="rowb">{% if rx.activity_why %}<p class="actwhy">{{ rx.activity_why }}</p>{% endif %}</div></details>
+      <details class="rowd"><summary><span class="rxk">How</span><p class="rxv">{{ rx.how_short }}</p><i class="chev" aria-hidden="true"></i></summary>
+        <div class="rowb"><ul class="rxlist">{% for h in rx.how_more %}<li>{{ h }}</li>{% endfor %}</ul></div></details>
+      {% if rx.reading %}<details class="rowd"><summary><span class="rxk">Why</span><p class="rxv"><b>{{ rx.why_need }}</b> {{ rx.why_story }}</p><i class="chev" aria-hidden="true"></i></summary>
+        <div class="rowb"><p class="whyhead"><b class="{{ rx.why_tone }}">{{ rx.why_title }}.</b> {{ rx.why_says }}</p>
           <ul class="rxlist facts">{% for e in rx.reading.evidence[:4] %}<li><b>{{ e.name }}</b> {{ e.line.split('. ')[0].rstrip('.') }}.</li>{% endfor %}
-          {% if rx.sleep and rx.sleep.state not in ('even', 'unknown', 'surplus') %}{% set sd = rx.sleep.says.split('. ')[0].rstrip('.') %}<li><b>Sleep debt</b> {{ sd[:1] | upper }}{{ sd[1:] }}.</li>{% endif %}</ul></details></div></div>{% endif %}
-      {% if rx.minimum %}{% set ms = rx.minimum.split('. ') %}<div class="rxl"><span class="rxk">Minimum</span>
-        <div class="rxv"><p class="rxv">{{ ms[0].rstrip('.') }}.</p>
-        {% if ms|length > 1 %}<details class="more"><summary>More</summary><p class="actwhy">{{ ms[1:]|join('. ') }}</p></details>{% endif %}</div></div>{% endif %}
-      {% if rx.tomorrow %}<div class="rxl"><span class="rxk">Tomorrow</span>
-        <div class="rxv"><p class="rxv">{{ rx.tomorrow_short }}</p>
-        <details class="more"><summary>Full session, and if you overdo or skip today</summary><dl class="tmr">{% for label, tone, text in rx.tomorrow %}<div class="t-{{ tone }}"><dt>{{ label }}</dt><dd>{{ text }}</dd></div>{% endfor %}</dl>
-        <p class="actwhy">Assumes a normal night. Re-read tomorrow morning with your sleep and HRV.</p></details></div></div>{% endif %}
+          {% if rx.sleep and rx.sleep.state not in ('even', 'unknown', 'surplus') %}{% set sd = rx.sleep.says.split('. ')[0].rstrip('.') %}<li><b>Sleep debt</b> {{ sd[:1] | upper }}{{ sd[1:] }}.</li>{% endif %}</ul></div></details>{% endif %}
+      {% if rx.minimum %}{% set ms = rx.minimum.split('. ') %}<details class="rowd"><summary><span class="rxk">Minimum</span><p class="rxv">{{ ms[0].rstrip('.') }}.</p><i class="chev" aria-hidden="true"></i></summary>
+        <div class="rowb"><p class="actwhy">{{ ms[1:]|join('. ') }}</p></div></details>{% endif %}
+      {% if rx.tomorrow %}<details class="rowd"><summary><span class="rxk">Tomorrow</span><p class="rxv">{{ rx.tomorrow_short }}</p><i class="chev" aria-hidden="true"></i></summary>
+        <div class="rowb"><dl class="tmr">{% for label, tone, text in rx.tomorrow %}<div class="t-{{ tone }}"><dt>{{ label }}</dt><dd>{{ text }}</dd></div>{% endfor %}</dl>
+        <p class="actwhy">Assumes a normal night. Re-read tomorrow morning with your sleep and HRV.</p></div></details>{% endif %}
       {% if rx.sleep and rx.sleep.lights_out %}<div class="rxl"><span class="rxk">Tonight</span><p class="rxv">In bed by <b>{{ rx.sleep.lights_out }}</b> for {{ rx.sleep_if[0][0][9:] if rx.sleep_if else '' }} of sleep. Do that, and {{ rx.sleep_if[0][2] if rx.sleep_if }}.</p></div>{% endif %}
     </div>
   </div>
