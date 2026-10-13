@@ -370,9 +370,10 @@ def room(rx: Rx, p: Profile, hist=None, usual: float | None = None, mode: str = 
     knee = max(floor + 10, min(band_lo, p.zones.bottom("Z2 Aerobic")) - 20)
     W, H, T, B = 640, 780, 24, 752
     KY = B - (B - T) * 0.09
-    L0, L1 = 0, 296                 # zones panel
-    SX = 320                        # spine (numbers) centre
-    R0, R1 = 344, 640               # where-you-trained panel
+    AX = 40                         # heart-rate numbers, right-aligned here
+    L0, L1 = 52, 296                # zones panel
+    SC = 330                        # the day's slider
+    R0, R1 = 368, 640               # where-you-trained panel
     segs = [(knee, band_lo, 1.0), (band_lo, c, 2.6), (c, top, 1.0)]
     units = sum((bb - aa) * w for aa, bb, w in segs if bb > aa)
 
@@ -406,9 +407,8 @@ def room(rx: Rx, p: Profile, hist=None, usual: float | None = None, mode: str = 
     o = [f'<svg class="room" viewBox="0 0 {W} {H}" role="img" '
          f'aria-label="Your heart today: {band_lo} to {c}. Resting {rest}, max {mx}.">']
 
-    # today's band across the whole chart, behind everything
-
-    # LEFT: zones, colored, labels reading out from the spine
+    # ZONES, colored and named
+    bounds = []
     for i, (name, zlo, zhi) in enumerate(p.zones.bounds):
         za = floor if i == 0 else max(zlo, floor)
         zb = min(zhi + 1, top)
@@ -416,30 +416,33 @@ def room(rx: Rx, p: Profile, hist=None, usual: float | None = None, mode: str = 
             continue
         y1, y2 = Y(zb), Y(za)
         o.append(f'<rect class="zf z{i + 1}" x="{L0}" y="{y1:.1f}" width="{L1 - L0}" height="{y2 - y1:.1f}"/>')
-        o.append(f'<rect class="zs z{i + 1}" x="{L1 - 4}" y="{y1:.1f}" width="4" height="{max(1, y2 - y1 - 1):.1f}"/>')
-        ya, yb2 = Y(za), Y(zb)
-        if ya - yb2 >= 16:
-            o.append(f'<text class="zn" x="{L0 + 14}" y="{(ya + yb2) / 2 + 5:.1f}">{ZONE_SHORT.get(name, name)}</text>')
+        if y2 - y1 >= 16:
+            o.append(f'<text class="zn" x="{L0 + 14}" y="{(y1 + y2) / 2 + 5:.1f}">{ZONE_SHORT.get(name, name)}</text>')
+        if i > 0:
+            bounds.append(zlo)
 
-    # SPINE: the numbers
-    last_y = None
-    aim_ = round((band_lo + c) / 2) if lo is not None else None
-    keep = {band_lo, c} | ({aim_} if aim_ else set())
-    ticks = sorted({*range((knee // 10 + 1) * 10, top, 10)} | keep)
-    ticks = [v for v in ticks if v in keep or all(abs(Y(v) - Y(k)) >= 22 for k in keep)]
-    for v in ticks:
-        y = Y(v)
-        if last_y is not None and abs(last_y - y) < 14 and v not in keep:
-            continue
-        cls = "tick aim" if v == aim_ else ("tick strong" if v in keep else "tick")
-        o.append(f'<text class="{cls}" x="{SX}" y="{y + 5:.1f}" text-anchor="middle">{v}</text>')
-        last_y = y
+    # NUMBERS on the left: every zone edge, resting and max, and round tens where there's room
+    edges = [rest, *bounds, mx]
+    nums = list(edges)
+    for v in range((knee // 10 + 1) * 10, top, 10):
+        if all(abs(Y(v) - Y(e)) >= 24 for e in nums):
+            nums.append(v)
+    for v in sorted(nums):
+        cls = "tick strong" if v in bounds else "tick"
+        o.append(f'<text class="{cls}" x="{AX}" y="{Y(v) + 4.5:.1f}" text-anchor="end">{v}</text>')
     if mode == "stretch":
-        o.append(f'<path class="brk" d="M{SX - 10},{KY + 3:.1f} l5,-5 l5,5 l5,-5 l5,5"/>')
-    o.append(f'<line class="ref" x1="0" x2="{W}" y1="{Y(mx):.1f}" y2="{Y(mx):.1f}"/>')
-    o.append(f'<text class="reft" x="{W}" y="{Y(mx) - 6:.1f}" text-anchor="end">your max {mx}</text>')
-    o.append(f'<line class="ref" x1="0" x2="{W}" y1="{Y(rest):.1f}" y2="{Y(rest):.1f}"/>')
-    o.append(f'<text class="reft" x="{W}" y="{Y(rest) - 6:.1f}" text-anchor="end">resting {rest}</text>')
+        o.append(f'<path class="brk" d="M{AX - 20},{KY + 3:.1f} l5,-5 l5,5 l5,-5 l5,5"/>')
+    o.append(f'<line class="ref" x1="{L0}" x2="{W}" y1="{Y(mx):.1f}" y2="{Y(mx):.1f}"/>')
+    o.append(f'<text class="reft" x="{W}" y="{Y(mx) - 6:.1f}" text-anchor="end">your max</text>')
+    o.append(f'<line class="ref" x1="{L0}" x2="{W}" y1="{Y(rest):.1f}" y2="{Y(rest):.1f}"/>')
+    o.append(f'<text class="reft" x="{W}" y="{Y(rest) - 6:.1f}" text-anchor="end">resting</text>')
+
+    # SLIDER: a track from resting to max, and today's range as the fixed thumb
+    o.append(f'<rect class="track" x="{SC - 4}" y="{Y(mx):.1f}" width="8" height="{Y(rest) - Y(mx):.1f}" rx="4"/>')
+    o.append(f'<rect class="thumb" x="{SC - 14}" y="{yt:.1f}" width="28" height="{yb - yt:.1f}" rx="14"/>')
+    if lo is not None:
+        ym = Y(round((band_lo + c) / 2))
+        o.append(f'<line class="notch" x1="{SC - 7}" x2="{SC + 7}" y1="{ym:.1f}" y2="{ym:.1f}"/>')
 
     # RIGHT: where you trained, a smooth curve colored by zone, full color inside today's band
     if hist is not None and hist.sum() > 0:
@@ -466,8 +469,8 @@ def room(rx: Rx, p: Profile, hist=None, usual: float | None = None, mode: str = 
         o.append(f'<path class="hl" d="{line}"/>')
         o.append(f'<text class="small" x="{R0}" y="{B + 18}">where you trained, last 4 weeks</text>')
         o.append(f'<text class="small" x="{L0}" y="{B + 18}">your zones</text>')
+        o.append(f'<text class="small" x="{SC}" y="{B + 18}" text-anchor="middle">today</text>')
 
-    # today's range: one outline across both sides, so a zone never looks like two
 
     # today's target: the number that matters, big, at its height; the range under it, small
     aim = round((band_lo + c) / 2) if lo is not None else c
