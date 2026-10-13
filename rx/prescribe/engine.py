@@ -200,7 +200,7 @@ def build_rx(p: Profile, day: str | None = None) -> Rx:
             dont = "No training at all today. Resting is the workout."
     elif verdict == EASY:
         low, ceiling = easy_band(z)
-        do = (f"{verb} easy, {mins} minutes max, heart rate {low}–{ceiling}. It should feel almost too easy.")
+        do = (f"{verb} easy, {mins} minutes max, heart rate {low}–{ceiling}. Easy enough to take a phone call the whole way without the other person hearing you breathe.")
         dont = f"Don't let the climbs drag you over {ceiling}. Shift down, spin, or walk them."
     elif verdict == STEADY:
         low, ceiling = z.bottom("Z2 Aerobic"), z.top("Z2 Aerobic")
@@ -642,12 +642,12 @@ def what_how(rx: Rx, kind: str | None, mins: int, low, ceiling, steps) -> tuple[
                "No riding, no running, no speed-walking to rack up steps."]
     elif v == EASY:
         what = f"An easy {noun}, {mins} minutes at {round((low + ceiling) / 2)} ({low}–{ceiling})."
-        how = [f"Hold {round((low + ceiling) / 2)}, never over {ceiling}. It should feel almost too easy.",
+        how = [f"Hold {round((low + ceiling) / 2)}, never over {ceiling}. Easy enough to take a phone call the whole way without the other person hearing you breathe.",
                f"On the climbs, shift down, spin or walk the steep pitches to stay in range."]
     elif v == STEADY:
         what = f"A steady {noun}, up to {mins} minutes at {round((low + ceiling) / 2)} ({low}–{ceiling})."
-        how = [f"Hold {round((low + ceiling) / 2)}, never over {ceiling}. All-day pace: you can "
-               f"talk, just not sing.",
+        how = [f"Hold {round((low + ceiling) / 2)}, never over {ceiling}. You could take a phone call, "
+               f"but you'd keep it short.",
                f"No chasing, no attacking climbs, no intervals."]
     else:
         what = f"A hard {noun}: 4 × 8 minutes at {low}–{ceiling - 3}, {mins} minutes total."
