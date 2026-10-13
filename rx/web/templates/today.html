@@ -80,6 +80,7 @@
   .env { font-size:19px; margin:0; max-width:56ch; } .env b { font-size:28px; font-weight:600; }
   .cv small { font-size:15px; color:var(--lichen); font-weight:500; }
   .card.dr { background:#fff; border:1px solid var(--rule); }
+  .card.t-good { background:#e6f4ec; } .card.t-ok { background:#fbf1dc; } .card.t-bad { background:#fde8e5; }
   .jr { margin-top:36px; }
   .jform { display:grid; gap:12px; }
   .jrow { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
@@ -107,18 +108,27 @@
   .jnote { font-size:16px; margin:12px 0 0; max-width:56ch; }
   .jpat { font-size:16px; margin:12px 0 0; }
   .jhint { color:var(--lichen); font-size:15px; margin:12px 0 0; max-width:56ch; }
-  .tiles { display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:0; margin:0 0 36px;
-           border-top:1px solid var(--rule); border-bottom:1px solid var(--rule); }
-  .tile { display:flex; flex-direction:column; gap:2px; padding:14px 14px 12px; text-decoration:none; border-right:1px solid var(--rule); min-width:0; }
-  .tile:last-child { border-right:0; }
-  .tile:hover { background:var(--frost); }
-  .tn { font-size:12px; font-weight:600; color:var(--lichen); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tiles { display:grid; grid-template-columns:repeat(auto-fit, minmax(132px, 1fr)); gap:10px; margin:0 0 40px; }
+  .tile { position:relative; display:flex; flex-direction:column; gap:2px; padding:14px 14px 12px; text-decoration:none;
+          border-radius:14px; min-width:0; background:var(--frost); color:var(--ink); transition:transform .15s ease; }
+  .tile:hover { transform:translateY(-2px); }
+  .tile.t-good { background:#e6f4ec; } .tile.t-ok { background:#fbf1dc; } .tile.t-bad { background:#fde8e5; }
+  .tile.t-good .tsp { color:var(--good); } .tile.t-ok .tsp { color:var(--warn); } .tile.t-bad .tsp { color:var(--bad); }
+  .tsp svg * { stroke:currentColor !important; } .tsp svg circle { fill:currentColor !important; }
+  .tile.day { color:#fff; }
+  .tile.day.v-rest { background:#8e8e93; } .tile.day.v-light { background:var(--s-rec); } .tile.day.v-easy { background:var(--s-end); }
+  .tile.day.v-steady { background:var(--s-aer); } .tile.day.v-hard { background:var(--s-thr); }
+  .tile.day .tn, .tile.day .ts { color:rgba(255,255,255,.88) !important; }
+  .tile.day .tv { font-size:28px; }
+  .tn { font-size:12px; font-weight:600; color:rgba(0,0,0,.55); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .tv { font-size:24px; font-weight:600; font-stretch:115%; line-height:1.15; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .ts { font-size:13px; font-weight:600; }
   .ts.good { color:var(--good); } .ts.ok { color:var(--warn); } .ts.bad { color:var(--bad); } .ts.none { color:var(--lichen); }
+  .batt { display:block; height:10px; margin-top:12px; border-radius:5px; background:rgba(0,0,0,.08); overflow:hidden; }
+  .batt i { display:block; height:100%; border-radius:5px; }
   .tsp svg { width:100%; height:26px; display:block; margin-top:6px; }
   @media (max-width:760px) { .tiles { display:flex; overflow-x:auto; scroll-snap-type:x mandatory; margin:0 -20px 28px; padding:0 20px; }
-    .tile { flex:0 0 42%; scroll-snap-align:start; } }
+    .tile { flex:0 0 40%; scroll-snap-align:start; } }
   .vrule { display:block; width:96px; height:6px; margin:18px 0 0; }
   .vrule.v-rest { background:#c9c9cd; } .vrule.v-light { background:var(--s-rec); } .vrule.v-easy { background:var(--s-end); }
   .vrule.v-steady { background:var(--s-aer); } .vrule.v-hard { background:var(--s-thr); }
@@ -293,18 +303,18 @@
 <p class="waiting">Waiting on last night's sleep and HRV. Open Garmin Connect on your phone so your watch syncs; Ceiling checks every 10 minutes. Until it lands, today is built from yesterday's data.</p>
 {% endif %}
 <nav class="tiles" aria-label="Your status">
-  <a class="tile" href="#rx"><span class="tn">Today</span><span class="tv">{{ {'rest':'Day off','light':'Walk','easy':'Easy','steady':'Steady','hard':'Hard'}[rx.verdict] }}</span><span class="ts {{ d.recovery.tone }}">{{ d.recovery.state }}</span></a>
-  {% if energy %}<a class="tile" href="#energy"><span class="tn">Energy</span><span class="tv">{{ energy.now }}</span><span class="ts {{ 'good' if energy.now >= 70 else 'ok' if energy.now >= 45 else 'bad' }}">Woke at {{ energy.wake }}</span><span class="tsp">{{ spark(energy.curve|map(attribute=1)|list, 120, 26) | safe }}</span></a>{% endif %}
+  <a class="tile day v-{{ rx.verdict }}" href="#rx"><span class="tn">Today</span><span class="tv">{{ {'rest':'Day off','light':'Walk','easy':'Easy','steady':'Steady','hard':'Hard'}[rx.verdict] }}</span><span class="ts {{ d.recovery.tone }}">{{ d.recovery.state }}</span></a>
+  {% if energy %}{% set et = 'good' if energy.now >= 60 else 'ok' if energy.now >= 35 else 'bad' %}<a class="tile t-{{ et }}" href="#energy"><span class="tn">Energy</span><span class="tv">{{ energy.now }}</span><span class="ts {{ et }}">Woke at {{ energy.wake }}</span><span class="batt"><i style="width:{{ energy.now }}%;background:{{ 'var(--s-aer)' if energy.now >= 60 else 'var(--s-tem)' if energy.now >= 35 else 'var(--ceiling)' }}"></i></span></a>{% endif %}
   {% set T = [(d.hrv, '/trends#hrv'), (d.rhr, '/trends#rhr'), (d.sleep, '/trends#sleep'), (d.freshness, '/trends#load'), (d.fitness, '/progress')] %}
   {% for m, href in T %}
-  <a class="tile" href="{{ href }}">
+  <a class="tile t-{{ m.tone }}" href="{{ href }}">
     <span class="tn">{{ m.name }}</span>
     <span class="tv">{{ m.value }}</span>
     <span class="ts {{ m.tone }}">{{ m.state }}</span>
     {% if m.series %}<span class="tsp">{{ spark(m.series[-30:], 120, 26, m.band) | safe }}</span>{% endif %}
   </a>
   {% endfor %}
-  {% if p.program %}<a class="tile" href="/plan"><span class="tn">Goal</span><span class="tv">{{ p.program.days_left if p.program.days_left is not none else '∞' }}</span><span class="ts none">{{ 'days to go' if p.program.days_left is not none else p.program.phase }}</span></a>{% endif %}
+  {% if p.program %}<a class="tile t-none" href="/plan"><span class="tn">Goal</span><span class="tv">{{ p.program.days_left if p.program.days_left is not none else '∞' }}</span><span class="ts none">{{ 'days to go' if p.program.days_left is not none else p.program.phase }}</span></a>{% endif %}
 </nav>
 <section class="hero" id="rx">
   <div>
@@ -322,8 +332,8 @@
     <p class="diag">{{ M.head }}</p>
     {% if M.zones %}<div class="azbar" aria-label="Time in each zone">{% for n, c, mm, sh in M.zones %}{% if sh > 0.5 %}<span class="{{ c }}" style="width:{{ sh }}%"><b>{% if sh > 9 %}{{ n }} {{ mm }}m{% endif %}</b></span>{% endif %}{% endfor %}</div>{% endif %}
     <div class="rf">
-      {% if M.right %}<div><p class="dlab">Right</p><ul class="rfl rgood">{% for x in M.right %}<li>{{ x }}</li>{% endfor %}</ul></div>{% endif %}
-      {% if M.fix %}<div><p class="dlab">To fix</p><ul class="rfl rbad">{% for x in M.fix %}<li>{{ x }}</li>{% endfor %}</ul></div>{% endif %}
+      {% if M.right %}<div><p class="dlab">What's good</p><ul class="rfl rgood">{% for x in M.right %}<li>{{ x }}</li>{% endfor %}</ul></div>{% endif %}
+      {% if M.fix %}<div><p class="dlab">What needs work</p><ul class="rfl rbad">{% for x in M.fix %}<li>{{ x }}</li>{% endfor %}</ul></div>{% endif %}
     </div>
     <p class="parts">Score: {% for k, v in M.parts.items() %}{{ k }} {{ v }}/{{ {'Ceiling':50,'Range':30,'Length':20}[k] }}{{ ', ' if not loop.last }}{% endfor %}.</p>
     {% if M.stats %}<div class="cards">{% for v, l, n in M.stats %}<div class="card"><span class="cl">{{ l }}</span><span class="cv">{{ v }}</span>{% if n %}<span class="cn">{{ n }}</span>{% endif %}</div>{% endfor %}</div>{% endif %}
@@ -334,9 +344,9 @@
     <p class="also">Also: {{ s2.name }}, {{ s2.dur }}{% if s2.score is not none %}, {{ s2.score }}% ({{ s2.word|lower }}){% endif %}.</p>
     {% endfor %}
     <div class="pad">
-      {% if after.more %}<details class="rowd"><summary><span class="rxk">Want more?</span><p class="rxv">{{ after.more.line }}</p><i class="chev" aria-hidden="true"></i></summary>
+      {% if after.more %}<details class="rowd" open><summary><span class="rxk">If you want more</span><p class="rxv">{{ after.more.line }}</p><i class="chev" aria-hidden="true"></i></summary>
         <div class="rowb"><dl class="tmr">{% for t, n, tone in after.more.ideas %}<div class="t-{{ 'good' if tone == 'good' else 'bad' }}"><dt>{{ t }}</dt><dd>{{ n }}</dd></div>{% endfor %}</dl></div></details>{% endif %}
-      {% if after.stop %}<div class="rxl"><span class="rxk">Stop here</span><p class="rxv">{{ after.stop }}</p></div>{% endif %}
+      {% if after.stop %}<div class="rxl"><span class="rxk">If you stop here</span><p class="rxv">{{ after.stop }}</p></div>{% endif %}
       <details class="rowd"><summary><span class="rxk">Tomorrow</span><p class="rxv">{{ ("Re-planned " ~ after.why ~ ": " ~ after.tomorrow) if after.changed else (after.tomorrow[:1]|upper ~ after.tomorrow[1:]) }}.</p><i class="chev" aria-hidden="true"></i></summary>
         <div class="rowb">{% if after.changed and after.was %}<p class="actwhy">This morning it was {{ after.was }}.</p>{% endif %}
         {% if rx.tomorrow %}<dl class="tmr">{% for label, tone, text in rx.tomorrow %}<div class="t-{{ tone }}"><dt>{{ label }}</dt><dd>{{ text }}</dd></div>{% endfor %}</dl>{% endif %}
@@ -395,7 +405,7 @@
     {% if energy %}<section class="en" id="energy">
       <p class="dlab">Energy</p>
       <p class="env"><b>{{ energy.now }}</b> now. You woke at {{ energy.wake }}. {{ energy.say }}</p>
-      <div class="cards">{% for n, pt, of, note in energy.parts %}<div class="card"><span class="cl">{{ n }}</span><span class="cv">{{ pt }}<small>/{{ of }}</small></span><span class="cn">{{ note }}</span></div>{% endfor %}
+      <div class="cards">{% for n, pt, of, note in energy.parts %}<div class="card t-{{ 'good' if pt >= of * 0.8 else 'ok' if pt >= of * 0.55 else 'bad' }}"><span class="cl">{{ n }}</span><span class="cv">{{ pt }}<small>/{{ of }}</small></span><span class="cn">{{ note }}</span></div>{% endfor %}
       {% for n, c in energy.drain if c > 0 %}<div class="card dr"><span class="cl">Drain: {{ n }}</span><span class="cv">−{{ c }}</span></div>{% endfor %}</div>
       <p class="parts">Ceiling's own formula: charged by sleep, HRV, resting HR and freshness; drained 2 an hour awake and a quarter of each session's load.</p>
     </section>{% endif %}

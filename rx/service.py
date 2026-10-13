@@ -290,7 +290,7 @@ def today_after(store: Store, p, rx) -> dict | None:
             if rv:
                 mins = zone_minutes(p, st[0], st[1])
                 tot = sum(mins) or 1
-                row.update(score=rv.score, word=rv.word, tone=rv.tone, head=rv.headline, right=rv.right,
+                row.update(target=rv.target, score=rv.score, word=rv.word, tone=rv.tone, head=rv.headline, right=rv.right,
                            fix=rv.fix, stats=rv.stats, parts=rv.parts,
                            zones=[(n, c, round(mm), mm / tot * 100) for (n, c, _, _), mm in zip(bands(p), mins)])
         out["sessions"].append(row)
@@ -319,65 +319,46 @@ def _aday(v: str) -> str:
 
 
 def _more_today(p, rx, load: float, done_min: int, tomorrow_now: str, nxt: str, main: dict | None = None) -> dict:
-    """If you want more today: what fits, and what it would do to tomorrow (run through the engine,
-    not guessed)."""
+    """If you want more today: a few ideas, and what each would do to tomorrow (run through the
+    engine, not guessed). Never framed as a gap: today's session is judged on what you picked."""
     from .prescribe import engine as eng
-    cap = rx.max_minutes or 60
-    left = cap - done_min
     ceil = rx.hr_ceiling or 130
-    ideas = []
-    if rx.verdict in (eng.REST, eng.LIGHT):
-        return {"left": 0, "ideas": [("A walk", "As long as you like, under " + str(ceil) + ". It's the only thing today was for.", "good")],
-                "line": "Nothing more today. Today was for recovering."}
+    easy_top = eng.easy_band(p.zones)[1]
     hot = main and main.get("score") is not None and main["parts"]["Ceiling"] < 30
-    if hot and rx.verdict != eng.HARD:
-        return {"left": 0, "ideas": [
-            ("A walk, or 15 minutes of mobility", "Free: no cost to tomorrow.", "good"),
-            (f"Not: more time over {ceil}", f"You've already had today's intensity and then some. More of it comes out of tomorrow.", "bad")],
-            "line": f"You went harder than today called for, so today's budget is spent. A walk is the most to add."}
+    if rx.verdict in (eng.REST, eng.LIGHT) or hot:
+        return {"ideas": [("A walk", f"As long as you like, under {min(ceil, easy_top)}. Free: no cost to tomorrow.", "good"),
+                          ("15 minutes of mobility", "Hips, calves, upper back.", "good")],
+                "line": "A walk or some mobility. Anything harder comes out of tomorrow."}
     if rx.verdict == eng.HARD:
-        ideas = [("A 20-minute cool-down spin or walk", f"Under {eng.easy_band(p.zones)[0]}. Flushes the legs, costs nothing.", "good"),
-                 ("15 minutes of mobility", "Hips, calves, upper back. The hard work is done; this helps it land.", "good")]
-        return {"left": 0, "ideas": ideas,
-                "line": "The hard work is done. More hard work now costs tomorrow and buys nothing extra."}
-    if left >= 15:
-        extra = left
-        hr = ceil - 5
-        v_more = eng._next_verdict(p, rx, load + eng._est_load(p, extra, hr))
-        v_over = eng._next_verdict(p, rx, load + eng._est_load(p, extra + 45, ceil + 8))
-        kind = {"easy": "an easy", "steady": "a steady"}.get(rx.verdict, "an easy")
-        ideas.append((f"Up to {extra} more minutes, under {ceil}",
-                      f"{kind[:1].upper() + kind[1:]} spin, hike or walk. Tomorrow "
-                      + (f"stays {_aday(tomorrow_now)}." if v_more == tomorrow_now else f"becomes {_aday(v_more)}."), "good"))
-        ideas.append(("Or 20–30 minutes of strength",
-                      "Squats, lunges, step-ups, core. It doesn't show up in heart-rate load, and it's what keeps "
-                      "a 43-year-old's legs and back durable.", "good"))
-        if v_over != tomorrow_now:
-            ideas.append((f"Not: another {extra + 45} minutes, or going over {ceil}",
-                          f"That turns tomorrow from {_aday(tomorrow_now)} into {_aday(v_over)}.", "bad"))
-        line = f"You've done {done_min} of today's {cap} minutes. There's room for {left} more, easy."
-    else:
-        ideas = [("A walk or 15 minutes of mobility", "Both are free: no cost to tomorrow.", "good")]
-        line = f"You've used today's {cap} minutes. Anything more should be a walk."
-    return {"left": max(0, left), "ideas": ideas, "line": line}
+        return {"ideas": [("A 20-minute cool-down spin or walk", f"Under {easy_top}. Flushes the legs, costs nothing.", "good"),
+                          ("15 minutes of mobility", "Hips, calves, upper back. Helps the hard work land.", "good"),
+                          ("Not: more hard work", "It costs tomorrow and buys nothing extra today.", "bad")],
+                "line": "A cool-down or some mobility. The hard work is done."}
+    room = max(20, (rx.max_minutes or 60) - done_min)
+    extra = min(room, 45)
+    v_more = eng._next_verdict(p, rx, load + eng._est_load(p, extra, ceil - 5))
+    v_big = eng._next_verdict(p, rx, load + eng._est_load(p, extra + 45, ceil + 8))
+    ideas = [(f"An easy {extra}-minute spin or hike, under {ceil}",
+              "Tomorrow " + (f"stays {_aday(tomorrow_now)}." if v_more == tomorrow_now else f"becomes {_aday(v_more)}."), "good"),
+             ("20–30 minutes of strength", "Squats, lunges, step-ups, core. Doesn't touch tomorrow, and it's what keeps "
+              "legs and back durable for the long haul.", "good"),
+             ("A walk or mobility", "Free: no cost to tomorrow.", "good")]
+    if v_big != tomorrow_now:
+        ideas.append((f"Not: another long or hard session", f"That turns tomorrow from {_aday(tomorrow_now)} into {_aday(v_big)}.", "bad"))
+    return {"ideas": ideas, "line": "Today's session is done. A few ideas that won't cost tomorrow:"}
 
 
 def _stop_here(p, rx, tomorrow_now: str, nxt: str, main: dict | None, done_min: int) -> str:
-    """If you do nothing more today: what that means."""
+    """If you do nothing more today: what that means. Plainly, no guilt."""
     from .prescribe import engine as eng
-    cap = rx.max_minutes or 60
-    score = main["score"] if main else None
+    score = main["score"] if main and main.get("score") is not None else None
+    hot = main and main.get("parts") and main["parts"]["Ceiling"] < 30
     if rx.verdict in (eng.REST, eng.LIGHT):
-        return (f"You trained on a recovery day. Stop here and it costs a little; go further and tomorrow pays. "
-                f"Tomorrow is {_aday(tomorrow_now)} as it stands.")
+        return f"The right call: today was for recovering. Tomorrow is {_aday(tomorrow_now)} as it stands."
+    if hot:
+        return (f"The right call. You went harder than {_aday(rx.verdict)} calls for, so resting now is what keeps tomorrow "
+                f"{_aday(tomorrow_now)}" + ("; if HRV dips overnight, it'll come down." if tomorrow_now in ("hard", "steady") else "."))
     if rx.verdict == eng.HARD:
-        return f"That's the day. Tomorrow is {_aday(tomorrow_now)}: the adaptation from today happens while you recover."
-    if main and main.get("score") is not None and main["parts"]["Ceiling"] < 30:
-        return (f"Good idea. You went harder than {_aday(rx.verdict)} calls for, so the best thing now is nothing. "
-                f"Tomorrow is {_aday(tomorrow_now)}" + (" as it stands; if HRV dips overnight, it'll come down." if tomorrow_now in ("hard", "steady") else "."))
-    if done_min < cap * 0.5:
-        return (f"Fine. It's {_aday(rx.verdict)}, so a shorter session gives up a little aerobic work and nothing else. "
-                f"Tomorrow stays {_aday(tomorrow_now)}, and you'll come into it fresher.")
-    good = score is not None and score >= 75
-    return ("That's the day done" + (", and done right" if good else "") +
-            f". Tomorrow is {_aday(tomorrow_now)}. Sleep tonight is what decides whether it stays that way.")
+        return f"That's the day. Tomorrow is {_aday(tomorrow_now)}: the fitness from today gets built while you recover."
+    return (f"Nothing changes: today's session is done{' and done right' if score and score >= 75 else ''}. "
+            f"Tomorrow is {_aday(tomorrow_now)}, and tonight's sleep is what decides whether it stays that way.")

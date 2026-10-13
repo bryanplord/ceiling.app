@@ -55,6 +55,7 @@ class Review:
     minutes_over: int = 0
     peak: int | None = None
     picked: str = ""
+    target: int | None = None
 
 
 def _kind(a) -> str:
@@ -144,7 +145,7 @@ def review(p, rx, a, stream, raw: dict | None = None) -> Review | None:
     target = target or rx.max_minutes or minutes
     picked = ""
     if chosen and planned and chosen is not planned:
-        picked = f"You picked the {chosen[3].split(' ', 1)[-1]} option instead of the {planned[3].split(' ', 1)[-1]}."
+        picked = f"Picked the {chosen[3].split(' ', 1)[-1]} option, judged on its own {target} minutes."
     elif chosen and planned:
         picked = f"The {chosen[3].split(' ', 1)[-1]}, as planned."
     as_planned = a.sport == getattr(rx, "sport", None)
@@ -153,7 +154,8 @@ def review(p, rx, a, stream, raw: dict | None = None) -> Review | None:
     off_menu = bool(opts) and not chosen and not as_planned and not walkday
 
     # points
-    ceiling_pts = 50 * max(0.0, 1 - share_over * 4)
+    # a 2% grace: one short push on a climb isn't a breach of the day
+    ceiling_pts = 50 * max(0.0, 1 - max(0.0, share_over - 0.02) * 4)
     if rx.verdict == HARD:
         range_pts = 30 * min(1.0, in_min / 28)                     # 4 x 8 at threshold, a little slack
     elif rx.verdict == STEADY:
@@ -211,7 +213,7 @@ def review(p, rx, a, stream, raw: dict | None = None) -> Review | None:
         fix.append(f"{minutes} min against {target} planned: {minutes - target} min long.")
     elif not walkday:
         right.append(f"Right length: {minutes} min of the {target} planned.")
-    if picked and "instead" in picked:
+    if picked and "option" in picked:
         right.append(picked)
     if off_menu:
         fix.append(f"A {NOUNS.get(kind, (kind, ''))[0]} wasn't one of today's options.")
@@ -284,11 +286,13 @@ def review(p, rx, a, stream, raw: dict | None = None) -> Review | None:
                     "Easier than today called for." if np.sum(below) > np.sum(over) else "Off the range most of the way.")
         else:
             head = "Too short to do what today was for." if ratio < 0.75 else "Longer than planned."
-        if s >= 75:
+        if lost[worst] < 4:
+            head = {"easy": "Easy, as asked.", "steady": "Steady, as asked.", "hard": "The work got done."}.get(rx.verdict, "As asked.")
+        elif s >= 75:
             head = "Good session. " + head.replace("Harder than", "A bit harder than").replace("Easier than", "A bit easier than")
     return Review(s, w, tone, head.strip(), right[:4], fix[:4], stats[:6],
                   {"Ceiling": round(ceiling_pts), "Range": round(range_pts), "Length": round(dur_pts)},
-                  round(100 * np.sum(inr) / valid_s), over_min, peak, picked)
+                  round(100 * np.sum(inr) / valid_s), over_min, peak, picked, target)
 
 
 class LiteRx:
