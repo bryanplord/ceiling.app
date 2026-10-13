@@ -220,6 +220,15 @@ def zones(request: Request):
     return _page(request, "zones.html", hr=hr, pw=pw, trend=dist.trend_chart)
 
 
+@app.get("/trends", response_class=HTMLResponse)
+def trends_page(request: Request):
+    from .. import trends as tr
+    store = open_store()
+    p, rx = today_rx(store)
+    t = cached(store, "trends", rx.date, lambda: tr.build(p))
+    return _page(request, "trends.html", t=t, axis=tr.axis(t))
+
+
 @app.get("/yesterday", response_class=HTMLResponse)
 def yesterday(request: Request, d: str | None = None):
     day = d or (local_today() - timedelta(days=1)).isoformat()

@@ -83,7 +83,7 @@ def _hm(hours: float) -> str:
     return f"{h}h {m:02d}m"
 
 
-def read(wellness, daily_load: dict[str, float], load_days, day: str) -> Reading:
+def read(wellness, daily_load: dict[str, float], load_days, day: str, response=None) -> Reading:
     d0 = date.fromisoformat(day)
     by = {w.date: w for w in wellness}
     iso = lambda n: (d0 - timedelta(days=n)).isoformat()
@@ -165,6 +165,28 @@ def read(wellness, daily_load: dict[str, float], load_days, day: str) -> Reading
             ctx += " You're carrying a lot of fatigue from the last week."
         ev.append(Evidence("Training", ctx, "ok" if big1 or big2 or heavy else "none"))
 
+    # ---- Stress from outside training ------------------------------------------
+    # Your own history says how much yesterday's load should move HRV. A shortfall
+    # beyond that is stress training doesn't explain (sleep, alcohol, work, illness).
+    outside = 0.0
+    if have_hrv and response is not None and getattr(response, "fitted", False) and len(load_days) >= 2 \
+            and load_days[-2].ctl > 5:
+        rel = load_days[-1].load / load_days[-2].ctl
+        expected = response.intercept + response.slope * rel
+        outside = z_t - expected
+        if outside < -1.0:
+            ev.append(Evidence("Outside training",
+                               f"Yesterday's training explains only part of last night's HRV: you're "
+                               f"{abs(outside):.1f} SD below what that load usually does to you. Something else "
+                               f"is adding stress: short sleep, drinks, work, travel, or a bug coming on.", "bad"))
+        elif outside > 0.75 and z_t < -0.5:
+            ev.append(Evidence("Outside training",
+                               "The dip is about what yesterday's training normally does to you. Nothing else "
+                               "is piling on.", "good"))
+
+    two_short = sum(1 for n in range(2) if iso(n) in by and by[iso(n)].sleep_secs
+                    and by[iso(n)].sleep_secs < 6 * 3600) == 2
+
     nights = len(ln_base)
     conf = ("Low confidence: only %d nights of history so far." % nights if nights < 28 else
             "Based on your last %d nights." % nights)
@@ -183,6 +205,13 @@ def read(wellness, daily_load: dict[str, float], load_days, day: str) -> Reading
         return R("unknown", "No overnight data", "none",
                  "Nothing came through from last night's watch, so there's nothing to read.",
                  "We're keeping today easy until there's data.", EASY)
+
+    if rhr_d is not None and two_short and rhr_d >= 5:
+        return R("illness", "Run down", "bad",
+                 "Two short nights and resting HR is up 5+ beats. That's when people catch colds: short "
+                 "sleepers get sick about four times as often when exposed. Your body needs sleep, not training.",
+                 "Walk at most, nothing long in the cold, and in bed early tonight. 48 hours of this.", LIGHT,
+                 "Scratchy throat or achy? Then it's a full day off.")
 
     if rhr_d is not None and (rhr_d >= 5 or (rhr_d >= 3 and (rhr_prev or 0) >= 3)) and (z_t < -0.5 or hrv_low7):
         return R("illness", "Something's off", "bad",

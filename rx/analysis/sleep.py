@@ -8,8 +8,12 @@ Need = your own baseline + extra after training.
 Quality: a night's sleep score docks credit, because 8 restless hours don't
   restore like 8 good ones: score 80+ full credit, 70s −15 min, 60s −30 min,
   45–59 −45 min, under 45 −60 min. Score with no duration: need × score/85.
-Balance: each night's (need − credited sleep), weighted so recent nights count most
-  (0.85 per night back, 14 nights). Positive = debt, negative = surplus.
+Debt behaves like fatigue: it builds night by night and drains slowly.
+  debt = yesterday's debt × e^(−1/4) + tonight's shortfall   (τ ≈ 4 days, Kitamura 2016)
+  A night over your need repays only half its surplus, at most 2 h a night,
+  because you can't sleep it all back at once (Belenky 2003, Banks 2010).
+  With no debt, surplus is banked (up to 3 h), and it drains the same way.
+  Balance = debt − bank. Positive = owed, negative = banked.
 
 Why it changes training (Fullagar 2015; Van Dongen 2003; Craven 2022; Mah 2011):
 sleep loss hits high-intensity and long efforts first and raises perceived effort;
@@ -24,10 +28,19 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 
 REST, LIGHT, EASY, STEADY, HARD = "rest", "light", "easy", "steady", "hard"
-DECAY = 0.85
-NIGHTS = 14
+import math
+KEEP = math.exp(-1 / 4)   # debt carried night to night (τ ≈ 4 days)
+NIGHTS = 14               # shown
+HISTORY = 40              # modelled
 EFFICIENCY = 0.9          # time asleep / time in bed
 TONIGHT_ADD = {REST: 0, LIGHT: 0, EASY: 15, STEADY: 20, HARD: 30}
+
+
+_ORDER = [REST, LIGHT, EASY, STEADY, HARD]
+
+
+def ORDER_MIN(a: str, b: str) -> str:
+    return _ORDER[min(_ORDER.index(a), _ORDER.index(b))]
 
 
 @dataclass
@@ -38,18 +51,22 @@ class Night:
     delta: float | None       # credited − need (+ surplus, − short)
     slept: float | None = None
     score: float | None = None
+    debt: float = 0.0         # running balance after this night (+ owed, − banked)
 
 
 def _penalty(score: float | None) -> float:
     if score is None:
         return 0.0
-    return 0.0 if score >= 80 else 0.25 if score >= 70 else 0.5 if score >= 60 else 0.75 if score >= 45 else 1.0
+    # Garmin's score already folds in overnight HRV/stress, which Ceiling reads directly,
+    # so the score only nudges: it stands in for restlessness and wake time.
+    return 0.0 if score >= 80 else 0.1 if score >= 70 else 0.25 if score >= 60 else 0.33 if score >= 45 else 0.5
 
 
 @dataclass
 class SleepBank:
     base: float
     nights: list[Night] = field(default_factory=list)
+    history: list[Night] = field(default_factory=list)   # all modelled nights, for trends
     balance: float = 0.0      # + debt (hours owed), − surplus
     state: str = "unknown"    # surplus | even | owed | debt | deep_debt | unknown
     tone: str = "none"
@@ -89,7 +106,8 @@ def _wake() -> tuple[int, int, str]:
     return t.hour, t.minute, t.strftime("%-I:%M %p")
 
 
-def bank(wellness, daily_load: dict[str, float], day: str, verdict: str | None = None) -> SleepBank:
+def bank(wellness, daily_load: dict[str, float], day: str, verdict: str | None = None,
+         history_nights: int | None = None) -> SleepBank:
     d0 = date.fromisoformat(day)
     by = {w.date: w for w in wellness}
     hist = [w.sleep_secs / 3600 for w in wellness
@@ -101,8 +119,7 @@ def bank(wellness, daily_load: dict[str, float], day: str, verdict: str | None =
     avg_load = statistics.mean([daily_load.get((d0 - timedelta(days=n)).isoformat(), 0.0) for n in range(1, 29)])
 
     nights: list[Night] = []
-    bal = 0.0
-    for k in range(NIGHTS):
+    for k in range(history_nights or HISTORY):
         nd = (d0 - timedelta(days=k)).isoformat()             # the morning you woke up
         trained = (d0 - timedelta(days=k + 1)).isoformat()    # the day before that night
         need = base + _training_add(daily_load.get(trained, 0.0), avg_load)
@@ -117,23 +134,47 @@ def bank(wellness, daily_load: dict[str, float], day: str, verdict: str | None =
             act = None
         delta = (act - need) if act is not None else None
         nights.append(Night(nd, act, need, delta, slept, score))
-        if delta is not None:
-            bal += -delta * DECAY ** k
     nights.reverse()
-    b = SleepBank(base, nights, bal)
+    debt = banked = 0.0
+    debts = []
+    for n in nights:
+        debt *= KEEP
+        banked *= KEEP
+        if n.delta is not None:
+            if n.delta < 0:
+                short = -n.delta
+                use = min(banked, short)
+                banked -= use
+                debt += short - use
+            else:
+                repay = 0.5 * min(2.0, n.delta)
+                if debt > 0:
+                    debt = max(0.0, debt - repay)
+                else:
+                    banked = min(3.0, banked + repay)
+        n.debt = debt - banked
+        debts.append(debt)
+    bal = debt - banked
+    big_yday = avg_load > 0 and daily_load.get((d0 - timedelta(days=1)).isoformat(), 0.0) > 1.5 * avg_load
+    recent_peak = max(debts[-4:-1]) if len(debts) >= 4 else 0.0
+    history = nights
+    nights = nights[-NIGHTS:]
+    b = SleepBank(base, nights, history, bal)
     last = nights[-1].slept
     last_score = nights[-1].score
 
     if bal >= 8:
         b.state, b.tone, b.cap, b.volume = "deep_debt", "bad", LIGHT, 0.6
         b.title = "Deep sleep debt"
-        b.says = (f"You owe {_hm(bal)} of sleep. At this level training doesn't stick: you're adding fatigue "
-                  f"you can't clear. Sleep is the workout until this comes down.")
+        b.says = (f"You owe {_hm(bal)} of sleep. At this level it isn't lost time, it's stress: higher "
+                  f"cortisol, slower muscle repair, lower HRV. Training on top of it digs deeper. "
+                  f"Add an hour in bed a night until this comes down.")
     elif bal >= 5:
         b.state, b.tone, b.cap, b.volume = "debt", "bad", EASY, 0.75
         b.title = "In sleep debt"
-        b.says = (f"You owe {_hm(bal)} of sleep. Hard efforts will feel harder and build less. "
-                  f"Easy only, and shorter, until you've paid some back.")
+        b.says = (f"You owe {_hm(bal)} of sleep. That's fatigue your body is carrying on top of training: "
+                  f"hard efforts feel harder and build less, and you're more likely to catch something. "
+                  f"Easy only, and shorter, until it's under 3 hours.")
     elif bal >= 2.5:
         b.state, b.tone, b.cap, b.volume = "owed", "ok", STEADY, 0.9
         b.title = "Running a sleep deficit"
@@ -144,18 +185,34 @@ def bank(wellness, daily_load: dict[str, float], day: str, verdict: str | None =
         b.title = "Sleep in the bank"
         b.says = (f"You've banked {_hm(-bal)} of sleep. Rested legs absorb hard work best, so if recovery "
                   f"agrees, this is the day for the big one.")
+    elif bal >= 1.0:
+        b.state, b.tone = "slightly_owed", "ok"
+        b.title = "A little short on sleep"
+        b.says = (f"You owe {_hm(bal)}. Not enough to change today, but it's the start of a pile. "
+                  f"An early night clears it.")
     else:
         b.state, b.tone = "even", "good"
         b.title = "Sleep is square"
         b.says = "You're getting the sleep you need. Sleep isn't holding you back."
 
-    if last is not None and (last < 6.0 or last < nights[-1].need - 1.5):
-        if b.cap == HARD:
-            b.cap = STEADY
-        b.says += f" Last night was short ({_hm(last)}), so no intervals today."
+    short_last = last is not None and (last < 6.0 or last < nights[-1].need - 1.5)
+    if short_last and big_yday:
+        # Sleep loss blunts muscle repair and refuelling (Lamon 2021, Skein 2011, Donga 2010):
+        # a short night after a big day is the worst pairing.
+        b.cap = ORDER_MIN(b.cap, EASY)
+        b.volume = min(b.volume, 0.7)
+        b.says += (f" Short night ({_hm(last)}) right after a big day is the worst combination: your muscles "
+                   f"repair and refuel slower on short sleep. Recovery day. Eat carbs and protein early.")
+    elif short_last:
+        b.cap = ORDER_MIN(b.cap, STEADY)
+        b.says += (f" Last night was short ({_hm(last)}), so no intervals. Expect pace or power 5–10% lower "
+                   f"at the same effort today. That's the sleep, not your fitness.")
+    if bal < 5 <= recent_peak:
+        b.cap = ORDER_MIN(b.cap, STEADY)
+        b.says += (" Your debt is coming down, but it takes a couple of normal nights to actually recover, "
+                   "even when you feel fine. Intervals wait one more day.")
     elif last_score is not None and last_score < 50:
-        if b.cap == HARD:
-            b.cap = STEADY
+        b.cap = ORDER_MIN(b.cap, STEADY)
         b.says += f" Last night scored {last_score:.0f}: you were in bed, but it didn't restore you. No intervals today."
     if last is not None and last < 5.0:
         b.no_technical = True

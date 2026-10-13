@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block head %}
+<style>
+  main.narrow { max-width:1200px; }
+  .th1 { font-size:clamp(56px, 9vw, 120px); margin:24px 0 18px; }
+  .thead { font-size:clamp(28px, 3.4vw, 40px); font-weight:800; font-stretch:72%; margin:0 0 8px; }
+  .thead.good { color:var(--good); } .thead.ok { color:var(--warn); } .thead.bad { color:var(--bad); }
+  .twhy { font-size:19px; max-width:60ch; margin:0 0 6px; }
+  .tsub { color:var(--lichen); font-size:15px; margin:0 0 36px; }
+  .trow { display:grid; grid-template-columns:300px 1fr; gap:32px; padding:22px 0; border-top:1px solid var(--rule); align-items:center; }
+  .tl b { display:block; font-size:17px; }
+  .tl .now { font-size:30px; font-weight:800; font-stretch:72%; font-variant-numeric:tabular-nums; display:block; margin:2px 0 6px; }
+  .tl p { margin:0; font-size:15px; line-height:1.45; padding-left:12px; border-left:4px solid var(--rule); }
+  .tl p.good { border-left-color:var(--good); } .tl p.ok { border-left-color:var(--warn); } .tl p.bad { border-left-color:var(--bad); }
+  .tr { display:block; width:100%; }
+  .tr.load, .tr.hrv, .tr.rhr, .tr.sleep { height:130px; }
+  .tr.form, .tr.debt, .tr.outside { height:100px; }
+  .tr .wk { stroke:var(--rule); stroke-width:1; vector-effect:non-scaling-stroke; }
+  .tr .band { fill:var(--lichen); opacity:.18; }
+  .tr .dot { stroke:var(--lichen); stroke-width:5; stroke-linecap:round; vector-effect:non-scaling-stroke; }
+  .tr .line { fill:none; stroke:var(--ink); stroke-width:2.5; vector-effect:non-scaling-stroke; stroke-linejoin:round; }
+  .tr.hrv .line { stroke:var(--z2); } .tr.rhr .line { stroke:var(--z5); } .tr.sleep .line { stroke:var(--z1); }
+  .tr.sleep .pos { fill:var(--z1); } .tr.sleep .neg { fill:var(--bad); }
+  .tr .need { fill:none; stroke:var(--ink); stroke-width:1.5; stroke-dasharray:5 4; vector-effect:non-scaling-stroke; }
+  .tr .lb { fill:var(--lichen); opacity:.55; }
+  .tr .atl { fill:none; stroke:var(--z4); stroke-width:2.5; vector-effect:non-scaling-stroke; }
+  .tr .ctl { fill:none; stroke:var(--ink); stroke-width:3; vector-effect:non-scaling-stroke; }
+  .tr .zero { stroke:var(--ink); stroke-width:1; vector-effect:non-scaling-stroke; opacity:.5; }
+  .tr .pos { fill:var(--good); } .tr .neg { fill:var(--bad); }
+  .tr.form .pos { fill:var(--z2); } .tr.form .neg { fill:var(--z4); }
+  .axis { position:relative; height:22px; margin-left:332px; color:var(--lichen); font-size:13px; }
+  .axis span { position:absolute; transform:translateX(-50%); top:4px; }
+  .axis span.last { transform:translateX(-100%); }
+  .key { display:flex; gap:18px; flex-wrap:wrap; color:var(--lichen); font-size:13px; margin-top:8px; }
+  .key i { display:inline-block; width:16px; height:3px; margin-right:6px; vertical-align:3px; }
+  @media (max-width: 760px) {
+    .trow { grid-template-columns:1fr; gap:12px; }
+    .axis { margin-left:0; }
+    .tr.load, .tr.hrv, .tr.rhr, .tr.sleep { height:110px; }
+  }
+</style>
+{% endblock %}
+{% block body %}
+<h1 class="th1">Trends.</h1>
+<p class="thead {{ t.tone }}">{{ t.headline }}</p>
+<p class="twhy">{{ t.why }}</p>
+<p class="tsub">Last 14 weeks on one timeline. Shaded bands are your normal range; lines are 7-day averages; dots are single nights.</p>
+{% for r in t.rows %}
+<div class="trow">
+  <div class="tl"><b>{{ r.name }}</b><span class="now">{{ r.now }}</span><p class="{{ r.tone }}">{{ r.says }}</p>
+    {% if r.key == 'load' %}<div class="key"><span><i style="background:var(--ink)"></i>Fitness</span><span><i style="background:var(--z4)"></i>Fatigue</span><span><i style="background:var(--lichen)"></i>Daily load</span></div>{% endif %}
+    {% if r.key == 'form' %}<div class="key"><span><i style="background:var(--z2)"></i>Fresh</span><span><i style="background:var(--z4)"></i>Carrying fatigue</span></div>{% endif %}
+    {% if r.key == 'debt' %}<div class="key"><span><i style="background:var(--good)"></i>Banked</span><span><i style="background:var(--bad)"></i>Owed</span></div>{% endif %}
+    {% if r.key == 'sleep' %}<div class="key"><span><i style="background:var(--z1)"></i>Met your need</span><span><i style="background:var(--bad)"></i>Short</span><span><i style="background:var(--ink)"></i>Your need</span></div>{% endif %}
+  </div>
+  <div>{{ r.svg | safe }}</div>
+</div>
+{% endfor %}
+{{ axis | safe }}
+{% endblock %}

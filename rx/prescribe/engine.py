@@ -143,7 +143,7 @@ def build_rx(p: Profile, day: str | None = None) -> Rx:
     y = p.yesterday
     last_two = [ld.load for ld in p.load_days[-2:]]
     verdict, why = decide(Inputs(rec, y, last_two))
-    reading = read(p.wellness, p.daily_load, p.load_days, day)
+    reading = read(p.wellness, p.daily_load, p.load_days, day, p.response)
     verdict = cap_verdict(verdict, reading.cap)
     why = [reading.says] + [r for r in why if not r.startswith(
         ("HRV", "Resting HR", "Sleep", "Recovered", "Recovery looks", "No sleep"))]
