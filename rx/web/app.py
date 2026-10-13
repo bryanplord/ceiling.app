@@ -85,7 +85,7 @@ def logout():
     return r
 
 
-def _refresh_in_background() -> None:
+def _refresh_in_background(force: bool = False) -> None:
     """Pull the last few days from intervals.icu at most once an hour, without
     making the page wait. The page shows what's stored; the next load is fresh."""
     key = os.getenv("INTERVALS_API_KEY", "")
@@ -104,7 +104,7 @@ def _refresh_in_background() -> None:
             # Mornings: until last night's sleep/HRV has landed, check every 10 minutes.
             # Garmin only uploads it once the watch syncs to the phone.
             every = REFRESH_EVERY_S if _have_last_night(store) else MORNING_EVERY_S
-            if backfilled and time.time() - last < every:
+            if backfilled and not force and time.time() - last < every:
                 return
             days = 3 if backfilled else 365
             store.set_meta("sync_state", f"running since {int(time.time())}")
@@ -152,6 +152,14 @@ def _warm(store=None) -> None:
 @app.on_event("startup")
 def _startup() -> None:
     threading.Thread(target=_warm, daemon=True).start()
+
+
+@app.post("/sync")
+def sync_now():
+    """The Sync now button. Signed-in only (the gate covers it). Pulls immediately,
+    ignoring the hourly limit; the page refreshes itself until it's done."""
+    _refresh_in_background(force=True)
+    return RedirectResponse("/?syncing=1", status_code=303)
 
 
 @app.get("/healthz", response_class=PlainTextResponse)
@@ -203,7 +211,9 @@ def today(request: Request, d: str | None = None):
             break
     last = store.get_meta("last_sync")
     mins_ago = int((time.time() - float(last)) / 60) if last and float(last) > 0 else None
-    return _page(request, "today.html", rx=rx, waiting=not _have_last_night(store), updated=mins_ago, d=dash, p=p, recent=recent,
+    syncing = _sync_lock.locked()   # only a sync actually in progress; never a stale flag
+    return _page(request, "today.html", rx=rx, waiting=not _have_last_night(store), updated=mins_ago,
+                 syncing=syncing, d=dash, p=p, recent=recent,
                  spark=dashboard.spark, room=dashboard.room(rx, p, *cached(store, "hrhist", rx.date, lambda: dist.hr_histogram(store, p))),
                  st=st, hist=storymod.history_chart(st),
                  sleep_chart=sleepmod.chart(rx.sleep) if rx.sleep else "",

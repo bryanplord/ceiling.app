@@ -62,3 +62,13 @@ def test_password_login(tmp_path, monkeypatch):
     # sign out
     c.get("/logout")
     assert 'name="password"' in c.get("/").text
+
+
+def test_sync_button(tmp_path, monkeypatch):
+    monkeypatch.setenv("RX_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("RX_OPEN", "1")
+    monkeypatch.delenv("INTERVALS_API_KEY", raising=False)
+    from rx.web.app import app
+    c = TestClient(app)
+    r = c.post("/sync", follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"].startswith("/")
