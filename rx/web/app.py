@@ -176,7 +176,7 @@ def _resp_keys(store) -> str:
             d = _json.loads(r["raw"]) if r["raw"] else {}
         except Exception:
             continue
-        keys |= {k for k, v in d.items() if "resp" in k.lower() or "breath" in k.lower()}
+        keys |= {k for k, v in d.items() if v not in (None, "", [], {})}
     return ", ".join(sorted(keys)) or "none"
 
 
@@ -199,7 +199,7 @@ def healthz():
                 f"days of sleep/HRV: {n['wellness']}\n"
                 f"nights with breathing rate (last 30): "
                 f"{sum(1 for w in s.wellness((local_today() - timedelta(days=30)).isoformat()) if w.breathing)}\n"
-                f"breathing fields offered by the source: {_resp_keys(s)}")
+                f"wellness fields with values: {_resp_keys(s)}")
     except Exception as e:
         return f"ok\nstore unavailable: {type(e).__name__}"
 
