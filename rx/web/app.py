@@ -149,6 +149,8 @@ def _warm(store=None) -> None:
         cached(store, "story", rx.date, lambda: storymod.build(store, p))
         cached(store, "planx", rx.date, lambda: plan_with_changes(store))
         cached(store, "planhist", rx.date, lambda: plan_history(store))
+        from .. import workouts as wk
+        cached(store, "workouts", rx.date, lambda: wk.build(store))
     except Exception as e:
         print(f"warm failed: {e}")
 
@@ -309,6 +311,35 @@ def trends_page(request: Request):
     p, rx = today_rx(store)
     t = cached(store, "trends", rx.date, lambda: tr.build(p))
     return _page(request, "trends.html", t=t, axis=tr.axis(t))
+
+
+@app.get("/workouts", response_class=HTMLResponse)
+def workouts_page(request: Request):
+    from .. import workouts as wk
+    store = open_store()
+    p, rx = today_rx(store)
+    rows = peek(store, "workouts", rx.date)
+    if rows is None:
+        threading.Thread(target=lambda: cached(store, "workouts", rx.date, lambda: wk.build(store)), daemon=True).start()
+        return _page(request, "workouts.html", rows=None, date=date)
+    agg = wk.aggregate(rows)
+    easy = sum(x[3] for x in agg[:3])
+    hard = sum(x[3] for x in agg[4:])
+    mid = agg[3][3]
+    if hard > 22:
+        note = (f"{hard:.0f}% of your time is Threshold or Max, about twice what most strong endurance athletes do. "
+                f"Too much hard work is what keeps HRV down; trade some of it for easy time.")
+    elif mid > 15:
+        note = (f"{mid:.0f}% of your time is Tempo, the zone that's too hard to recover from quickly and too easy "
+                f"to build top-end fitness. Make easy days easier and hard days harder.")
+    elif hard < 8:
+        note = f"Only {hard:.0f}% of your time is Threshold or Max. One or two hard sessions a week would move your fitness more."
+    elif easy < 70:
+        note = f"Only {easy:.0f}% of your time is easy. Most of your training should be easy so the hard days can be hard."
+    else:
+        note = "A good balance: mostly easy, with a real slice of hard."
+    scale = max([x[3] for x in agg] + [x[4] for x in agg]) * 1.1
+    return _page(request, "workouts.html", rows=rows, agg=agg, aggnote=note, scale=scale, date=date)
 
 
 @app.get("/yesterday", response_class=HTMLResponse)
