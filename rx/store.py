@@ -239,6 +239,10 @@ class Store:
         self.db.execute("INSERT OR REPLACE INTO meta VALUES (?,?)", (key, value))
         self.db.commit()
 
+    def counts(self) -> dict[str, int]:
+        return {t: self._one(f"SELECT COUNT(*) FROM {t}")[0]
+                for t in ("activities", "streams", "wellness")}
+
     def speed(self, activity_id: str) -> list | None:
         r = self._one("SELECT speed FROM streams WHERE activity_id=?", (activity_id,))
         return json.loads(r["speed"]) if r and r["speed"] else None

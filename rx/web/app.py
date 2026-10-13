@@ -83,6 +83,7 @@ def _refresh_in_background() -> None:
         return
 
     def run():
+        store = None
         try:
             from ..sources import intervals
             store = open_store()
@@ -90,12 +91,20 @@ def _refresh_in_background() -> None:
             if time.time() - last < REFRESH_EVERY_S:
                 return
             days = 3 if last else 365   # first run backfills a year
+            store.set_meta("sync_state", f"running since {int(time.time())}")
             client = intervals.IntervalsClient(key, os.getenv("INTERVALS_ATHLETE_ID", "0"))
-            intervals.sync(client, store, days=days, log=lambda *_: None)
+            intervals.sync(client, store, days=days,
+                           log=lambda msg: store.set_meta("sync_progress", str(msg).strip()))
             store.set_meta("last_sync", str(time.time()))
+            store.set_meta("sync_state", "ok")
             store.sync()
         except Exception as e:  # never take the site down over a sync
             print(f"sync failed: {e}")
+            if store:
+                try:
+                    store.set_meta("sync_state", f"failed: {type(e).__name__}: {str(e)[:160]}")
+                except Exception:
+                    pass
         finally:
             _sync_lock.release()
 
@@ -104,7 +113,19 @@ def _refresh_in_background() -> None:
 
 @app.get("/healthz", response_class=PlainTextResponse)
 def healthz():
-    return "ok"
+    """Public, so it shows only plumbing: whether syncing works and how many records
+    exist. No dates, names, heart rates or anything else about the athlete."""
+    try:
+        s = open_store()
+        n = s.counts()
+        state = s.get_meta("sync_state") or "never run (sign in to start it)"
+        last = s.get_meta("last_sync")
+        ago = f"{int((time.time() - float(last)) / 60)} min ago" if last else "never"
+        return (f"ok\nsync: {state}\nlast complete sync: {ago}\n"
+                f"activities: {n['activities']}  with heart-rate streams: {n['streams']}  "
+                f"days of sleep/HRV: {n['wellness']}")
+    except Exception as e:
+        return f"ok\nstore unavailable: {type(e).__name__}"
 
 
 def _page(request: Request, name: str, **ctx):
