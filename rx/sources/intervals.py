@@ -102,7 +102,7 @@ def sync(client: IntervalsClient, store: Store, days: int = 365,
     cur = oldest
     while cur <= newest:
         end = min(cur + timedelta(days=90), newest)
-        for raw in client.activities(cur.isoformat(), end.isoformat()):
+        for raw in client.activities(cur.isoformat(), (end + timedelta(days=1)).isoformat()):
             if not raw.get("id") or not raw.get("start_date_local"):
                 continue  # e.g. Strava stubs the API won't expose
             act = activity_from_icu(raw)
@@ -115,7 +115,9 @@ def sync(client: IntervalsClient, store: Store, days: int = 365,
                     store.upsert_stream(act.id, t, st["heartrate"], st.get("cadence"),
                                         st.get("velocity_smooth"))
                     counts["streams"] += 1
-        for raw in client.wellness(cur.isoformat(), end.isoformat()):
+        # Ask one day past the window: last night is filed under this morning's date, and a
+        # date-boundary or timezone mismatch must never make today's row arrive a day late.
+        for raw in client.wellness(cur.isoformat(), (end + timedelta(days=1)).isoformat()):
             store.upsert_wellness("intervals", wellness_from_icu(raw), raw)
             counts["wellness"] += 1
         log(f"  {cur} → {end}: {counts}")

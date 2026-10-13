@@ -33,28 +33,28 @@
   .rxv b.good { color:var(--good); } .rxv b.ok { color:var(--warn); } .rxv b.bad { color:var(--bad); }
   .rxl.over .rxk { color:var(--ceiling); }
   .rxl .steps { margin:0; font-size:18px; }
-  .room { width:100%; max-width:520px; display:block; margin-left:auto; overflow:visible; font-family:var(--face); }
-  .room .zf { opacity:.16; } .room .zon { opacity:.95; }
+  .room { width:100%; max-width:540px; display:block; margin-left:auto; overflow:visible; font-family:var(--face); }
+  .room .zt { opacity:.07; } .room .zr { opacity:1; }
   .room .z1 { fill:var(--z1); } .room .z2 { fill:var(--z2); } .room .z3 { fill:var(--z3); }
   .room .z4 { fill:var(--z4); } .room .z5 { fill:var(--z5); }
-  .room .zn { fill:var(--lichen); font-size:16px; font-weight:650; }
-  .room .zd { fill:var(--lichen); font-size:13px; }
-  .room .zn.on, .room .zd.on { fill:#0a0a0a; }
-  .room .avgl { stroke:#0a0a0a; stroke-width:2; stroke-dasharray:6 4; }
-  .room .hbin { fill:var(--lichen); opacity:.8; }
+  .room .zname { fill:var(--lichen); font-size:14px; font-weight:600; }
+  .room .tick { fill:var(--lichen); font-size:13px; font-variant-numeric:tabular-nums; }
+  .room .tick.strong { fill:var(--ink); font-weight:700; }
   .room .brk { fill:none; stroke:var(--lichen); stroke-width:1.5; }
-  .room .strip { fill:var(--lichen); font-size:13px; }
-  .room .restl { stroke:var(--z1); stroke-width:2; stroke-dasharray:2 4; }
-  .room .side.rest { fill:var(--z1); font-weight:650; }
-  .room .usual { stroke:var(--ink); stroke-width:2.5; }
-  .room .side.usualt { fill:var(--ink); }
-  .room .tick { fill:var(--lichen); font-size:14px; font-variant-numeric:tabular-nums; }
-  .room .side { fill:var(--lichen); font-size:16px; font-variant-numeric:tabular-nums; }
-  .room .side.strong { fill:var(--ink); font-weight:650; }
-  .room .lol { stroke:var(--lichen); stroke-width:1.5; }
-  .room .maxl { stroke:var(--lichen); stroke-width:1.5; stroke-dasharray:3 5; }
+  .room .ref { stroke:var(--lichen); stroke-width:1.2; stroke-dasharray:2 5; }
+  .room .reft { fill:var(--lichen); font-size:13px; }
+  .room .dens { fill:var(--ink); opacity:.10; stroke:var(--ink); stroke-opacity:.35; stroke-width:1.2; }
+  .room .densax { stroke:var(--rule); stroke-width:1; }
+  .room .usual { stroke:var(--ink); stroke-width:1.5; stroke-dasharray:3 3; }
+  .room .usualt, .room .small { fill:var(--lichen); font-size:13px; }
+  .room .today { fill:var(--ink); }
+  .room .tlab { fill:#fff; font-size:13px; font-weight:600; font-stretch:125%; letter-spacing:.12em; }
+  .room .trng { fill:#fff; font-size:34px; font-weight:600; font-stretch:125%; font-variant-numeric:tabular-nums; }
+  .room .taim { fill:#fff; opacity:.75; font-size:14px; }
+  .room .aim { stroke:#fff; stroke-width:2; stroke-dasharray:4 4; opacity:.7; }
   .room .ceil { fill:var(--ceiling); }
-  .room .cnum { fill:var(--ceiling); font-size:56px; font-weight:600; font-stretch:125%; font-variant-numeric:tabular-nums; }
+  .room .ceilt { fill:var(--ceiling); font-size:13px; font-weight:600; font-stretch:125%; letter-spacing:.1em; }
+  .room .ceiln { font-size:24px; letter-spacing:.02em; }
   .roomh { font-size:22px; font-weight:750; margin:0 0 2px; text-align:right; }
   .roomsub { color:var(--lichen); font-size:15px; margin:0 0 10px; text-align:right; }
   .roomcap { text-align:right; color:var(--lichen); font-size:15px; margin:6px 0 0; }
@@ -149,7 +149,7 @@
 
   @media (max-width: 900px) {
     .hero { grid-template-columns:1fr; gap:36px; padding:12px 0 48px; }
-    .room { margin:0; max-width:380px; }
+    .room { margin:0; max-width:100%; }
     .roomcap, .roomh, .roomsub { text-align:left; }
     .split, .trade, .next, .twocol { grid-template-columns:1fr; gap:36px; }
     .hist .lbl, .hist .tick { font-size:30px; } .hist .lbl.strong { font-size:34px; }
@@ -198,9 +198,9 @@
   {% if room %}
   <div>
     <p class="roomh">Your heart today</p>
-    <p class="roomsub">Resting to max, in your own zones. Today is the lit band; the grey strip is where you actually train.</p>
+    <p class="roomsub">Your zones, resting to max. Today's range in black.</p>
     {{ room | safe }}
-    <p class="roomcap">Stay in the lit band. <b>Never above {{ rx.hr_ceiling }}.</b>{% if rx.max_minutes %} {{ rx.max_minutes }} minutes max.{% endif %}</p>
+    <p class="roomcap">Stay in the black. <b>Never above {{ rx.hr_ceiling }}.</b>{% if rx.max_minutes %} {{ rx.max_minutes }} minutes max.{% endif %}</p>
   </div>
   {% endif %}
 </section>
