@@ -184,7 +184,9 @@ def healthz():
         ver = (os.getenv("RENDER_GIT_COMMIT") or "local")[:7]
         return (f"ok\nversion: {ver}\nsync: {state}\nlast complete sync: {ago}\n"
                 f"activities: {n['activities']}  with heart-rate streams: {n['streams']}  "
-                f"days of sleep/HRV: {n['wellness']}")
+                f"days of sleep/HRV: {n['wellness']}\n"
+                f"nights with breathing rate (last 30): "
+                f"{sum(1 for w in s.wellness((local_today() - timedelta(days=30)).isoformat()) if w.breathing)}")
     except Exception as e:
         return f"ok\nstore unavailable: {type(e).__name__}"
 
