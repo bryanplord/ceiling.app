@@ -42,20 +42,19 @@
   .rxlist.facts b { color:var(--ink); font-weight:600; margin-right:4px; }
   .whyhead { margin:0; font-size:18px; line-height:1.45; }
   .whyhead b.good { color:var(--good); } .whyhead b.ok { color:var(--warn); } .whyhead b.bad { color:var(--bad); }
-  .room { width:100%; max-width:540px; display:block; margin-left:auto; overflow:visible; font-family:var(--face); }
-  .room .xsec { fill:var(--ink); opacity:.045; }
-  .room .zf { opacity:.13; } .room .zon { opacity:.42; } .room .zs { opacity:1; }
+  .room { width:100%; max-width:560px; display:block; margin-left:auto; overflow:visible; font-family:var(--face); }
+  .room .xsec { fill:var(--ink); opacity:.05; }
+  .room .zf { opacity:.12; } .room .zon { opacity:.38; } .room .zs { opacity:1; }
   .room .z1 { fill:#7fa7d9; } .room .z2 { fill:#46b07f; } .room .z3 { fill:#e3bd52; }
   .room .z4 { fill:#ec9550; } .room .z5 { fill:#de5f55; }
   .room .zn { fill:var(--ink); font-size:15px; font-weight:600; }
   .room .zd { fill:var(--lichen); font-size:12px; }
   .room .tick { fill:var(--lichen); font-size:13px; font-variant-numeric:tabular-nums; }
-  .room .tick.strong { fill:var(--ink); font-weight:700; }
+  .room .tick.strong { fill:var(--ink); font-weight:700; font-size:14px; }
   .room .brk { fill:none; stroke:var(--lichen); stroke-width:1.5; }
   .room .ref { stroke:var(--lichen); stroke-width:1.2; stroke-dasharray:2 5; }
   .room .reft, .room .small { fill:var(--lichen); font-size:12px; }
-  .room .dens { fill:var(--ink); opacity:.09; }
-  .room .usual { stroke:var(--ink); stroke-width:1.5; stroke-dasharray:3 3; opacity:.6; }
+  .room .hb { opacity:.45; } .room .hb.in { opacity:.95; }
   .room .tlab { fill:var(--ink); font-size:12px; font-weight:600; font-stretch:125%; letter-spacing:.12em; }
   .room .trng { fill:var(--ink); font-size:28px; font-weight:600; font-stretch:125%; font-variant-numeric:tabular-nums; }
   .room .taim { fill:var(--lichen); font-size:13px; }
@@ -154,6 +153,9 @@
   @media (max-width: 900px) {
     .hero { grid-template-columns:1fr; gap:36px; padding:12px 0 48px; }
     .room { margin:0; max-width:100%; }
+    .room .zn { font-size:20px; } .room .zd { font-size:16px; } .room .tick { font-size:17px; }
+    .room .tick.strong { font-size:18px; } .room .reft, .room .small { font-size:16px; }
+    .room .trng { font-size:34px; } .room .tlab, .room .taim { font-size:16px; }
     .roomcap, .roomh, .roomsub { text-align:left; }
     .split, .trade, .next, .twocol { grid-template-columns:1fr; gap:36px; }
     .hist .lbl, .hist .tick { font-size:30px; } .hist .lbl.strong { font-size:34px; }
