@@ -390,7 +390,7 @@ def room(rx: Rx, p: Profile, hist=None, usual: float | None = None) -> str:
          f'aria-label="Your heart today: {band_lo} to {c}. Resting {rest}, max {mx}.">']
 
     # today's cross-section, behind everything: the full width of the chart
-    o.append(f'<rect class="xsec" x="{AX - 32}" y="{yt:.1f}" width="{W - AX + 32}" height="{yb - yt:.1f}"/>')
+    o.append(f'<rect class="xsec" x="{X0}" y="{yt:.1f}" width="{W - X0}" height="{yb - yt:.1f}" rx="6"/>')
 
     # zones column: tint, name, feel; the part inside today's range lit in full color
     for i, (name, zlo, zhi) in enumerate(p.zones.bounds):
@@ -399,16 +399,17 @@ def room(rx: Rx, p: Profile, hist=None, usual: float | None = None) -> str:
         if zb <= za:
             continue
         o.append(f'<rect class="zf z{i + 1}" x="{X0}" y="{Y(zb):.1f}" width="{X1 - X0}" height="{Y(za) - Y(zb):.1f}"/>')
+        o.append(f'<rect class="zs z{i + 1}" x="{X0}" y="{Y(zb):.1f}" width="4" height="{max(1, Y(za) - Y(zb) - 1):.1f}"/>')
         la_, lb = max(za, band_lo), min(zb, c + 1)
         if lb > la_:
             o.append(f'<rect class="zon z{i + 1}" x="{X0}" y="{Y(lb):.1f}" width="{X1 - X0}" height="{Y(la_) - Y(lb):.1f}"/>')
         ya, yb2 = Y(max(za, knee)), Y(zb)
-        inside = band_lo <= (za + zb) / 2 <= c
+        inside = False
         if ya - yb2 >= 34:
-            o.append(f'<text class="zn{" on" if inside else ""}" x="{X0 + 12}" y="{(ya + yb2) / 2 - 2:.1f}">{ZONE_SHORT.get(name, name)}</text>')
-            o.append(f'<text class="zd{" on" if inside else ""}" x="{X0 + 12}" y="{(ya + yb2) / 2 + 15:.1f}">{ZONE_FEEL.get(name, "")}</text>')
+            o.append(f'<text class="zn{" on" if inside else ""}" x="{X0 + 16}" y="{(ya + yb2) / 2 - 2:.1f}">{ZONE_SHORT.get(name, name)}</text>')
+            o.append(f'<text class="zd{" on" if inside else ""}" x="{X0 + 16}" y="{(ya + yb2) / 2 + 15:.1f}">{ZONE_FEEL.get(name, "")}</text>')
         elif ya - yb2 >= 16:
-            o.append(f'<text class="zn{" on" if inside else ""}" x="{X0 + 12}" y="{(ya + yb2) / 2 + 5:.1f}">{ZONE_SHORT.get(name, name)}</text>')
+            o.append(f'<text class="zn{" on" if inside else ""}" x="{X0 + 16}" y="{(ya + yb2) / 2 + 5:.1f}">{ZONE_SHORT.get(name, name)}</text>')
 
     last_y = None
     for v in sorted({*range((knee // 10 + 1) * 10, top, 10), band_lo, c}):
@@ -446,8 +447,5 @@ def room(rx: Rx, p: Profile, hist=None, usual: float | None = None) -> str:
     if usual and abs(Y(usual) - mid) > 30:
         o.append(f'<line class="usual" x1="{DX0}" x2="{DX1}" y1="{Y(usual):.1f}" y2="{Y(usual):.1f}"/>')
 
-    # today's range edges: quiet lines; the range itself says where the top is
-    o.append(f'<line class="edgelo" x1="{AX - 32}" x2="{W}" y1="{yt:.1f}" y2="{yt:.1f}"/>')
-    o.append(f'<line class="edgelo" x1="{AX - 32}" x2="{W}" y1="{yb:.1f}" y2="{yb:.1f}"/>')
     o.append("</svg>")
     return "".join(o)
