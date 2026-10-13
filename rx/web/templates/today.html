@@ -65,11 +65,21 @@
   .jnoteRow button { margin-top:0 !important; }
   .jr textarea { width:100%; font:inherit; font-size:17px; padding:14px; border:1px solid #d4d4d8; border-radius:8px; resize:vertical; }
   .jr button { margin-top:10px; font:inherit; font-weight:600; font-size:15px; padding:10px 20px; border:0; border-radius:8px; background:var(--ink); color:#fff; cursor:pointer; }
+  .jsaved { margin:12px 0 0; font-size:15px; font-weight:600; color:var(--good); opacity:0; transform:translateY(-4px);
+            transition:opacity .25s ease, transform .25s ease; min-height:1.4em; }
+  .jsaved.show { opacity:1; transform:none; }
+  .jsaved.show::before { content:"✓"; display:inline-grid; place-items:center; width:20px; height:20px; margin-right:8px;
+            border-radius:50%; background:var(--good); color:#fff; font-size:12px; animation:pop .35s ease; }
+  @keyframes pop { 0% { transform:scale(.4); } 70% { transform:scale(1.15); } 100% { transform:scale(1); } }
+  @media (prefers-reduced-motion: reduce) { .jsaved, .jsaved.show::before { transition:none; animation:none; } }
+  .jlog { list-style:none; padding:0; margin:10px 0 0; font-size:14px; color:var(--lichen); display:flex; flex-wrap:wrap; gap:4px 18px; }
+  .jlog b { color:var(--ink); font-weight:600; margin-right:4px; }
   .jtags { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0 0; }
   .jtags span { font-size:13px; font-weight:600; padding:4px 10px; border-radius:999px; background:var(--frost); }
   .jnote { font-size:16px; margin:12px 0 0; max-width:56ch; }
   .jpat { font-size:16px; margin:12px 0 0; }
   .jhint { color:var(--lichen); font-size:15px; margin:12px 0 0; max-width:56ch; }
+  .whatalt { margin:6px 0 0; color:var(--lichen); font-size:16px; }
   .rowd { border-bottom:1px solid var(--rule); }
   .rowd > summary { display:grid; grid-template-columns:110px 1fr 18px; gap:20px; padding:16px 0; cursor:pointer; list-style:none; align-items:start; }
   .rowd > summary::-webkit-details-marker { display:none; }
@@ -262,10 +272,9 @@
     <p class="dnext">Tomorrow{% if after.changed %}, re-planned {{ after.why }}{% endif %}: {{ after.tomorrow }}.{% if after.changed and after.was %} <span class="dwas">Was {{ after.was }}.</span>{% endif %}</p>
     {% endif %}
     <div class="pad">
-      <details class="rowd"><summary><span class="rxk">What</span><p class="rxv">{{ rx.what or rx.do }}</p><i class="chev" aria-hidden="true"></i></summary>
-        <div class="rowb">{% if rx.activity_why %}<p class="actwhy">{{ rx.activity_why }}</p>{% endif %}</div></details>
-      {% if rx.options %}<details class="rowd"><summary><span class="rxk">Or</span><p class="rxv">{{ rx.options_short }}</p><i class="chev" aria-hidden="true"></i></summary>
-        <div class="rowb"><dl class="tmr">{% for title, note, tone, short in rx.options %}<div class="t-{{ 'good' if tone == 'good' else 'muted' }}"><dt>{{ title }}</dt><dd>{{ note }}</dd></div>{% endfor %}</dl></div></details>{% endif %}
+      <details class="rowd"><summary><span class="rxk">What</span><div class="rxv"><p class="rxv">{{ rx.what or rx.do }}</p>{% if rx.options_short %}<p class="whatalt">{{ rx.options_short }}</p>{% endif %}</div><i class="chev" aria-hidden="true"></i></summary>
+        <div class="rowb">{% if rx.options %}<dl class="tmr">{% for title, note, tone, short, k in rx.options %}<div class="t-{{ 'good' if loop.first else ('bad' if tone == 'bad' else 'muted') }}"><dt>{{ title }}{% if loop.first %}: our pick{% endif %}</dt><dd>{{ note }}</dd></div>{% endfor %}</dl>{% endif %}
+        {% if rx.activity_why %}<p class="actwhy">{{ rx.activity_why }}</p>{% endif %}</div></details>
       <details class="rowd"><summary><span class="rxk">How</span><p class="rxv">{{ rx.how_short }}</p><i class="chev" aria-hidden="true"></i></summary>
         <div class="rowb"><ul class="rxlist">{% for h in rx.how_more %}<li>{{ h }}</li>{% endfor %}</ul></div></details>
       {% if rx.reading %}<details class="rowd"><summary><span class="rxk">Why</span><p class="rxv">{{ rx.why_need }} {{ rx.why_story }}</p><i class="chev" aria-hidden="true"></i></summary>
@@ -287,17 +296,19 @@
       <form method="post" action="/journal" class="jform">
         <div class="jrow"><span class="jk">Feeling</span>
           {% for v, l in [('good','Energized'),('normal','Normal'),('tired','Tired'),('sick','Sick')] %}
-          <label class="pill"><input type="radio" name="feel" value="{{ v }}" {{ 'checked' if tp.feel == v }} onchange="this.form.submit()"><span>{{ l }}</span></label>{% endfor %}</div>
+          <label class="pill"><input type="radio" name="feel" value="{{ v }}" {{ 'checked' if tp.feel == v }}><span>{{ l }}</span></label>{% endfor %}</div>
         <div class="jrow"><span class="jk">Drinks</span>
           {% for v, l in [('0','None'),('2','1 or 2'),('3','3 or more')] %}
-          <label class="pill"><input type="radio" name="drinks" value="{{ v }}" {{ 'checked' if tp.drinks == v }} onchange="this.form.submit()"><span>{{ l }}</span></label>{% endfor %}</div>
+          <label class="pill"><input type="radio" name="drinks" value="{{ v }}" {{ 'checked' if tp.drinks == v }}><span>{{ l }}</span></label>{% endfor %}</div>
         <div class="jrow"><span class="jk">Food</span>
           {% for v, l in [('good','Ate well'),('ok','OK'),('poor','Ate poorly')] %}
-          <label class="pill"><input type="radio" name="food" value="{{ v }}" {{ 'checked' if tp.food == v }} onchange="this.form.submit()"><span>{{ l }}</span></label>{% endfor %}</div>
-        <div class="jnoteRow"><input class="jtext" name="text" value="{{ entry.text if entry else '' }}" placeholder="Anything else? Pizza and a beer, long day at work…">
+          <label class="pill"><input type="radio" name="food" value="{{ v }}" {{ 'checked' if tp.food == v }}><span>{{ l }}</span></label>{% endfor %}</div>
+        <div class="jnoteRow"><input class="jtext" name="text" id="jtext" value="" placeholder="Anything else? Pizza and a beer, long day at work…">
           <button type="submit">Save</button></div>
       </form>
-      {% if entry_tags %}<p class="jtags">{% for t in entry_tags %}<span>{{ t }}</span>{% endfor %}</p>{% endif %}
+      <p class="jsaved" id="jsaved" role="status" aria-live="polite"></p>
+      <p class="jtags" id="jtags">{% for t in entry_tags %}<span>{{ t }}</span>{% endfor %}</p>
+      <ol class="jlog" id="jlog">{% if entry and entry.log %}{% for e in entry.log[-8:] %}{% if e.at %}<li><b>{{ e.at }}</b> {{ ((e.taps.feel or '')|replace('good','Energized')|replace('tired','Tired')|replace('sick','Sick')|replace('normal','Normal')) }}{{ ' · ' ~ e.text if e.text }}</li>{% endif %}{% endfor %}{% endif %}</ol>
       {% if after and after.journal_note %}<p class="jnote">{{ after.journal_note }}</p>{% endif %}
       {% if patterns %}<ul class="jpat">{% for x in patterns %}<li>{{ x }}</li>{% endfor %}</ul>
       {% else %}<p class="jhint">Log a line most days. After a few weeks Ceiling shows you what drinks, food, stress and late nights actually do to your recovery.</p>{% endif %}
@@ -441,4 +452,35 @@
     {% for n in rx.notes %}<p class="note">{{ n }}</p>{% endfor %}
   </div>
 </section>
+
+<script>
+(() => {
+  const form = document.querySelector('.jform');
+  if (!form) return;
+  const saved = document.getElementById('jsaved'), tags = document.getElementById('jtags'),
+        log = document.getElementById('jlog'), text = document.getElementById('jtext');
+  let timer;
+  async function send(extra) {
+    const body = new URLSearchParams(extra);
+    try {
+      const r = await fetch('/journal', {method: 'POST', body, headers: {'Accept': 'application/json'}});
+      const j = await r.json();
+      tags.innerHTML = j.tags.map(t => `<span>${t}</span>`).join('');
+      log.innerHTML = j.log.filter(e => e.at).map(e => `<li><b>${e.at}</b> ${e.what}</li>`).join('');
+      saved.textContent = `Got it, ${j.at}. Add more any time.`;
+      saved.classList.remove('show'); void saved.offsetWidth; saved.classList.add('show');
+      clearTimeout(timer); timer = setTimeout(() => saved.classList.remove('show'), 2600);
+    } catch (e) {
+      saved.textContent = "Couldn't save. Check your connection and tap again.";
+      saved.classList.add('show');
+    }
+  }
+  form.querySelectorAll('input[type=radio]').forEach(r => r.addEventListener('change', () => send({[r.name]: r.value})));
+  form.addEventListener('submit', ev => {
+    ev.preventDefault();
+    if (!text.value.trim()) return;
+    send({text: text.value.trim()}); text.value = '';
+  });
+})();
+</script>
 {% endblock %}

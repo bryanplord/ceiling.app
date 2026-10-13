@@ -33,6 +33,7 @@ class Profile:
     response: resp.Response
     progress: prog.Progress
     typical_minutes: dict[str, float] = field(default_factory=dict)
+    hr_hist: dict = field(default_factory=dict)   # activity id -> seconds at each bpm (30-s smoothed), last 150 days
     sport_mix: list[str] = field(default_factory=list)  # most → least common, last 28 days
 
     @property
@@ -116,7 +117,18 @@ def build(store: Store, as_of: str | None = None) -> Profile:
             typical[sport] = statistics.median(mins)
     mix = [s for s, _ in Counter(a.sport for a in past_acts if a.date >= cutoff28).most_common()]
 
+    import numpy as _np
+    cut150 = (date.fromisoformat(as_of) - timedelta(days=150)).isoformat()
+    hr_hist = {}
+    for a in past_acts:
+        if a.date >= cut150 and a.id in streams:
+            h_ = hra.clean(*streams[a.id])
+            v_ = h_[~_np.isnan(h_)]
+            if len(v_) >= 60:
+                v_ = _np.convolve(v_, _np.ones(30) / 30, mode="valid")
+                hr_hist[a.id] = _np.bincount(_np.clip(_np.round(v_).astype(int), 0, 230), minlength=231)
     return Profile(
+        hr_hist=hr_hist,
         as_of=as_of, max_hr=mx, threshold=th, aerobic=lt1, zones=zones, rest_hr=rest,
         activities=acts, wellness=wellness, session_load=session_load, daily_load=daily,
         load_days=load_days,

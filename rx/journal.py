@@ -105,33 +105,51 @@ def effect(tags: dict) -> tuple[str | None, str]:
     return None, ""
 
 
-def save(store, day: str, text: str, taps: dict | None = None) -> dict:
-    """Taps (the one-touch buttons) win over anything read from the note."""
-    tags = parse(text) if text else {}
-    taps = taps or {}
-    feel = taps.get("feel")
-    if feel == "sick":
-        tags["sick"] = True
-        tags.pop("feel", None)
-    elif feel in ("good", "tired"):
-        tags["feel"] = feel
-        tags.pop("sick", None) if "sick" not in parse(text or "") else None
-    elif feel == "normal":
-        tags.pop("feel", None)
-    if taps.get("drinks") in ("0", "2", "3"):
-        n = int(taps["drinks"])
-        if n:
-            tags["drinks"] = max(n, tags.get("drinks") or 0) if (tags.get("drinks") or 0) > 0 else n
-            tags["_tap_drinks"] = True
-        else:
-            tags.pop("drinks", None)
-    if taps.get("food") in ("good", "ok", "poor"):
-        if taps["food"] == "ok":
+def save(store, day: str, text: str, taps: dict | None = None, at: str = "") -> dict:
+    """Add a check-in. Every check-in is kept with its time, so "tired" at 7 AM and
+    "energized" at 2 PM both count; the day's tags are built from all of them, the latest
+    feeling winning, drinks adding up to the most reported, food the latest word."""
+    prev = load(store, day) or {}
+    log = prev.get("log") or ([{"at": "", "text": prev.get("text", ""), "taps": prev.get("taps", {})}]
+                              if prev.get("text") or prev.get("taps") else [])
+    taps = {k: v for k, v in (taps or {}).items() if v}
+    if text or taps:
+        log.append({"at": at, "text": (text or "").strip()[:500], "taps": taps})
+    tags: dict = {}
+    for e in log:                                     # oldest first: later check-ins win
+        t = parse(e.get("text") or "")
+        tp = e.get("taps") or {}
+        for k in ("sick", "stress", "late"):
+            if t.get(k):
+                tags[k] = True
+        if t.get("drinks"):
+            tags["drinks"] = max(tags.get("drinks") or 0, t["drinks"]) if t["drinks"] > 0 else (tags.get("drinks") or -1)
+        if t.get("food"):
+            tags["food"] = t["food"]
+        if t.get("feel"):
+            tags["feel"] = t["feel"]
+        f = tp.get("feel")
+        if f == "sick":
+            tags["sick"] = True
+        elif f in ("good", "tired"):
+            tags["feel"] = f
+        elif f == "normal":
+            tags.pop("feel", None)
+        if tp.get("drinks") in ("0", "2", "3"):
+            n = int(tp["drinks"])
+            if n == 0:
+                tags.pop("drinks", None)
+            else:
+                tags["drinks"] = max(n, tags.get("drinks") or 0)
+                tags["_tap_drinks"] = True
+        if tp.get("food") in ("good", "poor"):
+            tags["food"] = tp["food"]
+        elif tp.get("food") == "ok":
             tags.pop("food", None)
-        else:
-            tags["food"] = taps["food"]
-    store.set_meta(f"journal:{day}", json.dumps({"text": (text or "").strip()[:2000], "tags": tags,
-                                                  "taps": {k: v for k, v in taps.items() if v}}))
+    latest = {}
+    for e in log:
+        latest.update(e.get("taps") or {})
+    store.set_meta(f"journal:{day}", json.dumps({"text": "", "tags": tags, "taps": latest, "log": log[-40:]}))
     return tags
 
 

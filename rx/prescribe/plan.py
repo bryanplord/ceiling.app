@@ -158,7 +158,8 @@ def build(p: Profile, rx: Rx) -> Plan:
                 lo_, hi_ = eng.easy_band(p.zones)
             shim = SimpleNamespace(verdict=v, hr_low=lo_, hr_ceiling=hi_, date=d,
                                    max_minutes={HARD: 75, STEADY: 90, EASY: 60}[v])
-            alts = [o for o in eng.alternatives(p, shim, kind) if not (o[3].endswith("run") and ban & RUNS)]
+            alts = [o for o in eng.alternatives(p, shim, kind) if o[2] != "bad"
+                    and not (o[3].endswith("run") and ban & RUNS)]
             if alts:
                 names = [o[3] for o in alts[:2]]
                 pd.options = "Or " + " or ".join(names) + "."

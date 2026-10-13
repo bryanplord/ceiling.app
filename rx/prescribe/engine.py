@@ -843,7 +843,9 @@ def choose_activity(verdict: str, p: Profile, day: str, planned: dict | None = N
         # What you actually do counts most: your main sports get the nod, variety is a tiebreaker.
         habit = st["n"] / max(1, sum(v["n"] for kk, v in stats.items() if kk != "walk"))
         new_run = k in ("run", "trail run") and runs_recent < 6
-        score = ((4 if fits else 1.5 if reach else -10) + 3 * habit + 1 * (1 - share)
+        ov, _climb = over_share(p, k, hi, day) if verdict in (EASY, STEADY) else (None, None)
+        hot = ov is not None and ov > (0.3 if verdict == EASY else 0.4)
+        score = ((4 if fits else 1.5 if reach else -10) + 3 * habit + 1 * (1 - share) - (6 if hot else 0)
                  + (1 if k in CONTROLLED and verdict == EASY else 0)
                  - (1.5 if k == avoid else 0) - (1.5 if new_run else 0))
         notes[k] = (fits, reach, hr, st, share)
@@ -881,11 +883,28 @@ def choose_activity(verdict: str, p: Profile, day: str, planned: dict | None = N
     return sport, best, " ".join(parts), cap
 
 
+def over_share(p: Profile, kind: str, ceiling: int, day: str, last: int = 10) -> tuple[float | None, float | None]:
+    """How your own recent sessions of this kind actually went against today's ceiling:
+    (share of time above it, feet climbed per hour). Your terrain is in here: if every ride
+    from your door starts with a climb, it shows."""
+    acts = sorted((a for a in p.activities if SUBTYPE.get(a.raw_type or "") == kind and a.id in p.hr_hist
+                   and a.date < day), key=lambda a: a.date)[-last:]
+    if len(acts) < 3:
+        return None, None
+    over = tot = 0.0
+    for a in acts:
+        h = p.hr_hist[a.id]
+        over += float(h[ceiling + 1:].sum())
+        tot += float(h.sum())
+    climbs = [a.elev_m * 3.281 / (a.moving_s / 3600) for a in acts if a.elev_m and a.moving_s]
+    return (over / tot if tot else None), (sum(climbs) / len(climbs) if climbs else None)
+
+
 SNOW = {"ski tour", "nordic ski", "resort skiing"}
 BIKES = {"mountain bike", "road ride", "gravel ride", "trainer ride"}
 
 
-def alternatives(p: Profile, rx: Rx, chosen: str | None) -> list[tuple[str, str, str, str]]:
+def alternatives(p: Profile, rx: Rx, chosen: str | None, include_chosen: bool = False) -> list[tuple]:
     """Other ways to do today's session, from the things you actually do, each judged by what it
     does to YOUR heart (your own sessions of that kind over the last year) and by the season.
     Returns (title, note, tone, short name), best first. Same heart rate whatever you pick."""
@@ -901,7 +920,7 @@ def alternatives(p: Profile, rx: Rx, chosen: str | None) -> list[tuple[str, str,
                  (date.fromisoformat(rx.date) - timedelta(days=30)).isoformat() <= a.date < rx.date)
     out = []
     for k, st in stats.items():
-        if k == chosen or k == "walk" or st["n"] < 3:
+        if (k == chosen and not include_chosen) or k == "walk" or st["n"] < 3:
             continue
         if k in SNOW and not winter:
             continue
@@ -921,7 +940,7 @@ def alternatives(p: Profile, rx: Rx, chosen: str | None) -> list[tuple[str, str,
             mins = base
             if k in BIKES and rx.verdict == EASY:
                 mins = max(base, 60)                    # low impact: you can ride longer than you run
-            if k in ("run", "trail run") and runs30 < 3:
+            if k in ("run", "trail run") and runs30 < 6:
                 mins = min(mins, 40)
             if k == "ski tour":
                 mins = max(base, 75)
@@ -946,7 +965,15 @@ def alternatives(p: Profile, rx: Rx, chosen: str | None) -> list[tuple[str, str,
             if rx.verdict in (STEADY, HARD):
                 continue                                 # can't reach the range: not an option
             note, tone = f"Your {noun}s average {hr:.0f}, under today's range: fine for an easy day.", "ok"
-        if k == "mountain bike" and rx.verdict in (EASY, LIGHT):
+        ov, climb = over_share(p, k, hi, rx.date) if rx.verdict in (EASY, STEADY) else (None, None)
+        if ov is not None and ov > 0.3:
+            where = f" and climb {round(climb / 50) * 50:,.0f} ft an hour" if climb else ""
+            note = (f"Your last {noun}s spent {ov * 100:.0f}% of the time over {hi}{where}. "
+                    f"{'Holding easy means walking every climb.' if rx.verdict == EASY else 'Expect to go over on the climbs.'}")
+            tone = "bad"
+        elif ov is not None and rx.verdict in (EASY, STEADY):
+            note += f" Your recent ones stayed under {hi} {100 - ov * 100:.0f}% of the time."
+        if k == "mountain bike" and rx.verdict in (EASY, LIGHT) and tone != "bad":
             note += " Climbs spike it: spin, or walk the steep pitches."
         if k == "mountain bike" and deep:
             note += " Only if the trails are clear of snow."
@@ -955,11 +982,11 @@ def alternatives(p: Profile, rx: Rx, chosen: str | None) -> list[tuple[str, str,
         if k in ("run", "trail run") and deep:
             note += " If the trails are snowed in, a treadmill gives you the same session."
         if k in ("run", "trail run") and runs30 < 3:
-            note += " Your legs aren't used to running right now: keep it short."
+            note += " Shorter on foot: your legs aren't used to running right now."
         short = {"resort skiing": "a day of resort skiing"}.get(k, ("an " if noun[0] in "aeiou" else "a ") + noun)
-        out.append((title, note, tone, short))
-    out.sort(key=lambda o: 0 if o[2] == "good" else 1)
-    return out[:4]
+        out.append((title, note, tone, short, k))
+    out.sort(key=lambda o: (0 if o[4] == chosen else 1, {"good": 0, "ok": 1, "bad": 2}[o[2]]))
+    return out[:5]
 
 
 def _hm_short(h: float) -> str:

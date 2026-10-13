@@ -442,13 +442,40 @@ def data_page(request: Request, msg: str | None = None):
 
 @app.post("/journal")
 async def journal_save(request: Request):
+    """A check-in. Called by the page in the background (no reload); returns what was understood."""
+    from datetime import datetime as _dt
+    from zoneinfo import ZoneInfo as _Z
+    from ..config import settings as _settings
+    from fastapi.responses import JSONResponse
     from .. import journal as jr
     form = parse_qs((await request.body()).decode())
     text = (form.get("text", [""])[0] or "").strip()
     taps = {k: (form.get(k, [""])[0] or "") for k in ("feel", "drinks", "food")}
-    if text or any(taps.values()):
-        jr.save(open_store(), local_today().isoformat(), text, taps)
+    now = _dt.now(_Z(_settings().tz))
+    store = open_store()
+    day = now.date().isoformat()
+    tags = jr.save(store, day, text, taps, now.strftime("%-I:%M %p")) if (text or any(taps.values())) else {}
+    if "application/json" in request.headers.get("accept", ""):
+        entry = jr.load(store, day) or {}
+        cap, note = jr.effect(entry.get("tags", {}))
+        return JSONResponse({"ok": True, "at": now.strftime("%-I:%M %p"), "tags": jr.label(entry.get("tags", {})),
+                             "note": note, "log": [{"at": e.get("at", ""), "what": ", ".join(
+                                 jr.label(jr.parse(e.get("text", "")) | _taps_tags(e.get("taps", {})))) or e.get("text", "")}
+                                 for e in entry.get("log", [])][-8:]})
     return RedirectResponse("/#journal", status_code=303)
+
+
+def _taps_tags(t: dict) -> dict:
+    out = {}
+    if t.get("feel") == "sick":
+        out["sick"] = True
+    elif t.get("feel") in ("good", "tired"):
+        out["feel"] = t["feel"]
+    if t.get("drinks") in ("2", "3"):
+        out["drinks"] = int(t["drinks"]); out["_tap_drinks"] = True
+    if t.get("food") in ("good", "poor"):
+        out["food"] = t["food"]
+    return out
 
 
 @app.post("/connect")
