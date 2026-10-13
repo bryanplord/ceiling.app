@@ -80,6 +80,7 @@ def test_calendar_feed_needs_a_signed_key(tmp_path, monkeypatch):
     monkeypatch.setenv("RX_SECRET", "x" * 40)
     from rx.web import auth
     monkeypatch.setenv("RX_USERS", "bryan@example.com=" + auth.hash_password("pw"))
+    monkeypatch.setenv("RX_PRIMARY_EMAIL", "bryan@example.com")
     demo.seed(Store(tmp_path / "rx.db"), days=90, end=date.today())
     from rx.web.app import app
     c = TestClient(app)
