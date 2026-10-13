@@ -99,6 +99,7 @@ class Wellness:
     sleep_score: float | None = None
     sleep_secs: float | None = None
     readiness: float | None = None
+    breathing: float | None = None
 
 
 class _Row(tuple):
@@ -310,8 +311,28 @@ class Store:
             merged = Wellness(date=day)
             for f in ("hrv", "rhr", "sleep_score", "sleep_secs", "readiness"):
                 setattr(merged, f, _first(r[f] for r in rows))
+            merged.breathing = _first(_breathing(r) for r in rows)
             out.append(merged)
         return out
+
+
+def _breathing(row):
+    """Overnight breaths per minute, from the source's raw record (intervals.icu: respiration)."""
+    try:
+        raw = row["raw"]
+    except (IndexError, KeyError):
+        return None
+    if not raw:
+        return None
+    try:
+        d = json.loads(raw) if isinstance(raw, str) else raw
+    except Exception:
+        return None
+    for k in ("respiration", "avgSleepRespirationValue", "avgSleepRespiration"):
+        v = d.get(k) if isinstance(d, dict) else None
+        if isinstance(v, (int, float)) and 6 < v < 40:
+            return float(v)
+    return None
 
 
 def _first(values: Iterable):

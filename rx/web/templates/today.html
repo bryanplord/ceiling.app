@@ -224,7 +224,7 @@
         <div class="rowb"><ul class="rxlist">{% for h in rx.how_more %}<li>{{ h }}</li>{% endfor %}</ul></div></details>
       {% if rx.reading %}<details class="rowd"><summary><span class="rxk">Why</span><p class="rxv">{{ rx.why_need }} {{ rx.why_story }}</p><i class="chev" aria-hidden="true"></i></summary>
         <div class="rowb"><p class="whyhead"><b class="{{ rx.why_tone }}">{{ rx.why_title }}.</b> {{ rx.why_says }}</p>
-          <ul class="rxlist facts">{% for e in rx.reading.evidence[:4] %}<li><b>{{ e.name }}</b> {{ e.line.split('. ')[0].rstrip('.') }}.</li>{% endfor %}
+          <ul class="rxlist facts">{% for e in rx.reading.evidence[:5] %}<li><b>{{ e.name }}</b> {{ e.line.split('. ')[0].rstrip('.') }}.</li>{% endfor %}
           {% if rx.sleep and rx.sleep.state not in ('even', 'unknown', 'surplus') %}{% set sd = rx.sleep.says.split('. ')[0].rstrip('.') %}<li><b>Sleep debt</b> {{ sd[:1] | upper }}{{ sd[1:] }}.</li>{% endif %}</ul></div></details>{% endif %}
       {% if rx.minimum %}{% set ms = rx.minimum.split('. ') %}<details class="rowd"><summary><span class="rxk">Minimum</span><p class="rxv">{{ ms[0].rstrip('.') }}.</p><i class="chev" aria-hidden="true"></i></summary>
         <div class="rowb"><p class="actwhy">{{ ms[1:]|join('. ') }}</p></div></details>{% endif %}

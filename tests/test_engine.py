@@ -92,3 +92,24 @@ def test_score_penalizes_ceiling_and_duration():
     t2, h2 = demo.hr_session(70, 138, [(30, 15, 158)])
     bad = score(rx, t2, h2)
     assert bad.score < 60 and bad.minutes_over >= 10 and bad.over_duration >= 10
+
+
+def test_breathing_and_rhr_up_together_caps_the_day(store):
+    p = prof.build(store, TODAY.isoformat())
+    day = TODAY.isoformat()
+    for w in p.wellness:
+        w.breathing = 12.5
+    last = next(w for w in p.wellness if w.date == day)
+    last.breathing, last.rhr = 14.3, (last.rhr or 50) + 6
+    rx = eng.build_rx(p)
+    assert eng.ORDER.index(rx.verdict) <= eng.ORDER.index(eng.EASY)
+    assert "breathing" in rx.why_story.lower()
+    assert any(e.name == "Breathing" for e in rx.reading.evidence)
+
+
+def test_breathing_normal_changes_nothing(store):
+    p = prof.build(store, TODAY.isoformat())
+    base = eng.build_rx(p).verdict
+    for w in p.wellness:
+        w.breathing = 12.5
+    assert eng.build_rx(p).verdict == base

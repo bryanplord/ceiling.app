@@ -164,6 +164,16 @@ def build_rx(p: Profile, day: str | None = None) -> Rx:
     verdict = cap_verdict(verdict, reading.cap)
     why = [reading.says] + [r for r in why if not r.startswith(
         ("HRV", "Resting HR", "Sleep", "Recovered", "Recovery looks", "No sleep"))]
+    from ..analysis import breathing as br
+    breath = br.check(p.wellness, day)
+    if breath.last is not None and breath.usual is not None:
+        from ..analysis.reading import Evidence
+        reading.evidence.insert(0 if breath.status != "normal" else len(reading.evidence), Evidence(
+            "Breathing", f"{breath.last:.1f} breaths a minute overnight; your usual is {breath.usual:.1f}.",
+            "bad" if breath.status == "warning" else "ok" if breath.status == "up" else "good"))
+    if breath.status == "warning":
+        verdict = cap_verdict(verdict, LIGHT if breath.last - breath.usual >= 1.5 and breath.rhr_up >= 5 else EASY)
+        why.insert(0, breath.says)
     sb = sleepbank.bank(p.wellness, p.daily_load, day)
     before = verdict
     verdict = cap_verdict(verdict, sb.cap)
@@ -819,6 +829,8 @@ def choose_activity(verdict: str, p: Profile, day: str, planned: dict | None = N
 
     lo, hi = band
     best, best_score, notes = None, -99.0, {}
+    cut30_ = (date.fromisoformat(day) - timedelta(days=30)).isoformat()
+    runs_recent = sum(1 for a in p.activities if a.sport == RUN and cut30_ <= a.date < day)
     for k, st in stats.items():
         if k == "walk" or st["n"] < 3:
             continue
@@ -828,8 +840,12 @@ def choose_activity(verdict: str, p: Profile, day: str, planned: dict | None = N
         fits = lo - 3 <= hr <= hi + 2
         reach = st["hr_hi"] >= lo           # your harder sessions of this kind do reach it
         share = mix14.get(SPORT_OF.get(k, BIKE), 0.0) / tot if tot else 0.0
-        score = ((4 if fits else 1.5 if reach else -10) + 2 * (1 - share) + (1 if k in CONTROLLED and verdict == EASY else 0)
-                 - (1.5 if k == avoid else 0))
+        # What you actually do counts most: your main sports get the nod, variety is a tiebreaker.
+        habit = st["n"] / max(1, sum(v["n"] for kk, v in stats.items() if kk != "walk"))
+        new_run = k in ("run", "trail run") and runs_recent < 6
+        score = ((4 if fits else 1.5 if reach else -10) + 3 * habit + 1 * (1 - share)
+                 + (1 if k in CONTROLLED and verdict == EASY else 0)
+                 - (1.5 if k == avoid else 0) - (1.5 if new_run else 0))
         notes[k] = (fits, reach, hr, st, share)
         if score > best_score:
             best, best_score = k, score
@@ -987,6 +1003,10 @@ def why_story(verdict: str, p: Profile, day: str, sb, reading) -> tuple[str, str
         bad.append(f"resting HR is creeping up ({rhr7:.0f} against your usual {rhr60:.0f})")
     if load_up:
         bad.append(f"your last week is {(y.atl / y.ctl - 1) * 100:.0f}% above your normal training")
+    from ..analysis import breathing as br
+    b = br.check(p.wellness, day)
+    if b.status in ("warning", "up"):
+        bad.insert(0, f"your breathing was up overnight ({b.last:.1f} a minute against your usual {b.usual:.1f})")
     if hrv_dir == "flat" and rhr_dir == "flat":
         good.append("HRV and resting HR are both holding")
     else:
@@ -1001,7 +1021,10 @@ def why_story(verdict: str, p: Profile, day: str, sb, reading) -> tuple[str, str
     parts = []
     if bad:
         parts.append(join(bad)[0].upper() + join(bad)[1:] + ".")
-    if hrv_dir == "down" and (rhr_dir == "up" or debt >= 2.0):
+    if b.status == "warning":
+        parts.append("Breathing and resting HR rising together is often the first sign you're fighting "
+                     "something off, before you feel it. Keep today easy and see how tonight reads.")
+    elif hrv_dir == "down" and (rhr_dir == "up" or debt >= 2.0):
         parts.append("Together that means you're fatigued and not fully recovered. Easy work keeps the "
                      "fitness; anything harder digs the hole deeper.")
     elif hrv_dir == "down":
