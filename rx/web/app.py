@@ -90,13 +90,22 @@ def _refresh_in_background() -> None:
             last = float(store.get_meta("last_sync") or 0)
             if time.time() - last < REFRESH_EVERY_S:
                 return
-            days = 3 if last else 365   # first run backfills a year
+            # Backfill a year until a backfill has actually brought data in; an empty
+            # pull (source not ready yet) must not mark history as done.
+            backfilled = store.get_meta("backfilled") == "1"
+            days = 3 if backfilled else 365
             store.set_meta("sync_state", f"running since {int(time.time())}")
             client = intervals.IntervalsClient(key, os.getenv("INTERVALS_ATHLETE_ID", "0"))
             intervals.sync(client, store, days=days,
                            log=lambda msg: store.set_meta("sync_progress", str(msg).strip()))
             store.set_meta("last_sync", str(time.time()))
-            store.set_meta("sync_state", "ok")
+            after = store.counts()
+            if after["activities"] or after["wellness"]:
+                store.set_meta("backfilled", "1")
+                store.set_meta("sync_state", "ok")
+            else:
+                store.set_meta("sync_state", "ok, but intervals.icu returned no activities or wellness")
+                store.set_meta("last_sync", "0")   # try again on the next visit
             store.sync()
         except Exception as e:  # never take the site down over a sync
             print(f"sync failed: {e}")
