@@ -200,8 +200,7 @@ def build_rx(p: Profile, day: str | None = None) -> Rx:
             dont = "No training at all today. Resting is the workout."
     elif verdict == EASY:
         low, ceiling = easy_band(z)
-        do = (f"{verb} easy, {mins} minutes max, heart rate {low}–{ceiling}. It should feel almost too easy: "
-              f"full sentences the whole way.")
+        do = (f"{verb} easy, {mins} minutes max, heart rate {low}–{ceiling}. It should feel almost too easy.")
         dont = f"Don't let the climbs drag you over {ceiling}. Shift down, spin, or walk them."
     elif verdict == STEADY:
         low, ceiling = z.bottom("Z2 Aerobic"), z.top("Z2 Aerobic")
@@ -471,7 +470,7 @@ def _session_full(p: Profile, v: str, z, Noun: str) -> tuple[str, float]:
                 _est_load(p, 90, (lo + hi) / 2))
     if v == EASY:
         lo, hi = easy_band(z)
-        return (f"an easy day. {Noun}, 60 minutes at {lo}–{hi}, full sentences the whole way",
+        return (f"an easy day. {Noun}, 60 minutes at {lo}–{hi}",
                 _est_load(p, 60, (lo + hi) / 2))
     if v == LIGHT:
         return "a walk day. 30 to 45 minutes, nothing more", _est_load(p, 45, z.top("Z1 Recovery") - 15)
@@ -643,8 +642,7 @@ def what_how(rx: Rx, kind: str | None, mins: int, low, ceiling, steps) -> tuple[
                "No riding, no running, no speed-walking to rack up steps."]
     elif v == EASY:
         what = f"An easy {noun}, {mins} minutes at {round((low + ceiling) / 2)} ({low}–{ceiling})."
-        how = [f"Hold {round((low + ceiling) / 2)}, never over {ceiling}. It should feel almost too easy: "
-               f"full sentences the whole way.",
+        how = [f"Hold {round((low + ceiling) / 2)}, never over {ceiling}. It should feel almost too easy.",
                f"On the climbs, shift down, spin or walk the steep pitches to stay in range."]
     elif v == STEADY:
         what = f"A steady {noun}, up to {mins} minutes at {round((low + ceiling) / 2)} ({low}–{ceiling})."
