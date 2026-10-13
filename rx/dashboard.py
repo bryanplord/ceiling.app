@@ -353,7 +353,55 @@ ZONE_FEEL = {"Z1 Recovery": "barely working", "Z2 Aerobic": "all day, full sente
              "Z5 Max": "all out, no words"}
 
 
-def room(rx: Rx, p: Profile, hist=None, usual: float | None = None, mode: str = "stretch") -> str:
+def _marks(mark, Y, lo, c, AX, L0, L1, SC, R0, R1, W, T, B, bands) -> str:
+    """Alternative ways to show today's range (design exploration)."""
+    yt, yb = Y(c + 1), Y(lo)
+    o = []
+    if mark == "spotlight":       # dim everything outside the range
+        for y1, y2 in ((T - 30, yt), (yb, B + 4)):
+            o.append(f'<rect fill="#fff" opacity=".62" x="{L0}" y="{y1:.1f}" width="{R1 - L0}" height="{y2 - y1:.1f}"/>')
+    elif mark == "brackets":      # ink brackets on the scale
+        x = AX + 6
+        o.append(f'<path d="M{x + 8},{yt:.1f} H{x} V{yb:.1f} H{x + 8}" fill="none" stroke="#0a0a0a" stroke-width="2.5"/>')
+        o.append(f'<path d="M{L1 + 4},{yt:.1f} H{L1 + 12} V{yb:.1f} H{L1 + 4}" fill="none" stroke="#0a0a0a" stroke-width="2.5"/>')
+    elif mark == "hairlines":     # two dashed lines across the chart at the edges
+        for y, v in ((yt, c), (yb, lo)):
+            o.append(f'<line x1="{L0}" x2="{R1}" y1="{y:.1f}" y2="{y:.1f}" stroke="#0a0a0a" stroke-width="1.2" stroke-dasharray="4 3"/>')
+    elif mark == "spine":         # the scale itself goes thick and black over the range
+        o.append(f'<rect x="{L0 - 6}" y="{yt:.1f}" width="6" height="{yb - yt:.1f}" fill="#0a0a0a"/>')
+    elif mark == "pointer":       # a triangle at the aim, pointing into your zones
+        ya = Y((lo + c) / 2)
+        o.append(f'<path d="M{L0 - 14},{ya - 8:.1f} L{L0 - 2},{ya:.1f} L{L0 - 14},{ya + 8:.1f}Z" fill="#0a0a0a"/>')
+        for y in (yt, yb):
+            o.append(f'<line x1="{L0 - 10}" x2="{L0}" y1="{y:.1f}" y2="{y:.1f}" stroke="#0a0a0a" stroke-width="2"/>')
+    elif mark == "window":        # an inset frame inside the zones panel
+        o.append(f'<rect x="{L0 + 4}" y="{yt + 2:.1f}" width="{L1 - L0 - 8}" height="{yb - yt - 4:.1f}" fill="none" stroke="#fff" stroke-width="3"/>')
+        o.append(f'<rect x="{L0 + 1}" y="{yt:.1f}" width="{L1 - L0 - 2}" height="{yb - yt:.1f}" fill="none" stroke="#0a0a0a" stroke-width="1.5"/>')
+    elif mark == "hatch":         # diagonal stripes across the zones panel
+        o.append('<defs><pattern id="hx" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">'
+                 '<line x1="0" y1="0" x2="0" y2="8" stroke="#0a0a0a" stroke-width="1.2" opacity=".35"/></pattern></defs>')
+        o.append(f'<rect x="{L0}" y="{yt:.1f}" width="{L1 - L0}" height="{yb - yt:.1f}" fill="url(#hx)"/>')
+    elif mark == "tab":           # a tab sticking out of the zones panel
+        o.append(f'<rect x="{L1}" y="{yt:.1f}" width="34" height="{yb - yt:.1f}" fill="#0a0a0a"/>')
+        o.append(f'<text x="{L1 + 17}" y="{(yt + yb) / 2:.1f}" fill="#fff" font-size="12" font-weight="700" text-anchor="middle" '
+                 f'transform="rotate(-90 {L1 + 17} {(yt + yb) / 2:.1f})" dy="4">TODAY</text>')
+    elif mark == "glow":          # a soft band, no hard edges
+        o.append('<defs><linearGradient id="gl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0a0a0a" stop-opacity="0"/>'
+                 '<stop offset=".5" stop-color="#0a0a0a" stop-opacity=".12"/><stop offset="1" stop-color="#0a0a0a" stop-opacity="0"/></linearGradient></defs>')
+        pad = (yb - yt) * 0.35
+        o.append(f'<rect x="{L0}" y="{yt - pad:.1f}" width="{R1 - L0}" height="{yb - yt + 2 * pad:.1f}" fill="url(#gl)"/>')
+    elif mark == "solid":         # the range in full-strength zone color inside the zones panel
+        for name, cls, za, zb in bands:
+            a_, b_ = max(lo, za), min(c + 1, zb)
+            if b_ > a_:
+                o.append(f'<rect class="thumb {cls}" style="opacity:.75" x="{L0}" y="{Y(b_):.1f}" width="{L1 - L0}" height="{Y(a_) - Y(b_):.1f}"/>')
+    for y, v in ((yt, c), (yb, lo)):
+        o.append(f'<rect fill="#fff" x="0" y="{y - 9:.1f}" width="{AX + 1}" height="18"/>')
+        o.append(f'<text class="bnum" x="{AX}" y="{y + 4.5:.1f}" text-anchor="end">{v}</text>')
+    return "".join(o)
+
+
+def room(rx: Rx, p: Profile, hist=None, usual: float | None = None, mode: str = "stretch", mark: str = "hairlines") -> str:
     """Your heart today, built around a center spine of heart-rate numbers.
     Left: your zones, named and colored, reading out from the spine.
     Right: where you actually trained the last 4 weeks, one bar per 2 beats, colored by zone.
@@ -449,14 +497,15 @@ def room(rx: Rx, p: Profile, hist=None, usual: float | None = None, mode: str = 
     o.append(f'<text class="reft" x="{W}" y="{Y(rest) - 6:.1f}" text-anchor="end">resting</text>')
 
     # TODAY: a box over the range, one segment per band it crosses, in that band's color
-    o.append(f'<rect fill="#fff" x="{SC - 24}" y="{yt:.1f}" width="48" height="{yb - yt:.1f}"/>')
-    for name, cls, za, zb in bands:
-        a_, b_ = max(band_lo, za), min(c + 1, zb)
-        if b_ > a_:
-            o.append(f'<rect class="thumb {cls}" x="{SC - 24}" y="{Y(b_):.1f}" width="48" height="{Y(a_) - Y(b_):.1f}"/>')
-    o.append(f'<text class="bnum" x="{SC}" y="{yt + 15:.1f}" text-anchor="middle">{c}</text>')
-    if lo is not None:
-        o.append(f'<text class="bnum" x="{SC}" y="{yb - 6:.1f}" text-anchor="middle">{band_lo}</text>')
+    if mark == "box":
+        o.append(f'<rect fill="#fff" x="{SC - 24}" y="{yt:.1f}" width="48" height="{yb - yt:.1f}"/>')
+        for name, cls, za, zb in bands:
+            a_, b_ = max(band_lo, za), min(c + 1, zb)
+            if b_ > a_:
+                o.append(f'<rect class="thumb {cls}" x="{SC - 24}" y="{Y(b_):.1f}" width="48" height="{Y(a_) - Y(b_):.1f}"/>')
+        o.append(f'<text class="bnum" x="{SC}" y="{yt + 15:.1f}" text-anchor="middle">{c}</text>')
+        if lo is not None:
+            o.append(f'<text class="bnum" x="{SC}" y="{yb - 6:.1f}" text-anchor="middle">{band_lo}</text>')
 
     # RIGHT: where you trained, a histogram in 2-beat bins, each bin in its band's color
     if hist is not None and hist.sum() > 0:
@@ -477,8 +526,12 @@ def room(rx: Rx, p: Profile, hist=None, usual: float | None = None, mode: str = 
         o.append('<path class="hl" d="' + " ".join(f"{'M' if j == 0 else 'L'}{x:.1f},{y:.1f}" for j, (x, y) in enumerate(pts)) + '"/>')
         o.append(f'<text class="small" x="{R0}" y="{B + 18}">where you trained, last 4 weeks</text>')
         o.append(f'<text class="small" x="{L0}" y="{B + 18}">your zones</text>')
-        o.append(f'<text class="small" x="{SC}" y="{B + 18}" text-anchor="middle">today</text>')
+        if mark == "box":
+            o.append(f'<text class="small" x="{SC}" y="{B + 18}" text-anchor="middle">today</text>')
 
+
+    if mark != "box":
+        o.append(_marks(mark, Y, band_lo, c, AX, L0, L1, SC, R0, R1, W, T, B, bands))
 
     # today's target: the number that matters, big, at its height; the range under it, small
     aim = round((band_lo + c) / 2) if lo is not None else c
