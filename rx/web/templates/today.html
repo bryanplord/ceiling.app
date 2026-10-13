@@ -91,6 +91,9 @@
   .tsp svg { width:100%; height:26px; display:block; margin-top:6px; }
   @media (max-width:760px) { .tiles { display:flex; overflow-x:auto; scroll-snap-type:x mandatory; margin:0 -20px 28px; padding:0 20px; }
     .tile { flex:0 0 42%; scroll-snap-align:start; } }
+  .vrule { display:block; width:96px; height:6px; margin:18px 0 0; }
+  .vrule.v-rest { background:#c9c9cd; } .vrule.v-light { background:var(--s-rec); } .vrule.v-easy { background:var(--s-end); }
+  .vrule.v-steady { background:var(--s-aer); } .vrule.v-hard { background:var(--s-thr); }
   .goalline { display:inline-block; margin:14px 0 0; font-size:15px; font-weight:600; text-decoration:none; color:var(--ink); border-bottom:2px solid var(--ceiling); }
   .goalline.muted { color:var(--lichen); border-color:var(--rule); }
   .gnote { font-size:17px; margin:10px 0 0; color:var(--lichen); max-width:52ch; }
@@ -283,6 +286,7 @@
     </div>
     {% if p.program %}<a class="goalline" href="/plan">{{ p.program.title }}{% if p.program.days_left is not none %}: {{ p.program.days_left }} days{% endif %}{% if p.program.phase %}, {{ p.program.phase }} week{% endif %}</a>{% else %}<a class="goalline muted" href="/plan">Set a goal and Ceiling builds the programme →</a>{% endif %}
     <h1 class="verdict">{{ rx.headline }}</h1>
+    <span class="vrule v-{{ rx.verdict }}" aria-hidden="true"></span>
     {% if rx.diagnosis %}<p class="diag">{{ rx.diagnosis }}</p>{% endif %}
     {% if rx.goal_note %}<p class="gnote">{{ rx.goal_note }}</p>{% endif %}
     {% if after and after.done %}

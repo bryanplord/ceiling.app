@@ -36,6 +36,9 @@
     --ceiling:#ff3b30; --good:#23784f; --warn:#a96a10; --bad:#c2321c;
     --easy:#9db8ab; --middle:#d0b37a; --hard:#0a0a0a;
     --z1:#5b9bd5; --z2:#2fae6b; --z3:#e6c13d; --z4:#f2903a; --z5:#d9433b;
+    /* Brand spectrum: your heart, resting to max. The top of it is the Ceiling red. */
+    --s-rec:#8e7cc3; --s-end:#4a7fd4; --s-aer:#2e9e6a; --s-tem:#e0b030; --s-thr:#ee7a30; --s-max:#ff3b30;
+    --spectrum:linear-gradient(90deg, var(--s-rec) 0 16.66%, var(--s-end) 0 33.33%, var(--s-aer) 0 50%, var(--s-tem) 0 66.66%, var(--s-thr) 0 83.33%, var(--s-max) 0);
     --face:"Archivo", -apple-system, "Helvetica Neue", Arial, sans-serif;
   }
   * { box-sizing:border-box; }
@@ -51,6 +54,8 @@
 
   /* top bar */
   .bar { max-width:1200px; margin:0 auto; padding:22px 32px; display:flex; align-items:center; gap:28px; }
+  .spec { height:4px; background:var(--spectrum); }
+  .bleed { margin-left:calc(50% - 50vw); margin-right:calc(50% - 50vw); padding-left:calc(50vw - 50%) !important; padding-right:calc(50vw - 50%) !important; }
   .bar .wordmark { font-size:21px; flex:none; }
   .bar nav { display:flex; gap:24px; overflow-x:auto; font-size:15px; margin-left:auto; scrollbar-width:none; }
   .bar nav a { text-decoration:none; color:var(--lichen); white-space:nowrap; padding:4px 0; }
@@ -85,6 +90,7 @@
 {% block head %}{% endblock %}
 </head>
 <body>
+<div class="spec" aria-hidden="true"></div>
 {% block nav %}
 <header class="bar">
   <a href="/" aria-label="Today">{% include "_wordmark.html" %}</a>

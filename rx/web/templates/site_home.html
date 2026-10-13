@@ -14,11 +14,26 @@
   .trio p { font-size:17px; line-height:1.5; color:#2a2a2d; margin:0; }
   .big { font-size:clamp(40px, 7vw, 96px); font-weight:600; font-stretch:125%; letter-spacing:-0.01em; line-height:1; }
   .zones { display:flex; height:22px; margin:22px 0 10px; }
-  .zones span:nth-child(1){flex:9;background:#b3a6dc} .zones span:nth-child(2){flex:13;background:#7fa7d9}
-  .zones span:nth-child(3){flex:9;background:#46b07f} .zones span:nth-child(4){flex:9;background:#e3bd52}
-  .zones span:nth-child(5){flex:9;background:#ec9550} .zones span:nth-child(6){flex:24;background:#de5f55}
+  .zones span:nth-child(1){flex:9;background:var(--s-rec)} .zones span:nth-child(2){flex:13;background:var(--s-end)}
+  .zones span:nth-child(3){flex:9;background:var(--s-aer)} .zones span:nth-child(4){flex:9;background:var(--s-tem)}
+  .zones span:nth-child(5){flex:9;background:var(--s-thr)} .zones span:nth-child(6){flex:24;background:var(--s-max)}
   .zl { display:flex; justify-content:space-between; font-size:13px; color:var(--lichen); }
   .closing { padding:120px 0 96px; border-top:1px solid var(--rule); text-align:left; }
+  .closing.dark { background:var(--ink); border-top:0; position:relative; }
+  .closing.dark::before { content:""; position:absolute; left:0; right:0; top:0; height:6px; background:var(--spectrum); }
+  .closing.dark h2 { color:#fff !important; }
+  .closing.dark .btn.light { color:#fff; border-color:#fff; }
+  .closing.dark .btn.dark { background:#fff; color:var(--ink); border-color:#fff; }
+  .closing.dark .btn.dark:hover { background:var(--ceiling); color:#fff; border-color:var(--ceiling); }
+  .herospec { display:flex; height:10px; margin:28px 0 0; max-width:520px; }
+  .herospec span { flex:1; } .herospec span:nth-child(1){background:var(--s-rec)} .herospec span:nth-child(2){background:var(--s-end)}
+  .herospec span:nth-child(3){background:var(--s-aer)} .herospec span:nth-child(4){background:var(--s-tem)}
+  .herospec span:nth-child(5){background:var(--s-thr)} .herospec span:nth-child(6){background:var(--s-max)}
+  .tint-end { background:#eef3fb; border-top:0; }
+  .tint-aer { background:#edf7f1; border-top:0; }
+  .trio h3::before { content:""; display:block; width:28px; height:4px; margin-bottom:14px; }
+  .trio div:nth-child(1) h3::before { background:var(--s-end); } .trio div:nth-child(2) h3::before { background:var(--s-thr); }
+  .trio div:nth-child(3) h3::before { background:var(--s-aer); }
   .closing h2 { font-size:clamp(44px, 8vw, 112px); margin:0; color:var(--ink); font-weight:600; font-stretch:125%; text-transform:uppercase; letter-spacing:.04em; line-height:1; }
   @media (max-width: 860px) { .heroGrid, .trio { grid-template-columns:1fr; } .trio { padding:56px 0; gap:32px; } }
 </style>
@@ -27,6 +42,7 @@
 <section class="hero heroGrid">
   <div>
     <h1>This is how you train.</h1>
+    <div class="herospec" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span></div>
     <p class="lede">Your daily workout prescription, written from your own heart rate, HRV, sleep and training load. Every morning.</p>
     <div class="ctas"><a class="btn dark" href="/join">Join the waitlist</a><a class="btn light" href="/how">How it works</a></div>
   </div>
@@ -51,7 +67,7 @@
   </div>
 </section>
 
-<section class="sec">
+<section class="sec tint-end bleed">
   <h2>Built on you. Not averages.</h2>
   <div>
     <p>Your zones come from your own threshold and aerobic threshold, measured in your own sessions. Not 220 minus your age.</p>
@@ -67,7 +83,7 @@
   <div><h3>On your calendar</h3><p>The next few days, planned only as far as can honestly be seen, and rewritten every morning as things change.</p></div>
 </section>
 
-<section class="sec">
+<section class="sec tint-aer bleed">
   <h2>For people who train 1 to 3 hours a day.</h2>
   <div>
     <p>Riders, runners, skiers and everyone in between who already wears the watch and wants it to finally tell them something.</p>
@@ -75,7 +91,7 @@
   </div>
 </section>
 
-<section class="closing">
+<section class="closing dark bleed">
   <h2>Train like you mean it.</h2>
   <div class="ctas"><a class="btn dark" href="/join">Join the waitlist</a><a class="btn light" href="/login">Sign in</a></div>
 </section>
