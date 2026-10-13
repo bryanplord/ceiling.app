@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 
 from ..analysis import load as la
+from ..analysis.reading import Reading, cap_verdict, read
 from ..analysis.recovery import AMBER, GREEN, RED, Recovery, assess
 from ..profile import Profile
 from ..sports import BIKE, LABEL, RUN, SKI, WALK
@@ -53,6 +54,9 @@ class Rx:
     scenarios: list[str] = field(default_factory=list)
     recovery: Recovery | None = None
     notes: list[str] = field(default_factory=list)
+    reading: Reading | None = None
+    skip_short: str = ""
+    overdo_short: str = ""
 
 
 @dataclass
@@ -135,6 +139,10 @@ def build_rx(p: Profile, day: str | None = None) -> Rx:
     y = p.yesterday
     last_two = [ld.load for ld in p.load_days[-2:]]
     verdict, why = decide(Inputs(rec, y, last_two))
+    reading = read(p.wellness, p.daily_load, p.load_days, day)
+    verdict = cap_verdict(verdict, reading.cap)
+    why = [reading.says] + [r for r in why if not r.startswith(
+        ("HRV", "Resting HR", "Sleep", "Recovered", "Recovery looks", "No sleep"))]
     sport = _pick_sport(verdict, p)
     mins = _round5(_minutes(verdict, sport, p))
 
@@ -184,7 +192,7 @@ def build_rx(p: Profile, day: str | None = None) -> Rx:
     tonight = EARLY_BED if (rec.sleep.status in (RED, AMBER) or verdict in (REST, LIGHT, HARD)) \
         else "Normal bedtime. Aim for 8 hours in bed."
     rx = Rx(day, verdict, HEADLINE[verdict], why[:3], do, dont, tonight, sport,
-            low, ceiling, mins, steps, recovery=rec)
+            low, ceiling, mins, steps, recovery=rec, reading=reading)
     rx.scenarios = scenarios(p, rx)
     rx.if_skip, rx.if_overdo = consequences(p, rx)
     rx.compress, rx.stretch = flex(p, rx)
@@ -324,10 +332,17 @@ def consequences(p: Profile, rx: Rx) -> tuple[str | None, str | None]:
     else:
         effect = f"tomorrow stays {TOMORROW[nv]}, but only if you sleep well."
     if_overdo = f"{lead} {effect} " + _personal_cost(p, over_load)
+    if ORDER.index(nv) < ORDER.index(ideal_nv):
+        rx.overdo_short = f"Tomorrow becomes {TOMORROW[nv]} instead of {TOMORROW[ideal_nv]}."
+    else:
+        rx.overdo_short = "You'll need a great night's sleep just to stay on track."
+    if rx.verdict in (REST, LIGHT):
+        rx.overdo_short = f"You dig the hole deeper. Tomorrow becomes {TOMORROW[nv]}."
     if rx.verdict in (REST, LIGHT):
         if_overdo += " You don't get fitter on a day you can't absorb. You dig the hole deeper."
 
     if rx.verdict in (REST, LIGHT):
+        rx.skip_short = "Nothing lost. But moving helps you recover faster than sitting."
         return "Skipping the walk costs nothing. Moving at all is the point.", if_overdo
 
     # Skipping: fitness lost today, and if it becomes a habit.
@@ -339,6 +354,8 @@ def consequences(p: Profile, rx: Rx) -> tuple[str | None, str | None]:
         ld = la.step(ld, 0.0, rx.date)
     lost_4 = (y.ctl - ld.ctl) / max(y.ctl, 1) * 100
     nv_skip = _next_verdict(p, rx, 0.0)
+    rx.skip_short = (f"You lose {lost_today:.1f}% of your fitness today, "
+                     f"{lost_4:.0f}% if it turns into 4 days off.")
     if_skip = (f"You give up about {lost_today:.1f}% of your 6-week fitness today, "
                f"and {lost_4:.0f}% if you skip the next 4 days too. "
                f"You'd be fresher tomorrow ({TOMORROW[nv_skip]}), but that's a trade, not a win.")

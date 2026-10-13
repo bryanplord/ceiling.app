@@ -15,6 +15,14 @@
   .flex h3, .trade h3 { margin:0 0 6px; font-size:15px; font-weight:650; }
   .flex p, .trade p { margin:0; color:var(--lichen); font-size:16px; line-height:1.45; }
 
+  .pad { margin-top:36px; border-top:2px solid var(--ink); }
+  .rxl { display:grid; grid-template-columns:110px 1fr; gap:20px; padding:16px 0; border-bottom:1px solid var(--rule); }
+  .rxk { font-weight:700; font-size:15px; color:var(--lichen); padding-top:4px; }
+  .rxv { margin:0; font-size:19px; line-height:1.4; max-width:52ch; text-wrap:pretty; }
+  .rxv.strong { font-size:clamp(21px, 2.3vw, 26px); font-weight:620; letter-spacing:-0.01em; }
+  .rxv b.good { color:var(--good); } .rxv b.ok { color:var(--warn); } .rxv b.bad { color:var(--bad); }
+  .rxl.over .rxk { color:var(--ceiling); }
+  .rxl .steps { margin:0; font-size:18px; }
   .room { width:100%; max-width:420px; display:block; margin-left:auto; overflow:visible; font-family:var(--face); }
   .room .z0 { fill:var(--frost); } .room .z1 { fill:var(--frost2); }
   .room .zl { fill:var(--lichen); font-size:13px; }
@@ -30,6 +38,34 @@
   .roomcap { text-align:right; color:var(--lichen); font-size:15px; margin:6px 0 0; }
   .roomcap b { color:var(--ceiling); font-weight:650; }
 
+  .because b.good { color:var(--good); } .because b.ok { color:var(--warn); } .because b.bad { color:var(--bad); }
+  .rtitle { font-size:clamp(40px, 6vw, 72px); font-weight:850; font-stretch:68%; line-height:.95; margin:0 0 16px; }
+  .rtitle.good { color:var(--good); } .rtitle.ok { color:var(--warn); } .rtitle.bad { color:var(--bad); }
+  .rsays { font-size:clamp(19px, 2vw, 22px); line-height:1.45; max-width:60ch; margin:0 0 20px; text-wrap:pretty; }
+  .evidence { list-style:none; padding:0; margin:0 0 8px; max-width:70ch; }
+  .evidence li, .yl { color:var(--ink) !important; }
+  .evidence li { padding:12px 0 12px 16px; border-left:4px solid var(--rule); margin:0 0 8px; font-size:16px; line-height:1.45; }
+  .evidence li b { display:block; font-size:14px; color:var(--lichen); font-weight:650; }
+  .evidence li.good { border-left-color:var(--good); } .evidence li.ok { border-left-color:var(--warn); }
+  .evidence li.bad { border-left-color:var(--bad); }
+  .ask { font-size:18px; font-weight:600; background:var(--frost); border-radius:10px; padding:16px 18px; max-width:62ch; margin:16px 0; }
+  .conf { color:var(--lichen); font-size:15px; margin:12px 0 0; }
+  .twocol { display:grid; grid-template-columns:1fr 1fr; gap:48px; margin-top:28px; }
+  .twocol h3 { font-size:17px; margin:0 0 12px; }
+  .getback { font-size:17px; line-height:1.5; padding-left:22px; margin:0; } .getback li { margin:0 0 10px; }
+  .histwrap { margin:8px 0 6px; }
+  .hist { display:block; width:100%; height:auto; overflow:visible; font-family:var(--face); }
+  .hist .hline { fill:none; stroke:var(--ink); stroke-width:2.5; stroke-linejoin:round; }
+  .hist .bestz { fill:var(--good); opacity:.16; } .hist .normz { fill:var(--lichen); opacity:.18; }
+  .hist .now { fill:var(--ceiling); }
+  .hist .lbl { fill:var(--lichen); font-size:16px; } .hist .lbl.strong { fill:var(--ink); font-weight:700; font-size:18px; }
+  .hist .tick { fill:var(--lichen); font-size:14px; }
+  .legend { display:flex; gap:20px; flex-wrap:wrap; color:var(--lichen); font-size:14px; margin:0 0 24px; }
+  .k.best { background:var(--good); opacity:.35; } .k.norm { background:var(--lichen); opacity:.4; } .k.nowk { background:var(--ceiling); border-radius:50%; }
+  .yl { font-size:17px; line-height:1.45; margin:0 0 14px; padding-left:14px; border-left:4px solid var(--rule); }
+  .yl.good { border-left-color:var(--good); } .yl.bad { border-left-color:var(--bad); } .yl.ok { border-left-color:var(--warn); }
+  .tr { font-style:normal; font-size:13px; font-weight:650; white-space:nowrap; margin-left:4px; }
+  .tr.better { color:var(--good); } .tr.worse { color:var(--bad); } .tr.flat { color:var(--lichen); }
   section.band { border-top:1px solid var(--rule); padding:56px 0; }
   .split { display:grid; grid-template-columns:1fr 1fr; gap:72px; }
   .split h2 b { color:var(--ink); font-weight:650; margin-right:8px; }
@@ -86,8 +122,11 @@
     .hero { grid-template-columns:1fr; gap:36px; padding:12px 0 48px; }
     .room { margin:0; max-width:380px; }
     .roomcap { text-align:left; }
-    .split, .trade, .next { grid-template-columns:1fr; gap:40px; }
+    .split, .trade, .next, .twocol { grid-template-columns:1fr; gap:36px; }
+    .hist .lbl, .hist .tick { font-size:30px; } .hist .lbl.strong { font-size:34px; }
+    .hist .hline { stroke-width:4; }
     .flex { grid-template-columns:1fr; gap:18px; }
+    .rxl { grid-template-columns:1fr; gap:4px; padding:14px 0; }
     section.band { padding:40px 0; }
     .mval { font-size:44px; }
   }
@@ -106,16 +145,16 @@
   <div>
     <p class="date">{{ day_label }}</p>
     <h1 class="verdict">{{ rx.headline }}</h1>
-    <p class="move">{{ rx.do }}</p>
-    {% if rx.why %}<p class="because">{{ rx.why | join(' ') }}</p>{% endif %}
-    {% if rx.steps %}<ol class="steps">{% for s in rx.steps %}<li>{{ s }}</li>{% endfor %}</ol>{% endif %}
-    <p class="dont">{{ rx.dont }}</p>
-    {% if rx.compress %}
-    <div class="flex">
-      <div><h3>Short on time</h3><p>{{ rx.compress }}</p></div>
-      <div><h3>Feeling strong</h3><p>{{ rx.stretch }}</p></div>
+    <div class="pad">
+      <div class="rxl"><span class="rxk">Do</span>
+        <p class="rxv strong">{{ rx.do }}</p></div>
+      {% if rx.steps %}<div class="rxl"><span class="rxk"></span><ol class="steps">{% for s in rx.steps %}<li>{{ s }}</li>{% endfor %}</ol></div>{% endif %}
+      <div class="rxl"><span class="rxk">Don't</span><p class="rxv">{{ rx.dont }}</p></div>
+      {% if rx.reading %}<div class="rxl"><span class="rxk">Because</span>
+        <p class="rxv"><b class="{{ rx.reading.tone }}">{{ rx.reading.title }}.</b> {{ rx.reading.says.split('. ')[0] }}.</p></div>{% endif %}
+      {% if rx.skip_short %}<div class="rxl"><span class="rxk">Skip it</span><p class="rxv">{{ rx.skip_short }}</p></div>{% endif %}
+      {% if rx.overdo_short %}<div class="rxl over"><span class="rxk">Overdo it</span><p class="rxv">{{ rx.overdo_short }}</p></div>{% endif %}
     </div>
-    {% endif %}
   </div>
   {% if room %}
   <div>
@@ -131,6 +170,49 @@
   <p class="muted">Ceiling is pulling your activities and nights from intervals.icu. Refresh in a few minutes.</p>
 </section>
 {% else %}
+
+{% if rx.reading %}
+<section class="band reading">
+  <h2>Last night, read</h2>
+  <p class="rtitle {{ rx.reading.tone }}">{{ rx.reading.title }}</p>
+  <p class="rsays">{{ rx.reading.says }}</p>
+  <ul class="evidence">
+    {% for e in rx.reading.evidence %}<li class="{{ e.tone }}"><b>{{ e.name }}</b>{{ e.line }}</li>{% endfor %}
+  </ul>
+  {% if rx.reading.ask %}<p class="ask">{{ rx.reading.ask }}</p>{% endif %}
+  <p class="conf">{{ rx.reading.confidence }} Today: {{ rx.reading.action | lower }}</p>
+</section>
+{% endif %}
+
+{% if st.standing %}
+<section class="band cycle">
+  <h2>Where you are in your cycle</h2>
+  <p class="rsays">{{ st.standing }}</p>
+  {% if hist %}<div class="histwrap">{{ hist | safe }}</div>
+  <p class="legend"><span><i class="k best"></i>Your best 3 weeks</span><span><i class="k norm"></i>Your normal range now</span><span><i class="k nowk"></i>Now</span></p>{% endif %}
+  {% if st.best_says %}<p class="rsays">{{ st.best_says }}</p>{% endif %}
+  {% if st.differences %}
+  <div class="twocol">
+    <div><h3>Then vs now</h3><ul class="evidence">{% for l in st.differences %}<li class="{{ l.tone }}">{{ l.text }}</li>{% endfor %}</ul></div>
+    <div><h3>How to get back there</h3><ol class="getback">{% for g in st.get_back %}<li>{{ g }}</li>{% endfor %}</ol></div>
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if st.good or st.work_on %}
+<section class="band you">
+  <h2>You, right now</h2>
+  <div class="twocol">
+    <div><h3>What you're good at</h3>
+      {% for l in st.good %}<p class="yl good">{{ l.text }}{% if l.trend %} <em class="tr {{ l.trend }}">{{ {'better':'Getting better','worse':'Slipping','flat':'Holding'}[l.trend] }}</em>{% endif %}</p>{% else %}<p class="muted">Not enough history yet.</p>{% endfor %}
+    </div>
+    <div><h3>What to work on</h3>
+      {% for l in st.work_on %}<p class="yl {{ l.tone }}">{{ l.text }}{% if l.trend %} <em class="tr {{ l.trend }}">{{ {'better':'Getting better','worse':'Getting worse','flat':'No change'}[l.trend] }}</em>{% endif %}</p>{% else %}<p class="muted">Nothing stands out. Keep going.</p>{% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
 
 {% if rx.if_skip or rx.if_overdo %}
 <section class="band">
@@ -170,11 +252,6 @@
 
   <div>
     <h2><b>Recovery</b>how you're absorbing it</h2>
-    <div class="metric lead">
-      <div class="mtop"><span class="mname">Last night</span></div>
-      <span class="mval {{ d.recovery.tone }}" style="grid-column:1 / -1">{{ d.recovery.state }}</span>
-      <p class="mdetail">{{ d.recovery.detail }}</p>
-    </div>
     {% for m in [d.hrv, d.rhr] %}{{ metric(m, band=True) }}{% endfor %}
     {{ metric(d.sleep, bars=True) }}
   </div>

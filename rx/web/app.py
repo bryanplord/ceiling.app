@@ -14,7 +14,7 @@ from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse,
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from .. import dashboard
+from .. import dashboard, story as storymod
 from .. import profile as prof
 from ..service import cached, open_store, profile_for, recovery_history, scored_day, today_rx
 from ..clock import local_today
@@ -128,6 +128,7 @@ def _warm(store=None) -> None:
         store = store or open_store()
         p, rx = today_rx(store)
         cached(store, "dash", rx.date, lambda: dashboard.build(store, p, rx))
+        cached(store, "story", rx.date, lambda: storymod.build(store, p))
     except Exception as e:
         print(f"warm failed: {e}")
 
@@ -166,6 +167,7 @@ def today(request: Request, d: str | None = None):
     store = open_store()
     p, rx = today_rx(store, d)
     dash = cached(store, "dash", rx.date, lambda: dashboard.build(store, p, rx))
+    st = cached(store, "story", rx.date, lambda: storymod.build(store, p))
     when = date.fromisoformat(rx.date)
     recent = []
     for a in sorted(p.activities, key=lambda a: a.start_local or a.date, reverse=True):
@@ -181,6 +183,7 @@ def today(request: Request, d: str | None = None):
             break
     return _page(request, "today.html", rx=rx, d=dash, p=p, recent=recent,
                  spark=dashboard.spark, room=dashboard.room(rx, p),
+                 st=st, hist=storymod.history_chart(st),
                  day_label=when.strftime("%A, %B %-d"))
 
 
