@@ -29,7 +29,7 @@ def open_store() -> Store:
 
 
 _built: dict = {}
-_build_lock = threading.Lock()
+_build_lock = threading.RLock()
 
 
 def data_version(store: Store) -> tuple:
@@ -58,9 +58,17 @@ def cached(store: Store, name: str, day: str, make):
     """Memoize anything derived from a day's profile under the same data version."""
     key = (name, day, data_version(store))
     with _build_lock:
-        if key not in _built:
-            _built[key] = make()
-        return _built[key]
+        if key in _built:
+            return _built[key]
+    val = make()                 # built outside the lock so one slow build never blocks every page
+    with _build_lock:
+        return _built.setdefault(key, val)
+
+
+def peek(store: Store, name: str, day: str):
+    """A cached value if it's ready, else None (never builds)."""
+    with _build_lock:
+        return _built.get((name, day, data_version(store)))
 
 
 def profile_for(store: Store, day: str | None = None):
@@ -83,3 +91,48 @@ def recovery_history(store: Store, days: int = 30):
     ws = store.wellness()
     end = local_today()
     return [assess(ws, (end - timedelta(days=i)).isoformat()) for i in range(days - 1, -1, -1)]
+
+
+def plan_with_changes(store: Store, day: str | None = None):
+    """Today's plan, marked against yesterday's plan (rebuilt as it stood yesterday morning)."""
+    from datetime import date as _d
+    from .prescribe import plan as planmod
+    p, rx = today_rx(store, day)
+    pl = planmod.build(p, rx)
+    y = (_d.fromisoformat(rx.date) - timedelta(days=1)).isoformat()
+    try:
+        py, rxy = today_rx(store, y)
+        changed = planmod.adjust(p, rx, pl, planmod.build(py, rxy))
+    except Exception:
+        changed = []
+    return pl, changed
+
+
+def plan_history(store: Store, days: int = 7):
+    """Each of the last few days: what the plan said the evening before, what the morning made of it, and why."""
+    from datetime import date as _d
+    from .prescribe import plan as planmod
+    end = _d.fromisoformat(local_today().isoformat())
+    out = []
+    for k in range(days - 1, -1, -1):
+        d = (end - timedelta(days=k)).isoformat()
+        y = (end - timedelta(days=k + 1)).isoformat()
+        try:
+            p, rx = today_rx(store, d)
+            py, rxy = today_rx(store, y)
+            prev = planmod.build(py, rxy)
+            planned = next((x for x in prev.days if x.date == d), None)
+            if planned is None or planned.reason.startswith("You rarely"):
+                continue
+            from .prescribe.engine import ORDER
+            why = planmod.causes(p, rx, prev)
+            if planned.verdict == rx.verdict:
+                text = "Went as planned."
+            else:
+                up = 1 if ORDER.index(rx.verdict) > ORDER.index(planned.verdict) else -1
+                text = planmod.explain(up, why, rx)
+            out.append({"date": d, "was": planned.verdict, "now": rx.verdict, "why": text,
+                        "changed": planned.verdict != rx.verdict})
+        except Exception:
+            continue
+    return out

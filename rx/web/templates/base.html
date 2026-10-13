@@ -82,7 +82,7 @@
   <a href="/" aria-label="Today">{% include "_wordmark.html" %}</a>
   <nav>
     <a href="/" class="{{ 'on' if active=='today' }}">Today</a>
-    <a href="/plan" class="{{ 'on' if active=='plan' }}">Plan</a>
+    <a href="/calendar" class="{{ 'on' if active=='calendar' }}">Calendar</a>
     <a href="/trends" class="{{ 'on' if active=='trends' }}">Trends</a>
     <a href="/zones" class="{{ 'on' if active=='zones' }}">Zones</a>
     <a href="/you" class="{{ 'on' if active=='you' }}">You vs age</a>
@@ -95,6 +95,6 @@
   </nav>
 </header>
 {% endblock %}
-<main class="{{ 'narrow' if active not in ('today', 'login', 'plan') }}">{% block body %}{% endblock %}</main>
+<main class="{{ 'narrow' if active not in ('today', 'login', 'calendar') }}">{% block body %}{% endblock %}</main>
 </body>
 </html>

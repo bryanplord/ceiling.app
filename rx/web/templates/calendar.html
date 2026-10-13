@@ -23,6 +23,17 @@
   .day details p { font-size:14px; line-height:1.45; margin:6px 0 0; }
   .v-rest { background:#c9c9cd; } .v-light { background:#b3a6dc; } .v-easy { background:#7fa7d9; }
   .v-steady { background:#46b07f; } .v-hard { background:#ec9550; }
+  .day .kind s.was { color:var(--lichen); font-weight:500; margin-left:6px; }
+  .day .why.chg { color:var(--ink); }
+  .hist { margin-top:56px; max-width:820px; }
+  .hist h2 { color:var(--ink); font-size:20px; margin:0 0 6px; }
+  .hsub { color:var(--lichen); margin:0 0 14px; }
+  .hist ul { list-style:none; padding:0; margin:0; border-top:1px solid var(--rule); }
+  .hist li { display:grid; grid-template-columns:120px 160px 1fr; gap:16px; padding:12px 0; border-bottom:1px solid var(--rule); font-size:16px; }
+  .hist li.same { color:var(--lichen); }
+  .hist s { color:var(--lichen); }
+  .hdate { color:var(--lichen); }
+  @media (max-width: 700px) { .hist li { grid-template-columns:1fr; gap:2px; } }
   .sub { margin-top:56px; padding-top:28px; border-top:1px solid var(--rule); max-width:640px; }
   .sub h2 { color:var(--ink); font-size:20px; margin:0 0 8px; }
   .sub p { color:var(--lichen); margin:0 0 16px; }
@@ -49,14 +60,27 @@
     <div class="dh"><span class="wd">{{ 'Today' if d.confidence == 'Today' else dd.strftime('%a') }}</span>
       <span class="dn">{{ dd.day }}</span><span class="vbar v-{{ d.verdict }}"></span></div>
     <div class="db">{% set kind = {'rest':'Day off','light':'Walk','easy':'Easy','steady':'Steady','hard':'Hard'}[d.verdict] %}
-      <span class="kind">{{ kind }}</span>
+      <span class="kind">{{ kind }}{% if d.was %} <s class="was">{{ {'rest':'Day off','light':'Walk','easy':'Easy','steady':'Steady','hard':'Hard'}[d.was] }}</s>{% endif %}</span>
       {% if d.title != kind %}<p class="ttl">{{ d.title }}</p>{% endif %}
-      {% if d.reason and d.confidence != 'Today' %}<p class="why">{{ d.reason }}</p>{% endif %}
+      {% if d.because %}<p class="why chg">Changed: {{ d.because }}</p>
+      {% elif d.reason and d.confidence != 'Today' %}<p class="why">{{ d.reason }}</p>{% endif %}
       {% if d.verdict != 'rest' %}<details><summary>Details</summary><p>{{ d.detail }}</p></details>{% endif %}
       <span class="conf">{{ d.confidence }}</span></div>
   </div>
 {% endfor %}
 </div>
+
+{% set K = {'rest':'Day off','light':'Walk','easy':'Easy','steady':'Steady','hard':'Hard'} %}
+<section class="hist">
+  <h2>How the plan has changed</h2>
+  <p class="hsub">Each morning against what the plan said the day before.</p>
+  {% if hist %}
+  <ul>{% for h in hist|reverse %}{% set hd = date.fromisoformat(h.date) %}
+    <li class="{{ 'same' if not h.changed }}"><span class="hdate">{{ hd.strftime('%a %b %-d') }}</span>
+      <span class="hwhat">{% if h.changed %}<s>{{ K[h.was] }}</s> <b>{{ K[h.now] }}</b>{% else %}{{ K[h.now] }}{% endif %}</span>
+      <span class="hwhy">{{ h.why }}</span></li>{% endfor %}</ul>
+  {% else %}<p class="hsub">Working it out from the last week. Refresh in a minute.</p>{% endif %}
+</section>
 
 <section class="sub">
   <h2>Put it on your calendar</h2>

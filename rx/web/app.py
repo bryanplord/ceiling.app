@@ -18,7 +18,7 @@ from .. import dashboard, story as storymod
 from ..analysis import sleep as sleepmod
 from ..analysis import distribution as dist
 from .. import profile as prof
-from ..service import cached, open_store, profile_for, recovery_history, scored_day, today_rx
+from ..service import cached, peek, plan_history, plan_with_changes, open_store, profile_for, recovery_history, scored_day, today_rx
 from ..clock import local_today
 from . import auth
 
@@ -147,6 +147,8 @@ def _warm(store=None) -> None:
         p, rx = today_rx(store)
         cached(store, "dash", rx.date, lambda: dashboard.build(store, p, rx))
         cached(store, "story", rx.date, lambda: storymod.build(store, p))
+        cached(store, "planx", rx.date, lambda: plan_with_changes(store))
+        cached(store, "planhist", rx.date, lambda: plan_history(store))
     except Exception as e:
         print(f"warm failed: {e}")
 
@@ -223,18 +225,21 @@ def today(request: Request, d: str | None = None):
                  day_label=when.strftime("%A, %B %-d"))
 
 
-@app.get("/plan", response_class=HTMLResponse)
+@app.get("/calendar", response_class=HTMLResponse)
 def plan_page(request: Request):
     from ..prescribe import plan as planmod
     store = open_store()
     p, rx = today_rx(store)
-    pl = cached(store, "plan", rx.date, lambda: planmod.build(p, rx))
+    pl, changed = cached(store, "planx", rx.date, lambda: plan_with_changes(store))
+    hist = peek(store, "planhist", rx.date)
+    if hist is None:
+        threading.Thread(target=lambda: cached(store, "planhist", rx.date, lambda: plan_history(store)), daemon=True).start()
     email = auth.verify("session", request.cookies.get(auth.COOKIE)) if auth.enabled() else None
     feed = None
     if email:
         tok = auth.sign("cal", email, 10 * 365 * 24 * 3600)
         feed = f"{request.url.netloc}/plan.ics?k={tok}"
-    return _page(request, "plan.html", plan=pl, feed=feed, date=date)
+    return _page(request, "calendar.html", plan=pl, changed=changed, hist=hist, feed=feed, date=date)
 
 
 @app.get("/plan.ics")
@@ -245,7 +250,7 @@ def plan_ics(k: str = ""):
         return Response("Not found.", status_code=404)
     store = open_store()
     p, rx = today_rx(store)
-    pl = cached(store, "plan", rx.date, lambda: planmod.build(p, rx))
+    pl, _ = cached(store, "planx", rx.date, lambda: plan_with_changes(store))
     return Response(planmod.ics(pl), media_type="text/calendar; charset=utf-8",
                     headers={"Cache-Control": "no-cache"})
 

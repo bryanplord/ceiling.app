@@ -422,10 +422,12 @@ def consequences(p: Profile, rx: Rx) -> tuple[str | None, str | None]:
     return if_skip, if_overdo
 
 
-def _session(p: Profile, v: str, day: str | None = None) -> tuple[str, float]:
+def _session(p: Profile, v: str, day: str | None = None, noun: str | None = None) -> tuple[str, float]:
     """A verdict written out as the actual session for you, activity included,
     and roughly what it costs in load."""
     z = p.zones
+    if noun:
+        return _session_full(p, v, z, noun[:1].upper() + noun[1:])
     noun = "session"
     if day and v not in (REST, LIGHT):
         try:
@@ -710,7 +712,8 @@ SPORT_OF = {"mountain bike": BIKE, "road ride": BIKE, "gravel ride": BIKE, "trai
 CONTROLLED = {"road ride", "gravel ride", "trainer ride", "run", "hike"}   # easy to hold a steady HR
 
 
-def choose_activity(verdict: str, p: Profile, day: str) -> tuple[str, str | None, str, int | None]:
+def choose_activity(verdict: str, p: Profile, day: str, planned: dict | None = None,
+                    avoid: str | None = None) -> tuple[str, str | None, str, int | None]:
     """Which activity, and why that one. Returns (sport, kind, reason, max minutes or None).
 
     First rule: it has to actually put YOUR heart in today's range. That's judged from your own
@@ -724,6 +727,8 @@ def choose_activity(verdict: str, p: Profile, day: str) -> tuple[str, str | None
                               "Anything with a climb or a pace would."), None
 
     mix14 = _mix(p, day, 14)
+    for k_, h_ in (planned or {}).items():          # days already planned count toward the mix
+        mix14[k_] = mix14.get(k_, 0.0) + h_
     tot = sum(v for k, v in mix14.items() if k != WALK) or 0.0
     stats = kind_stats(p, day)
     skied14 = mix14.get(SKI, 0.0) > 0
@@ -747,7 +752,8 @@ def choose_activity(verdict: str, p: Profile, day: str) -> tuple[str, str | None
         fits = lo - 3 <= hr <= hi + 2
         reach = st["hr_hi"] >= lo           # your harder sessions of this kind do reach it
         share = mix14.get(SPORT_OF.get(k, BIKE), 0.0) / tot if tot else 0.0
-        score = (4 if fits else 1.5 if reach else -10) + 2 * (1 - share) + (1 if k in CONTROLLED and verdict == EASY else 0)
+        score = ((4 if fits else 1.5 if reach else -10) + 2 * (1 - share) + (1 if k in CONTROLLED and verdict == EASY else 0)
+                 - (1.5 if k == avoid else 0))
         notes[k] = (fits, reach, hr, st, share)
         if score > best_score:
             best, best_score = k, score

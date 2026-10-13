@@ -30,6 +30,9 @@ class PlanDay:
     detail: str         # the full session
     confidence: str     # Today | Likely | Probable | Sketch
     reason: str = ""
+    load: float = 0.0
+    was: str = ""       # the verdict yesterday's plan had for this day, if it changed
+    because: str = ""
 
 
 @dataclass
@@ -61,15 +64,16 @@ def _horizon(rx: Rx) -> tuple[int, str]:
     return 8, "You're recovered, so we can see about a week ahead."
 
 
-def _noun(p: Profile, v: str, d: str) -> str:
+def _pick(p: Profile, v: str, d: str, planned: dict, avoid: str | None) -> tuple[str, str | None, str]:
     try:
-        sport, kind, _, _ = eng.choose_activity(v, p, d)
+        sport, kind, _, _ = eng.choose_activity(v, p, d, planned, avoid)
     except Exception:
-        return "session"
-    return eng.NOUN.get(kind or "", None) or {eng.BIKE: "ride", eng.RUN: "run", eng.SKI: "ski tour", WALK: "walk"}.get(sport, "session")
+        return eng.BIKE, None, "session"
+    noun = eng.NOUN.get(kind or "", None) or {eng.BIKE: "ride", eng.RUN: "run", eng.SKI: "ski tour", WALK: "walk"}.get(sport, "session")
+    return sport, kind, noun
 
 
-def _title(p: Profile, v: str, d: str, rx: Rx | None = None) -> str:
+def _title(p: Profile, v: str, d: str, rx: Rx | None = None, n: str = "session") -> str:
     if rx is not None:
         return rx.what.rstrip(".") if rx.what else eng.HEADLINE[v]
     z = p.zones
@@ -77,7 +81,6 @@ def _title(p: Profile, v: str, d: str, rx: Rx | None = None) -> str:
         return "Day off"
     if v == LIGHT:
         return "A walk, 30 to 45 minutes"
-    n = _noun(p, v, d)
     if v == HARD:
         return f"Hard {n}: 4 × 8 minutes at {z.bottom('Z4 Threshold')}–{z.top('Z4 Threshold')}"
     if v == STEADY:
@@ -97,9 +100,12 @@ def build(p: Profile, rx: Rx) -> Plan:
     days = [PlanDay(rx.date, rx.verdict, _title(p, rx.verdict, rx.date, rx),
                     " ".join(rx.how) if rx.how else rx.do, "Today", rx.diagnosis)]
     today_load = eng._rx_load(p, rx) if rx.verdict != REST else 0.0
+    days[0].load = today_load
     state = la.step(p.yesterday, today_load, rx.date)
     loads = [p.yesterday.load, today_load]
     hard_days = [rx.date] if rx.verdict == HARD else []
+    planned = {rx.sport: (rx.max_minutes or 60) / 60} if rx.verdict not in (REST, LIGHT) else {}
+    last_kind = None
     d0 = date.fromisoformat(rx.date)
     for k in range(1, n):
         d = (d0 + timedelta(days=k)).isoformat()
@@ -110,12 +116,16 @@ def build(p: Profile, rx: Rx) -> Plan:
             v, reason = STEADY, "Two hard days already this week."
         if (d0 + timedelta(days=k)).weekday() in rest_wd and v != REST:
             v, reason = REST, f"You rarely train on {(d0 + timedelta(days=k)).strftime('%A')}s."
-        detail, load = eng._session(p, v, d)
+        sport, kind, noun = _pick(p, v, d, planned, last_kind) if v not in (REST, LIGHT) else (WALK, "walk", "walk")
+        detail, load = eng._session(p, v, d, noun)
+        if v not in (REST, LIGHT):
+            planned[sport] = planned.get(sport, 0.0) + {HARD: 1.25, STEADY: 1.5, EASY: 1.0}[v]
+        last_kind = kind
         if v == HARD:
             hard_days.append(d)
         conf = "Likely" if k == 1 else "Probable" if k <= 3 else "Sketch"
         detail = detail[:1].upper() + detail[1:] + "."
-        days.append(PlanDay(d, v, _title(p, v, d), detail, conf, reason))
+        days.append(PlanDay(d, v, _title(p, v, d, n=noun), detail, conf, reason, load))
         state = la.step(state, load, d)
         loads.append(load)
     note = (f"Planned {n} days out. {why} It assumes you sleep normally and do what's planned; "
@@ -123,7 +133,85 @@ def build(p: Profile, rx: Rx) -> Plan:
     return Plan(days, n, note)
 
 
-def ics(plan: Plan, url: str = "https://www.ceiling.app/plan") -> str:
+WORD = {REST: "a day off", LIGHT: "a walk", EASY: "easy", STEADY: "steady", HARD: "hard"}
+
+
+def causes(p: Profile, rx: Rx, prev: Plan) -> list[tuple[str, int]]:
+    """What happened between yesterday's plan and this morning, each tagged by which way it pushes:
+    +1 makes you readier than the plan assumed, -1 less ready. Biggest first."""
+    out = []
+    y = (date.fromisoformat(rx.date) - timedelta(days=1)).isoformat()
+    planned = next((d for d in prev.days if d.date == y), None)
+    actual = p.daily_load.get(y, 0.0)
+    if planned is not None:
+        if planned.verdict in (REST, LIGHT) and actual > max(30.0, planned.load * 1.5):
+            out.append((f"you trained yesterday when the plan said {WORD[planned.verdict]}", -1))
+        elif planned.load > 10:
+            r = actual / planned.load
+            if r >= 1.3:
+                out.append((f"yesterday went harder than planned (about {r:.1f}× the plan)", -1))
+            elif actual < 5:
+                out.append(("you skipped yesterday's session", +1))
+            elif r <= 0.6:
+                out.append(("yesterday was lighter than planned", +1))
+    last = rx.sleep.nights[-1] if rx.sleep and rx.sleep.nights else None
+    if last and last.slept is not None:
+        h, m = int(last.slept), round((last.slept - int(last.slept)) * 60)
+        if last.slept < last.need - 1.0:
+            out.append((f"you slept {h}h {m:02d}m, short of the {eng._hm_words(last.need)} you needed", -1))
+        elif last.slept >= last.need - 0.25 and (last.score or 80) >= 80:
+            out.append((f"you slept well ({h}h {m:02d}m)", +1))
+    w = sorted((x for x in p.wellness if x.date <= rx.date), key=lambda x: x.date)
+    if w and w[-1].date == rx.date and w[-1].rhr:
+        base = [x.rhr for x in w[-61:-1] if x.rhr]
+        if len(base) >= 14:
+            u = sum(base) / len(base)
+            if w[-1].rhr >= u + 4:
+                out.append((f"resting HR was up at {w[-1].rhr:.0f} (you're usually {u:.0f})", -1))
+    if w and w[-1].date == rx.date and w[-1].hrv:
+        base = [x.hrv for x in w[-61:-1] if x.hrv]
+        if len(base) >= 14:
+            u = sum(base) / len(base)
+            if w[-1].hrv < u * 0.88:
+                out.append((f"HRV dropped to {w[-1].hrv:.0f} (you're usually {u:.0f})", -1))
+            elif w[-1].hrv > u * 1.1:
+                out.append((f"HRV came in high at {w[-1].hrv:.0f} (you're usually {u:.0f})", +1))
+    return out
+
+
+def _sentence(xs: list[str]) -> str:
+    s = xs[0] if len(xs) == 1 else ", ".join(xs[:-1]) + " and " + xs[-1]
+    return s[:1].upper() + s[1:] + "."
+
+
+def explain(direction: int, why: list[tuple[str, int]], rx: Rx | None = None) -> str:
+    """Why a day moved up (+1) or down (-1): only the causes that push that way."""
+    match = [t for t, sgn in why if sgn == direction]
+    if match:
+        return _sentence(match)
+    if rx is not None and direction < 0 and rx.why_story:
+        return rx.why_story.split(". ")[0].rstrip(".") + "."
+    return ("Your numbers this morning came in better than the plan assumed." if direction > 0
+            else "Your numbers this morning came in worse than the plan assumed.")
+
+
+def adjust(p: Profile, rx: Rx, plan: Plan, prev: Plan) -> list[PlanDay]:
+    """Mark every day whose plan changed since yesterday, and say why."""
+    from .engine import ORDER
+    was = {d.date: d.verdict for d in prev.days if not d.reason.startswith("You rarely")}
+    why = causes(p, rx, prev)
+    changed, first = [], True
+    for d in plan.days:
+        if d.date in was and was[d.date] != d.verdict:
+            d.was = was[d.date]
+            up = 1 if ORDER.index(d.verdict) > ORDER.index(d.was) else -1
+            d.because = explain(up, why, rx) if first else "Knock-on from the change above."
+            first = False
+            changed.append(d)
+    return changed
+
+
+def ics(plan: Plan, url: str = "https://www.ceiling.app/calendar") -> str:
     """An iCalendar feed of the plan: all-day events, rebuilt every time a calendar app fetches it."""
     def esc(s: str) -> str:
         return s.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
