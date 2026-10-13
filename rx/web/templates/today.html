@@ -43,9 +43,9 @@
   .rowd { border-bottom:1px solid var(--rule); }
   .rowd > summary { display:grid; grid-template-columns:110px 1fr 18px; gap:20px; padding:16px 0; cursor:pointer; list-style:none; align-items:start; }
   .rowd > summary::-webkit-details-marker { display:none; }
-  .rowd .chev { width:8px; height:8px; margin-top:12px; border-right:1.5px solid #b9b9be; border-bottom:1.5px solid #b9b9be;
-                transform:rotate(45deg); transition:transform .15s; justify-self:end; }
-  .rowd[open] .chev { transform:rotate(-135deg); margin-top:16px; }
+  .rowd .chev { width:8px; height:8px; margin:0; border-right:1.5px solid #b9b9be; border-bottom:1.5px solid #b9b9be;
+                transform:translateY(-2px) rotate(45deg); transition:transform .15s; justify-self:end; align-self:center; }
+  .rowd[open] .chev { transform:translateY(2px) rotate(-135deg); }
   .rowd > summary:hover .chev { border-color:var(--ink); }
   .rowb { padding:0 38px 18px 130px; }
   .rowb > :first-child { margin-top:0; }
