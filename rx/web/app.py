@@ -313,3 +313,13 @@ def api_today(d: str | None = None):
         "if_skip": rx.if_skip, "if_overdo": rx.if_overdo,
         "scenarios": rx.scenarios, "notes": rx.notes,
     }
+
+
+# The Coach page (fullrecord/): a separate page beside Today. Optional: without
+# its package extras or an Anthropic API key it stays off and nothing here changes.
+try:
+    from fullrecord.web import router as _coach_router
+    app.include_router(_coach_router)
+except ImportError:
+    pass
+
