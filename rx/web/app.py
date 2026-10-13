@@ -93,6 +93,7 @@ def _refresh_in_background() -> None:
             client = intervals.IntervalsClient(key, os.getenv("INTERVALS_ATHLETE_ID", "0"))
             intervals.sync(client, store, days=days, log=lambda *_: None)
             store.set_meta("last_sync", str(time.time()))
+            store.sync()
         except Exception as e:  # never take the site down over a sync
             print(f"sync failed: {e}")
         finally:

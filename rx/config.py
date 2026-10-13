@@ -18,6 +18,8 @@ class Settings:
     intervals_athlete_id: str
     data_dir: Path
     tz: str
+    turso_url: str = ""
+    turso_token: str = ""
 
     @property
     def db_path(self) -> Path:
@@ -36,4 +38,6 @@ def settings() -> Settings:
         intervals_athlete_id=os.getenv("INTERVALS_ATHLETE_ID", "0").strip() or "0",
         data_dir=data_dir,
         tz=os.getenv("RX_TZ", "America/Los_Angeles"),
+        turso_url=os.getenv("TURSO_DATABASE_URL", "").strip(),
+        turso_token=os.getenv("TURSO_AUTH_TOKEN", "").strip(),
     )

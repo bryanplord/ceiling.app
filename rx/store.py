@@ -1,8 +1,9 @@
-"""SQLite store. One file, no server, easy to share between developers."""
+"""SQLite store. One file locally; a Turso replica when deployed."""
 from __future__ import annotations
 
 import json
 import sqlite3
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -81,15 +82,91 @@ class Wellness:
     readiness: float | None = None
 
 
+class _Row(tuple):
+    """A result row readable by position or by column name, like sqlite3.Row."""
+
+    def __new__(cls, values, names):
+        r = super().__new__(cls, values)
+        r._names = names
+        return r
+
+    def __getitem__(self, key):
+        if isinstance(key, str):
+            return tuple.__getitem__(self, self._names[key])
+        return tuple.__getitem__(self, key)
+
+    def keys(self):
+        return list(self._names)
+
+
+class _Locked:
+    """Wraps a Turso (libsql) connection: one shared connection per process, every
+    statement run under a lock and its rows read out immediately, so web requests
+    and the background refresh can share it safely."""
+
+    def __init__(self, conn):
+        self.conn = conn
+        self.lock = threading.RLock()
+
+    def execute(self, sql, args=()):
+        with self.lock:
+            cur = self.conn.execute(sql, args)
+            if not cur.description:
+                return []
+            names = {d[0]: i for i, d in enumerate(cur.description)}
+            return [_Row(row, names) for row in cur.fetchall()]
+
+    def executescript(self, script):
+        with self.lock:
+            self.conn.executescript(script)
+
+    def commit(self):
+        with self.lock:
+            self.conn.commit()
+
+    def sync(self):
+        with self.lock:
+            if hasattr(self.conn, "sync"):
+                self.conn.sync()
+
+    def close(self):
+        self.conn.close()
+
+
 class Store:
-    def __init__(self, path: Path | str):
+    """Local SQLite by default. With TURSO_DATABASE_URL set, a local replica of the
+    hosted Turso database: reads are local and fast, writes go to Turso, so the data
+    survives hosts that wipe their disk (e.g. Render's free tier)."""
+
+    def __init__(self, path: Path | str, turso_url: str = "", turso_token: str = "",
+                 backend: str = "sqlite"):
         self.path = str(path)
-        self.db = sqlite3.connect(self.path)
-        self.db.row_factory = sqlite3.Row
+        self.remote = bool(turso_url)
+        if turso_url or backend == "libsql":
+            import libsql
+            conn = (libsql.connect(self.path, sync_url=turso_url, auth_token=turso_token)
+                    if turso_url else libsql.connect(self.path))
+            self.db = _Locked(conn)
+            if turso_url:
+                self.db.sync()
+        else:
+            self.db = sqlite3.connect(self.path, check_same_thread=False)
+            self.db.row_factory = sqlite3.Row
         self.db.executescript(SCHEMA)
         cols = {r[1] for r in self.db.execute("PRAGMA table_info(streams)")}
         if "speed" not in cols:  # migrate databases created before speed was stored
             self.db.execute("ALTER TABLE streams ADD COLUMN speed TEXT")
+            self.db.commit()
+
+    def _one(self, sql: str, args: tuple = ()):
+        for row in self.db.execute(sql, args):
+            return row
+        return None
+
+    def sync(self) -> None:
+        """Pull the latest from Turso into the local replica (no-op for plain SQLite)."""
+        if self.remote:
+            self.db.sync()
 
     def close(self) -> None:
         self.db.close()
@@ -139,24 +216,23 @@ class Store:
         return [Activity(**{k: r[k] for k in cols}) for r in self.db.execute(q, args)]
 
     def activity(self, activity_id: str) -> Activity | None:
-        r = self.db.execute("SELECT * FROM activities WHERE id=?", (activity_id,)).fetchone()
+        r = self._one("SELECT * FROM activities WHERE id=?", (activity_id,))
         if not r:
             return None
         return Activity(**{k: r[k] for k in Activity.__dataclass_fields__.keys()})
 
     def has_stream(self, activity_id: str) -> bool:
-        return self.db.execute(
-            "SELECT 1 FROM streams WHERE activity_id=?", (activity_id,)).fetchone() is not None
+        return self._one("SELECT 1 FROM streams WHERE activity_id=?", (activity_id,)) is not None
 
     def stream(self, activity_id: str) -> tuple[list, list, list | None] | None:
-        r = self.db.execute("SELECT * FROM streams WHERE activity_id=?", (activity_id,)).fetchone()
+        r = self._one("SELECT * FROM streams WHERE activity_id=?", (activity_id,))
         if not r:
             return None
         return (json.loads(r["time"]), json.loads(r["hr"]),
                 json.loads(r["cadence"]) if r["cadence"] else None)
 
     def get_meta(self, key: str) -> str | None:
-        r = self.db.execute("SELECT value FROM meta WHERE key=?", (key,)).fetchone()
+        r = self._one("SELECT value FROM meta WHERE key=?", (key,))
         return r["value"] if r else None
 
     def set_meta(self, key: str, value: str) -> None:
@@ -164,7 +240,7 @@ class Store:
         self.db.commit()
 
     def speed(self, activity_id: str) -> list | None:
-        r = self.db.execute("SELECT speed FROM streams WHERE activity_id=?", (activity_id,)).fetchone()
+        r = self._one("SELECT speed FROM streams WHERE activity_id=?", (activity_id,))
         return json.loads(r["speed"]) if r and r["speed"] else None
 
     def wellness(self, since: str | None = None) -> list[Wellness]:

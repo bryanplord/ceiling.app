@@ -12,8 +12,19 @@ from .store import Store
 from .clock import local_today
 
 
+_shared: Store | None = None
+
+
 def open_store() -> Store:
-    return Store(settings().db_path)
+    """Plain SQLite: a fresh connection each time. Turso: one shared replica per
+    process (opening one means pulling from Turso, too slow to do per request)."""
+    global _shared
+    s = settings()
+    if not s.turso_url:
+        return Store(s.db_path)
+    if _shared is None:
+        _shared = Store(s.data_dir / "replica.db", s.turso_url, s.turso_token)
+    return _shared
 
 
 def today_rx(store: Store, day: str | None = None):
