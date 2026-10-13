@@ -16,8 +16,8 @@ from ..sports import BIKE, LABEL, RUN, SKI, WALK
 REST, LIGHT, EASY, STEADY, HARD = "rest", "light", "easy", "steady", "hard"
 ORDER = [REST, LIGHT, EASY, STEADY, HARD]
 HEADLINE = {
-    REST: "Rest day.",
-    LIGHT: "Light day.",
+    REST: "Day off.",
+    LIGHT: "Just a stroll.",
     EASY: "Easy day.",
     STEADY: "Go. Steady.",
     HARD: "Go hard.",
@@ -157,38 +157,45 @@ def build_rx(p: Profile, day: str | None = None) -> Rx:
 
     z = p.zones
     steps: list[str] = []
+    verb = {BIKE: "Ride", RUN: "Run", SKI: "Skin", WALK: "Walk"}.get(sport, LABEL[sport])
     if verdict in (REST, LIGHT):
         ceiling = z.top("Z1 Recovery")
         low = None
-        miles = round(mins / 60 * WALK_MPH, 1)
-        do = f"Walk, {mins} min or {miles} miles max. Keep HR under {ceiling}."
-        dont = "No running. No riding. No intervals."
-        if verdict == REST:
-            dont = "No training. A walk is the whole day."
+        if verdict == LIGHT:
+            do = (f"No workout today. The most you should do is a relaxed walk, up to {mins} minutes, "
+                  f"heart rate under {ceiling}. A stroll, not a power walk.")
+            dont = "Don't sneak in a ride or a run. Don't speed-walk to rack up steps, and skip the steep hills."
+        else:
+            do = (f"Take the day off. If you want to move, a slow walk of {mins} minutes tops keeps you loose. "
+                  f"Heart rate under {ceiling}.")
+            dont = "No training at all today. Resting is the workout."
     elif verdict == EASY:
         low, ceiling = z.top("Z1 Recovery") - 10, z.bottom("Z2 Aerobic") + 6
-        do = f"{LABEL[sport]}, {mins} minutes max. HR {low}–{ceiling}, average about {round((low + ceiling) / 2)}. Never above {ceiling}."
-        dont = f"No climbs that push you past {ceiling}. Walk or soft-pedal them."
+        do = (f"{verb} easy, {mins} minutes max, heart rate {low}–{ceiling}. It should feel almost too easy: "
+              f"full sentences the whole way.")
+        dont = f"Don't let the climbs drag you over {ceiling}. Shift down, spin, or walk them."
     elif verdict == STEADY:
         low, ceiling = z.bottom("Z2 Aerobic"), z.top("Z2 Aerobic")
-        do = f"{LABEL[sport]}, {mins} minutes max. HR {low}–{ceiling}, average about {round((low + ceiling) / 2)}. Never above {ceiling}."
-        dont = f"No efforts above {ceiling}. No intervals today."
+        avg = round((low + ceiling) / 2)
+        do = (f"{verb} up to {mins} minutes at all-day pace: heart rate {low}–{ceiling}, settling around {avg}. "
+              f"You can talk, just not sing.")
+        dont = f"No chasing, no attacking climbs, no intervals. Nothing over {ceiling}."
     else:  # HARD
         z4lo, z4hi = z.bottom("Z4 Threshold"), z.top("Z4 Threshold")
         low, ceiling = z4lo, z4hi + 3
         steps = [
-            f"15 min easy, HR under {z.top('Z2 Aerobic')}.",
-            f"4 × 8 min at HR {z4lo}–{z4hi}. Recover 4 min easy between.",
+            f"15 min easy to warm up, heart rate under {z.top('Z2 Aerobic')}.",
+            f"4 × 8 min hard at {z4lo}–{z4hi}, with 4 min easy between. Hard but even: a few words at a time.",
             f"10 min easy to finish.",
         ]
-        do = f"{LABEL[sport]}: 4 × 8 min hard at HR {z4lo}–{z4hi}, 75 minutes total."
-        dont = f"Don't go above {ceiling}, even on the last rep. Don't add a fifth."
+        do = f"{verb} with 4 hard 8-minute efforts at heart rate {z4lo}–{z4hi}. 75 minutes total."
+        dont = f"Don't go over {ceiling}, even on the last one. Don't add a fifth."
 
     if sport in (BIKE, SKI) and verdict in (EASY, STEADY):
         # Mountain riding and skinning are intermittent: climbs spike HR, descents drop it.
         # The ceiling is about what you sustain, not a single beep on a punchy pitch.
-        dont += (f" On climbs, judge it on the last minute, not one beep: a spike past {ceiling} for under "
-                 f"30 seconds is fine. Stay above it for a minute and you're doing a harder day than this.")
+        dont += (f" A spike on a steep pitch is fine if it's under 30 seconds. "
+                 f"Over {ceiling} for a full minute means back off.")
     tonight = EARLY_BED if (rec.sleep.status in (RED, AMBER) or verdict in (REST, LIGHT, HARD)) \
         else "Normal bedtime. Aim for 8 hours in bed."
     rx = Rx(day, verdict, HEADLINE[verdict], why[:3], do, dont, tonight, sport,
