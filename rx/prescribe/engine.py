@@ -642,17 +642,17 @@ def what_how(rx: Rx, kind: str | None, mins: int, low, ceiling, steps) -> tuple[
         how = [f"Heart rate under {ceiling}. A stroll, not a power walk.",
                "No riding, no running, no speed-walking to rack up steps."]
     elif v == EASY:
-        what = f"An easy {noun}, {mins} minutes at {round((low + ceiling) / 2)}."
+        what = f"An easy {noun}, {mins} minutes at {round((low + ceiling) / 2)} ({low}–{ceiling})."
         how = [f"Hold {round((low + ceiling) / 2)}, never over {ceiling}. It should feel almost too easy: "
                f"full sentences the whole way.",
                f"On the climbs, shift down, spin or walk the steep pitches to stay in range."]
     elif v == STEADY:
-        what = f"A steady {noun}, up to {mins} minutes at {round((low + ceiling) / 2)}."
+        what = f"A steady {noun}, up to {mins} minutes at {round((low + ceiling) / 2)} ({low}–{ceiling})."
         how = [f"Hold {round((low + ceiling) / 2)}, never over {ceiling}. All-day pace: you can "
                f"talk, just not sing.",
                f"No chasing, no attacking climbs, no intervals."]
     else:
-        what = f"A hard {noun}: 4 × 8 minutes at threshold, {mins} minutes total."
+        what = f"A hard {noun}: 4 × 8 minutes at {low}–{ceiling - 3}, {mins} minutes total."
         how = list(steps) + [f"Never over {ceiling}, even on the last one."]
     if rx.sport in (BIKE, SKI) and v in (EASY, STEADY):
         how.append(f"A short spike on a steep pitch is fine. If you're over {ceiling} for a full minute, ease off.")
