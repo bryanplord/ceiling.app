@@ -1,6 +1,7 @@
 """Build the history from a Garmin account export, once, into the app's database.
 
     python -m fullrecord.ingest path/to/export.zip      (or the unpacked folder)
+    python -m fullrecord.ingest path/to/export.zip --email someone@example.com
 
 Reads every activity file for its second-by-second records, and the HRV, sleep
 and all-day monitoring files for the nights. Writes to the Coach page's own
@@ -61,11 +62,13 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("path", help="Garmin export zip or unpacked folder")
     ap.add_argument("--tz", default=os.getenv("RX_TZ", "America/Los_Angeles"))
+    ap.add_argument("--email", default="", help="the Ceiling account the history is for; "
+                    "leave out for the primary athlete")
     args = ap.parse_args(argv)
     tz = ZoneInfo(args.tz)
 
-    from rx.service import open_store
-    store = open_store()
+    from rx.service import open_store, owner_of
+    store = open_store(owner_of(args.email) if args.email else "")
     db.ensure(store)
 
     work = tempfile.mkdtemp(prefix="fullrecord-")

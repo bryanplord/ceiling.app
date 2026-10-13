@@ -1,7 +1,7 @@
 """Sleep as a bank account: what you need, what you got, what you owe.
 
 Need = your own baseline + extra after training.
-  Baseline: the 75th percentile of your last 60 nights, which approximates what
+  Baseline: the median of your last 60 nights (your usual night), which approximates what
   you sleep when nothing cuts it short. Clamped to 7.5–9 h.
   Training: +0 / 15 / 30 / 45 min the night after a light / normal / big / huge
   day, judged against your own 28-day average load.
@@ -115,7 +115,9 @@ def bank(wellness, daily_load: dict[str, float], day: str, verdict: str | None =
     scores = [w.sleep_score for w in wellness if w.sleep_score and w.date > (d0 - timedelta(days=60)).isoformat()]
     if len(hist) < 7 and len(scores) < 7:
         return SleepBank(8.0, title="Not enough sleep data", says="Need a week of sleep data to track your balance.")
-    base = min(9.0, max(7.5, statistics.quantiles(hist, n=4)[2])) if len(hist) >= 7 else 8.0
+    # Your usual night (the median), not your longest ones: watches undercount sleep a little, and
+    # a 75th-percentile baseline turned ordinary weeks into "debt". Clamped to 7.5–8.75 hours.
+    base = min(8.75, max(7.5, statistics.median(hist))) if len(hist) >= 7 else 8.0
     avg_load = statistics.mean([daily_load.get((d0 - timedelta(days=n)).isoformat(), 0.0) for n in range(1, 29)])
 
     nights: list[Night] = []

@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block head %}
+<style>
+  .ph { font-size:clamp(40px, 6vw, 72px); margin:12px 0 0; }
+  .lede2 { font-size:19px; line-height:1.5; max-width:62ch; margin:18px 0 0; color:#2a2a2d; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:12px; margin-top:28px; }
+  .gc input { position:absolute; opacity:0; pointer-events:none; }
+  .gc span { display:block; padding:20px; border:1.5px solid var(--rule); border-radius:12px; font-size:18px; font-weight:600; cursor:pointer; min-height:84px; }
+  .gc span small { display:block; font-weight:400; font-size:14px; color:var(--lichen); margin-top:6px; }
+  .gc input:checked + span { border-color:var(--ink); box-shadow:inset 0 0 0 1px var(--ink); }
+  .gc input:focus-visible + span { outline:2px solid var(--ceiling); outline-offset:2px; }
+  .gform { margin-top:24px; display:grid; gap:16px; max-width:640px; }
+  .gform label { display:grid; gap:6px; font-size:14px; font-weight:600; }
+  .gform input[type=text], .gform input[type=date], .gform input[type=number] { font:inherit; font-size:17px; padding:12px 14px; border:1px solid #d4d4d8; border-radius:8px; }
+  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .gform button { font:inherit; font-weight:600; font-size:16px; padding:15px 22px; border:0; border-radius:999px; background:var(--ink); color:#fff; cursor:pointer; justify-self:start; }
+  .gform button:hover { background:var(--ceiling); }
+  .or { color:var(--lichen); font-size:15px; margin:28px 0 0; }
+  .wfields { display:none; } .wfields.on { display:grid; }
+  .count { display:flex; flex-wrap:wrap; gap:48px; margin-top:28px; }
+  .count b { display:block; font-size:clamp(40px, 6vw, 64px); font-weight:600; font-stretch:125%; line-height:1; }
+  .count span { color:var(--lichen); font-size:14px; }
+  .warn { margin-top:24px; padding:14px 16px; border-left:3px solid var(--warn); background:#fbf6ec; max-width:70ch; font-size:16px; }
+  .tl { display:flex; gap:2px; margin-top:36px; }
+  .tl div { flex:1; height:30px; position:relative; }
+  .tl div.cur::after { content:""; position:absolute; left:50%; top:-10px; width:2px; height:50px; background:var(--ink); }
+  .ph-Base { background:#7fa7d9; } .ph-Build { background:#46b07f; } .ph-Peak { background:#ec9550; }
+  .ph-Taper { background:#e3bd52; } .ph-Recover { background:#c9d8ea; } .ph-Race { background:#de5f55; }
+  .tlk { display:flex; flex-wrap:wrap; gap:6px 16px; font-size:13px; color:var(--lichen); margin-top:10px; }
+  .tlk i { display:inline-block; width:12px; height:12px; margin-right:6px; vertical-align:-1px; }
+  table.wk { width:100%; border-collapse:collapse; margin-top:32px; font-size:15px; font-variant-numeric:tabular-nums; }
+  table.wk th { text-align:left; color:var(--lichen); font-weight:600; padding:8px 10px 8px 0; border-bottom:2px solid var(--ink); }
+  table.wk td { padding:10px 10px 10px 0; border-bottom:1px solid var(--rule); vertical-align:top; }
+  table.wk tr.cur td { font-weight:600; }
+  .nut { margin-top:28px; } .nut li { font-size:17px; margin:6px 0; }
+  .change { margin-top:36px; display:flex; gap:12px; }
+  .change button { font:inherit; font-size:15px; padding:10px 16px; border:1px solid var(--rule); background:#fff; border-radius:999px; cursor:pointer; }
+  @media (max-width:700px) { .row2 { grid-template-columns:1fr; } table.wk td.note, table.wk th.note { display:none; } }
+</style>
+{% endblock %}
+{% block body %}
+{% if not prog %}
+<h1 class="ph">What are you training for?</h1>
+<p class="lede2">Pick a goal, or type it in your own words. Ceiling builds the programme and the calendar from it, and every morning's prescription follows it.</p>
+<form method="post" action="/plan" class="gform" style="max-width:none">
+  <div class="cards">
+    {% for c in canned %}
+    <label class="gc"><input type="radio" name="canned" value="{{ c.id }}" {{ 'checked' if loop.first }} data-kind="{{ c.kind }}">
+      <span>{{ c.title }}<small>{{ {'best_shape':'Peak fitness by a date, or ongoing','event':'Base, build, peak, taper to race day','weight':'A safe weekly rate, fuelled training','longevity':'Mostly easy, some hard, strength twice a week'}[c.kind] }}</small></span></label>
+    {% endfor %}
+  </div>
+  <p class="or">Or say it your way:</p>
+  <label>Your goal<input type="text" name="text" placeholder="Run a marathon in May. Lose 15 lb by Christmas. Best shape by March 1."></label>
+  <div class="row2">
+    <label>By when<input type="date" name="date"></label>
+    <label>Target (optional)<input type="text" name="target" placeholder="Sub 4 hours, finish strong…"></label>
+  </div>
+  <div class="row2 wfields" id="wf">
+    <label>Weight now (lb)<input type="number" step="0.1" name="w_now" placeholder="181"></label>
+    <label>Target weight (lb)<input type="number" step="0.1" name="w_target" placeholder="170"></label>
+  </div>
+  <button type="submit">Build my plan</button>
+</form>
+<script>
+(() => { const wf = document.getElementById('wf');
+  const sync = () => { const c = document.querySelector('input[name=canned]:checked');
+    const t = (document.querySelector('input[name=text]').value || '').toLowerCase();
+    wf.classList.toggle('on', (c && c.dataset.kind === 'weight') || /lose|weight|lb|pound/.test(t)); };
+  document.querySelectorAll('input[name=canned], input[name=text]').forEach(e => e.addEventListener('input', sync)); sync(); })();
+</script>
+{% else %}
+<h1 class="ph">{{ prog.title }}</h1>
+{% if prog.goal.target %}<p class="lede2" style="color:var(--lichen)">“{{ prog.goal.target }}”</p>{% endif %}
+<div class="count">
+  {% if prog.days_left is not none %}<div><b>{{ prog.days_left }}</b><span>days to go</span></div>{% endif %}
+  {% if prog.phase %}<div><b>{{ prog.phase }}</b><span>this week's phase</span></div>{% endif %}
+  {% if prog.this_week %}<div><b>{{ prog.this_week.hours }} h</b><span>this week's target</span></div>
+  <div><b>{{ done_h }} h</b><span>done so far this week</span></div>{% endif %}
+</div>
+<p class="lede2">{{ prog.summary }}</p>
+{% for w in prog.warnings %}<p class="warn">{{ w }}</p>{% endfor %}
+{% if prog.nutrition %}<ul class="nut">{% for n in prog.nutrition %}<li>{{ n }}</li>{% endfor %}</ul>{% endif %}
+{% if prog.weeks %}
+<div class="tl" aria-label="Programme phases">{% for w in prog.weeks %}<div class="ph-{{ w.phase }}{{ ' cur' if w.current }}" title="{{ w.start }}: {{ w.phase }}"></div>{% endfor %}</div>
+<div class="tlk">{% for ph in ['Base','Build','Recover','Peak','Taper','Race'] %}{% if prog.weeks|selectattr('phase','equalto',ph)|list %}<span><i class="ph-{{ ph }}"></i>{{ ph }}</span>{% endif %}{% endfor %}<span>Line: this week</span></div>
+<table class="wk">
+  <tr><th>Week of</th><th>Phase</th><th>Hours</th><th>Hard days</th><th>Long session</th><th class="note">Focus</th></tr>
+  {% for w in prog.weeks %}{% set wd = date.fromisoformat(w.start) %}
+  <tr class="{{ 'cur' if w.current }}"><td>{{ wd.strftime('%b %-d') }}</td><td>{{ w.phase }}</td><td>{{ w.hours }}</td>
+    <td>{{ w.hard_days }}</td><td>{{ (w.long_minutes ~ ' min') if w.long_minutes else '–' }}</td><td class="note">{{ w.note }}</td></tr>
+  {% endfor %}
+</table>
+{% endif %}
+<p class="lede2">The calendar and every morning's prescription follow this. Bad sleep, low HRV or a hard day you didn't plan still win on the day: the programme bends, and it catches up over the next week.</p>
+<form method="post" action="/plan/clear" class="change"><button type="submit">Change goal</button></form>
+{% endif %}
+{% endblock %}

@@ -1,10 +1,53 @@
 {% extends "base.html" %}
+{% block head %}
+<style>
+  .pg h1 { margin-bottom:12px; }
+  .earned { font-size:clamp(22px, 2.6vw, 28px); line-height:1.35; font-weight:600; max-width:40ch; margin:8px 0 0; }
+  .blk { margin-top:52px; }
+  .blk h2 { color:var(--ink); font-size:20px; margin:0 0 6px; }
+  .blk .sub { color:var(--lichen); margin:0 0 16px; }
+  .wins li { font-size:19px; margin:10px 0; max-width:60ch; }
+  .wins { padding-left:20px; }
+  .mk { display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:0; border-top:2px solid var(--ink); }
+  .mk div { padding:18px 16px 18px 0; border-bottom:1px solid var(--rule); }
+  .mk b { display:block; font-size:13px; color:var(--lichen); font-weight:600; }
+  .mk strong { display:block; font-size:30px; font-weight:600; font-stretch:115%; margin:4px 0; }
+  .mk strong.good { color:var(--good); } .mk strong.ok { color:var(--warn); } .mk strong.bad { color:var(--bad); }
+  .mk p { margin:0; font-size:15px; color:#2a2a2d; max-width:34ch; }
+  .calls { font-size:20px; line-height:1.45; max-width:60ch; }
+  .meas .row { align-items:baseline; }
+  .meas .row b { font-weight:600; }
+</style>
+{% endblock %}
 {% block body %}
+<div class="pg">
 <h1>{{ p.progress.headline }}</h1>
-{% for m in p.progress.measures %}
-<h2>{{ m.name }}</h2>
-<p class="big">{{ m.sentence }}</p>
-<p class="muted">{{ m.trend | capitalize }}</p>
-{% endfor %}
-<p class="muted">Each measure compares the last few weeks with about two months earlier, against your own history only.</p>
+{% if m.earned %}<p class="earned">{{ m.earned }}</p>{% endif %}
+
+{% if m.wins or m.milestones %}
+<section class="blk"><h2>What's getting better</h2>
+  <ul class="wins">{% for x in m.milestones %}<li><b>{{ x }}</b></li>{% endfor %}{% for x in m.wins %}<li>{{ x }}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+
+{% if m.markers %}
+<section class="blk"><h2>What we're watching</h2>
+  <p class="sub">The few numbers that say whether this is working, and which way they should go.</p>
+  <div class="mk">{% for name, val, why, tone in m.markers %}<div><b>{{ name }}</b><strong class="{{ tone }}">{{ val }}</strong><p>{{ why }}</p></div>{% endfor %}</div>
+</section>
+{% endif %}
+
+<section class="blk"><h2>How the calls held up</h2>
+  {% if calls %}
+  <p class="calls">Over the last {{ calls.days }} days you did what the morning called for on {{ calls.followed }}.
+    {{ calls.line }}</p>
+  <p class="sub">{% if calls.live < calls.days %}{{ calls.days - calls.live }} of these days are before Ceiling saved its calls, so they're replayed: what it would have said that morning. {% endif %}This is how Ceiling checks itself: if following the call doesn't leave you more recovered, the call is wrong, not you.</p>
+  {% else %}<p class="sub">Needs a week of days to check.</p>{% endif %}
+</section>
+
+<section class="blk meas"><h2>Every measure</h2>
+  <p class="sub">The last few weeks against about two months earlier, against your own history only.</p>
+  {% for x in p.progress.measures %}<div class="row"><span><b>{{ x.name }}</b><br><span class="muted">{{ x.sentence }}</span></span><span class="muted">{{ x.trend | capitalize }}</span></div>{% endfor %}
+</section>
+</div>
 {% endblock %}

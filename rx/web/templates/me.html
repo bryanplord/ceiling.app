@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block head %}
+<style>
+  .me { margin-top:28px; border-top:2px solid var(--ink); }
+  .me a { display:grid; grid-template-columns:200px 1fr 20px; gap:20px; align-items:center; padding:22px 0; border-bottom:1px solid var(--rule); text-decoration:none; }
+  .me a:hover b { color:var(--ceiling); }
+  .me b { font-size:22px; font-weight:600; }
+  .me span { color:var(--lichen); font-size:17px; }
+  .me i { justify-self:end; width:9px; height:9px; border-right:1.5px solid #b9b9be; border-top:1.5px solid #b9b9be; transform:rotate(45deg); }
+  @media (max-width:700px) { .me a { grid-template-columns:1fr 20px; gap:4px 12px; } .me span { grid-column:1; } .me i { grid-row:1 / span 2; grid-column:2; } }
+</style>
+{% endblock %}
+{% block body %}
+<h1>You</h1>
+<nav class="me">
+  <a href="/trends"><b>Trends</b><span>HRV, resting heart rate, sleep and training load over time.</span><i></i></a>
+  <a href="/recovery"><b>Recovery</b><span>Last night and the last month, read against your normal.</span><i></i></a>
+  <a href="/zones"><b>Zones</b><span>Your heart-rate zones and where your time goes.</span><i></i></a>
+  <a href="/you"><b>You vs your age</b><span>VO2max, resting heart rate and HRV against people your age and athletes your age.</span><i></i></a>
+  <a href="/profile"><b>Profile</b><span>Your thresholds, max heart rate and how they were measured.</span><i></i></a>
+  <a href="/data"><b>Data</b><span>What came in from your watch, and your connection.</span><i></i></a>
+  <a href="/logout"><b>Sign out</b><span></span><i></i></a>
+</nav>
+{% endblock %}

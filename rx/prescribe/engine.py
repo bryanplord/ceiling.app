@@ -59,7 +59,11 @@ class Rx:
     skip_short: str = ""
     example: str = ""
     minimum: str = ""
+    maximum: str = ""
+    options: list = field(default_factory=list)     # other ways to do today: (title, note, tone)
+    options_short: str = ""
     tomorrow_short: str = ""
+    goal_note: str = ""
     why_need: str = ""
     why_story: str = ""
     how_short: str = ""
@@ -161,15 +165,55 @@ def build_rx(p: Profile, day: str | None = None) -> Rx:
     verdict = cap_verdict(verdict, reading.cap)
     why = [reading.says] + [r for r in why if not r.startswith(
         ("HRV", "Resting HR", "Sleep", "Recovered", "Recovery looks", "No sleep"))]
+    from ..analysis import breathing as br
+    breath = br.check(p.wellness, day)
+    if breath.last is not None and breath.usual is not None:
+        from ..analysis.reading import Evidence
+        reading.evidence.insert(0 if breath.status != "normal" else len(reading.evidence), Evidence(
+            "Breathing", f"{breath.last:.1f} breaths a minute overnight; your usual is {breath.usual:.1f}.",
+            "bad" if breath.status == "warning" else "ok" if breath.status == "up" else "good"))
+    if breath.status == "warning":
+        verdict = cap_verdict(verdict, LIGHT if breath.last - breath.usual >= 1.5 and breath.rhr_up >= 5 else EASY)
+        why.insert(0, breath.says)
     sb = sleepbank.bank(p.wellness, p.daily_load, day)
     before = verdict
     verdict = cap_verdict(verdict, sb.cap)
     if sb.state in ("owed", "debt", "deep_debt") or verdict != before or sb.no_technical:
         why.insert(1, sb.says)
-    sport, chosen_kind, sport_reason, cap_mins = choose_activity(verdict, p, day)
+    cut30 = (date.fromisoformat(day) - timedelta(days=30)).isoformat()
+    runs30 = sum(1 for a in p.activities if a.sport == RUN and cut30 <= a.date < day)
+    ran_yday = any(a.sport == RUN and a.date == (date.fromisoformat(day) - timedelta(days=1)).isoformat() for a in p.activities)
+    # Not a regular runner: running only on easy days, never two days running.
+    ban = {"run", "trail run"} if runs30 < 6 and (verdict in (STEADY, HARD) or ran_yday) else None
+    # The programme (your goal): phase, hard days allowed this week, the long session, the goal sport.
+    from .. import goals as gl
+    gday = gl.daily(getattr(p, "program", None), date.fromisoformat(day))
+    goal_note = ""
+    if gday:
+        z_ = p.zones
+        if verdict == HARD and z_:
+            mon = (date.fromisoformat(day) - timedelta(days=date.fromisoformat(day).weekday())).isoformat()
+            hard_done = sum(1 for a in p.activities if mon <= a.date < day and a.avg_hr
+                            and a.avg_hr >= z_.bottom("Z3 Tempo") and (a.moving_s or 0) >= 30 * 60)
+            if hard_done >= gday["hard_days"]:
+                verdict = STEADY
+                goal_note = (f"{gday['phase']} week: {gday['hard_days']} hard "
+                             f"day{'s' if gday['hard_days'] != 1 else ''} a week, and you've had it.")
+        if gday["phase"] == "Taper" and verdict == HARD:
+            goal_note = "Taper: keep the intensity, cut the volume."
+    goal_sport = gday.get("sport") if gday else ""
+    if goal_sport == RUN and ban and verdict != HARD and not ran_yday:
+        ban = None                                   # the goal is a run: easy and steady runs are the plan
+    sport, chosen_kind, sport_reason, cap_mins = choose_activity(verdict, p, day, ban=ban,
+                                                                 prefer=goal_sport or None)
     mins = _round5(_minutes(verdict, sport, p) * (sb.volume if verdict not in (REST, LIGHT) else 1.0))
     if cap_mins:
         mins = min(mins, cap_mins)
+    if gday and gday.get("long_minutes") and verdict in (EASY, STEADY) and (not goal_sport or sport == goal_sport):
+        mins = gday["long_minutes"]
+        goal_note = f"Long {LABEL[sport].lower()} day: {mins} minutes, easy the whole way. This is the session that builds you for the {getattr(p.program.goal, 'event', '') or 'goal'}."
+    if gday and gday["phase"] == "Taper":
+        mins = _round5(mins * 0.6)
     diag = diagnosis(verdict, p, day, reading, sb)
 
     if not p.ready:
@@ -200,8 +244,7 @@ def build_rx(p: Profile, day: str | None = None) -> Rx:
             dont = "No training at all today. Resting is the workout."
     elif verdict == EASY:
         low, ceiling = easy_band(z)
-        do = (f"{verb} easy, {mins} minutes max, heart rate {low}–{ceiling}. It should feel almost too easy: "
-              f"full sentences the whole way.")
+        do = (f"{verb} easy, {mins} minutes max, heart rate {low}–{ceiling}. Easy enough to take a phone call the whole way without the other person hearing you breathe.")
         dont = f"Don't let the climbs drag you over {ceiling}. Shift down, spin, or walk them."
     elif verdict == STEADY:
         low, ceiling = z.bottom("Z2 Aerobic"), z.top("Z2 Aerobic")
@@ -249,7 +292,17 @@ def build_rx(p: Profile, day: str | None = None) -> Rx:
     rx.why_title, rx.why_tone, rx.why_says = why_lead(verdict, p, day, reading)
     rx.why_need, rx.why_story = why_story(verdict, p, day, sb, reading)
     rx.what, rx.how = what_how(rx, kind, mins, low, ceiling, steps)
+    rx.goal_note = goal_note
     rx.minimum = minimum_dose(p, rx, kind)
+    rx.options = alternatives(p, rx, kind)
+    try:
+        rx.maximum = maximum(p, rx)
+    except Exception:
+        rx.maximum = ""
+    if rx.options:
+        names = [o[3] for o in rx.options[:3]]
+        rx.options_short = "Or " + (names[0] if len(names) == 1 else ", ".join(names[:-1]) + " or " + names[-1]) + \
+            ", same heart rate."
     key = next((i for i, h in enumerate(rx.how) if "×" in h), 0) if verdict == HARD else 0
     rx.how_short = rx.how[key] if rx.how else rx.do
     rx.how_more = [h for i, h in enumerate(rx.how) if i != key]
@@ -327,6 +380,62 @@ def _personal_cost(p: Profile, load: float) -> str:
         return "Your personal recovery cost is learned after about 3 weeks of sleep and HRV data."
     s = "; ".join(parts) + "."
     return s[0].upper() + s[1:]
+
+
+TOMORROW_SHORT = {REST: "a day off", LIGHT: "a walk-only day", EASY: "an easy day",
+                  STEADY: "a steady day", HARD: "a hard day"}
+
+
+def maximum(p: Profile, rx: Rx) -> str:
+    """The most you can do today without making tomorrow worse, and what happens past it."""
+    if not p.ready or not p.yesterday or rx.hr_ceiling is None:
+        return ""
+    ceil = rx.hr_ceiling
+    if rx.verdict in (REST, LIGHT):
+        over = _next_verdict(p, rx, _est_load(p, 75, p.zones.bottom("Z3 Tempo")))
+        base = _next_verdict(p, rx, _rx_load(p, rx))
+        if ORDER.index(over) < ORDER.index(base):
+            return (f"A 60-minute walk, heart rate under {ceil}. Turn it into a workout and tomorrow drops "
+                    f"from {TOMORROW_SHORT[base]} to {TOMORROW_SHORT[over]}.")
+        return (f"A 60-minute walk, heart rate under {ceil}. Turn it into a workout and the fatigue you're "
+                f"clearing stays: tomorrow only holds at {TOMORROW_SHORT[base]} if you sleep well.")
+    ideal = _next_verdict(p, rx, _rx_load(p, rx))
+    if rx.verdict == HARD:
+        z = p.zones
+        z4 = (z.bottom("Z4 Threshold") + z.top("Z4 Threshold")) / 2
+        five = _est_load(p, 40, z4) + _est_load(p, 50, z.top("Z1 Recovery"))
+        v5 = _next_verdict(p, rx, five)
+        if ORDER.index(v5) >= ORDER.index(ideal):
+            six = _next_verdict(p, rx, _est_load(p, 48, z4) + _est_load(p, 55, z.top("Z1 Recovery")))
+            tail = (f"A sixth turns tomorrow from {TOMORROW_SHORT[ideal]} into {TOMORROW_SHORT[six]}."
+                    if ORDER.index(six) < ORDER.index(ideal) else
+                    "A sixth is done tired, so it adds fatigue and very little fitness.")
+            return f"5 efforts instead of 4, same {z.bottom('Z4 Threshold')}–{z.top('Z4 Threshold')}. {tail}"
+        return (f"The 4 efforts as written. A fifth turns tomorrow from {TOMORROW_SHORT[ideal]} into "
+                f"{TOMORROW_SHORT[v5]}.")
+    mid = ((rx.hr_low or ceil - 15) + ceil) / 2
+    most = rx.max_minutes
+    nxt = ideal
+    for m in range(rx.max_minutes + 15, rx.max_minutes * 3 + 1, 15):
+        v = _next_verdict(p, rx, _est_load(p, m, mid))
+        if ORDER.index(v) < ORDER.index(ideal):
+            nxt = v
+            break
+        most = m
+    else:
+        nxt = None
+    cap_note = ""
+    if rx.sport == RUN:
+        cut30 = (date.fromisoformat(rx.date) - timedelta(days=30)).isoformat()
+        if sum(1 for a in p.activities if a.sport == RUN and cut30 <= a.date < rx.date) < 6:
+            cap_note = (f" On a run, keep it to {rx.max_minutes}: your legs aren't used to more. "
+                        f"The extra time is fine on the bike.")
+    if most > rx.max_minutes:
+        tail = (f" Past that, tomorrow drops from {TOMORROW_SHORT[ideal]} to {TOMORROW_SHORT[nxt]}." if nxt
+                else " Even longer wouldn't change tomorrow, but it adds nothing today needs.")
+        return f"{most} minutes, still never over {ceil}.{tail}{cap_note}"
+    return (f"{rx.max_minutes} minutes. Even 15 more turns tomorrow from {TOMORROW_SHORT[ideal]} into "
+            f"{TOMORROW_SHORT[nxt]}." if nxt else f"{rx.max_minutes} minutes.") + cap_note
 
 
 def flex(p: Profile, rx: Rx) -> tuple[str | None, str | None]:
@@ -423,10 +532,12 @@ def consequences(p: Profile, rx: Rx) -> tuple[str | None, str | None]:
     return if_skip, if_overdo
 
 
-def _session(p: Profile, v: str, day: str | None = None) -> tuple[str, float]:
+def _session(p: Profile, v: str, day: str | None = None, noun: str | None = None) -> tuple[str, float]:
     """A verdict written out as the actual session for you, activity included,
     and roughly what it costs in load."""
     z = p.zones
+    if noun:
+        return _session_full(p, v, z, noun[:1].upper() + noun[1:])
     noun = "session"
     if day and v not in (REST, LIGHT):
         try:
@@ -471,7 +582,7 @@ def _session_full(p: Profile, v: str, z, Noun: str) -> tuple[str, float]:
                 _est_load(p, 90, (lo + hi) / 2))
     if v == EASY:
         lo, hi = easy_band(z)
-        return (f"an easy day. {Noun}, 60 minutes at {lo}–{hi}, full sentences the whole way",
+        return (f"an easy day. {Noun}, 60 minutes at {lo}–{hi}",
                 _est_load(p, 60, (lo + hi) / 2))
     if v == LIGHT:
         return "a walk day. 30 to 45 minutes, nothing more", _est_load(p, 45, z.top("Z1 Recovery") - 15)
@@ -569,7 +680,9 @@ SUBTYPE = {"MountainBikeRide": "mountain bike", "EMountainBikeRide": "mountain b
            "Ride": "road ride", "road_biking": "road ride", "GravelRide": "gravel ride", "gravel_cycling": "gravel ride",
            "VirtualRide": "trainer ride", "Run": "run", "TrailRun": "trail run", "trail_running": "trail run",
            "BackcountrySki": "ski tour", "backcountry_skiing": "ski tour", "NordicSki": "nordic ski",
-           "Hike": "hike", "hiking": "hike", "Walk": "walk", "walking": "walk"}
+           "Hike": "hike", "hiking": "hike", "Walk": "walk", "walking": "walk",
+           "AlpineSki": "resort skiing", "resort_skiing_snowboarding_ws": "resort skiing",
+           "resort_skiing": "resort skiing", "Snowboard": "resort skiing"}
 
 
 def usual_kind(p: Profile, sport: str) -> str | None:
@@ -627,7 +740,7 @@ def example_ride(p: Profile, sport: str, verdict: str, mins: int, ceiling: int |
 
 NOUN = {"mountain bike": "mountain bike ride", "road ride": "road ride", "gravel ride": "gravel ride",
         "trainer ride": "trainer ride", "trail run": "trail run", "run": "run", "ski tour": "ski tour",
-        "nordic ski": "nordic ski", "hike": "hike", "walk": "walk"}
+        "nordic ski": "nordic ski", "hike": "hike", "walk": "walk", "resort skiing": "day of resort skiing"}
 
 
 def what_how(rx: Rx, kind: str | None, mins: int, low, ceiling, steps) -> tuple[str, list[str]]:
@@ -642,17 +755,16 @@ def what_how(rx: Rx, kind: str | None, mins: int, low, ceiling, steps) -> tuple[
         how = [f"Heart rate under {ceiling}. A stroll, not a power walk.",
                "No riding, no running, no speed-walking to rack up steps."]
     elif v == EASY:
-        what = f"An easy {noun}, {mins} minutes at {round((low + ceiling) / 2)}."
-        how = [f"Hold {round((low + ceiling) / 2)}, never over {ceiling}. It should feel almost too easy: "
-               f"full sentences the whole way.",
+        what = f"An easy {noun}, {mins} minutes at {round((low + ceiling) / 2)} ({low}–{ceiling})."
+        how = [f"Hold {round((low + ceiling) / 2)}, never over {ceiling}. Easy enough to take a phone call the whole way without the other person hearing you breathe.",
                f"On the climbs, shift down, spin or walk the steep pitches to stay in range."]
     elif v == STEADY:
-        what = f"A steady {noun}, up to {mins} minutes at {round((low + ceiling) / 2)}."
-        how = [f"Hold {round((low + ceiling) / 2)}, never over {ceiling}. All-day pace: you can "
-               f"talk, just not sing.",
+        what = f"A steady {noun}, up to {mins} minutes at {round((low + ceiling) / 2)} ({low}–{ceiling})."
+        how = [f"Hold {round((low + ceiling) / 2)}, never over {ceiling}. You could take a phone call, "
+               f"but you'd keep it short.",
                f"No chasing, no attacking climbs, no intervals."]
     else:
-        what = f"A hard {noun}: 4 × 8 minutes at threshold, {mins} minutes total."
+        what = f"A hard {noun}: 4 × 8 minutes at {low}–{ceiling - 3}, {mins} minutes total."
         how = list(steps) + [f"Never over {ceiling}, even on the last one."]
     if rx.sport in (BIKE, SKI) and v in (EASY, STEADY):
         how.append(f"A short spike on a steep pitch is fine. If you're over {ceiling} for a full minute, ease off.")
@@ -708,11 +820,14 @@ def kind_stats(p: Profile, day: str, days: int = 150) -> dict[str, dict]:
 
 
 SPORT_OF = {"mountain bike": BIKE, "road ride": BIKE, "gravel ride": BIKE, "trainer ride": BIKE,
-            "run": RUN, "trail run": RUN, "ski tour": SKI, "nordic ski": SKI, "hike": WALK, "walk": WALK}
+            "run": RUN, "trail run": RUN, "ski tour": SKI, "nordic ski": SKI, "hike": WALK, "walk": WALK,
+            "resort skiing": SKI}
 CONTROLLED = {"road ride", "gravel ride", "trainer ride", "run", "hike"}   # easy to hold a steady HR
 
 
-def choose_activity(verdict: str, p: Profile, day: str) -> tuple[str, str | None, str, int | None]:
+def choose_activity(verdict: str, p: Profile, day: str, planned: dict | None = None,
+                    avoid: str | None = None, ban: set | None = None,
+                    prefer: str | None = None) -> tuple[str, str | None, str, int | None]:
     """Which activity, and why that one. Returns (sport, kind, reason, max minutes or None).
 
     First rule: it has to actually put YOUR heart in today's range. That's judged from your own
@@ -726,8 +841,10 @@ def choose_activity(verdict: str, p: Profile, day: str) -> tuple[str, str | None
                               "Anything with a climb or a pace would."), None
 
     mix14 = _mix(p, day, 14)
+    for k_, h_ in (planned or {}).items():          # days already planned count toward the mix
+        mix14[k_] = mix14.get(k_, 0.0) + h_
     tot = sum(v for k, v in mix14.items() if k != WALK) or 0.0
-    stats = kind_stats(p, day)
+    stats = {k: v for k, v in kind_stats(p, day).items() if k not in (ban or set())} or kind_stats(p, day)
     skied14 = mix14.get(SKI, 0.0) > 0
     band = _band(verdict, p)
 
@@ -740,6 +857,8 @@ def choose_activity(verdict: str, p: Profile, day: str) -> tuple[str, str | None
 
     lo, hi = band
     best, best_score, notes = None, -99.0, {}
+    cut30_ = (date.fromisoformat(day) - timedelta(days=30)).isoformat()
+    runs_recent = sum(1 for a in p.activities if a.sport == RUN and cut30_ <= a.date < day)
     for k, st in stats.items():
         if k == "walk" or st["n"] < 3:
             continue
@@ -749,7 +868,15 @@ def choose_activity(verdict: str, p: Profile, day: str) -> tuple[str, str | None
         fits = lo - 3 <= hr <= hi + 2
         reach = st["hr_hi"] >= lo           # your harder sessions of this kind do reach it
         share = mix14.get(SPORT_OF.get(k, BIKE), 0.0) / tot if tot else 0.0
-        score = (4 if fits else 1.5 if reach else -10) + 2 * (1 - share) + (1 if k in CONTROLLED and verdict == EASY else 0)
+        # What you actually do counts most: your main sports get the nod, variety is a tiebreaker.
+        habit = st["n"] / max(1, sum(v["n"] for kk, v in stats.items() if kk != "walk"))
+        new_run = k in ("run", "trail run") and runs_recent < 6
+        ov, _climb = over_share(p, k, hi, day) if verdict in (EASY, STEADY) else (None, None)
+        hot = ov is not None and ov > (0.3 if verdict == EASY else 0.4)
+        score = ((4 if fits else 1.5 if reach else -10) + 3 * habit + 1 * (1 - share) - (6 if hot else 0)
+                 + (1 if k in CONTROLLED and verdict == EASY else 0)
+                 - (1.5 if k == avoid else 0) - (1.5 if new_run and prefer != RUN else 0)
+                 + (3 if prefer and SPORT_OF.get(k) == prefer else 0))
         notes[k] = (fits, reach, hr, st, share)
         if score > best_score:
             best, best_score = k, score
@@ -783,6 +910,112 @@ def choose_activity(verdict: str, p: Profile, day: str) -> tuple[str, str | None
             cap = 40
             parts.append("Keep it to 40 minutes: your legs aren't used to much running right now.")
     return sport, best, " ".join(parts), cap
+
+
+def over_share(p: Profile, kind: str, ceiling: int, day: str, last: int = 10) -> tuple[float | None, float | None]:
+    """How your own recent sessions of this kind actually went against today's ceiling:
+    (share of time above it, feet climbed per hour). Your terrain is in here: if every ride
+    from your door starts with a climb, it shows."""
+    acts = sorted((a for a in p.activities if SUBTYPE.get(a.raw_type or "") == kind and a.id in p.hr_hist
+                   and a.date < day), key=lambda a: a.date)[-last:]
+    if len(acts) < 3:
+        return None, None
+    over = tot = 0.0
+    for a in acts:
+        h = p.hr_hist[a.id]
+        over += float(h[ceiling + 1:].sum())
+        tot += float(h.sum())
+    climbs = [a.elev_m * 3.281 / (a.moving_s / 3600) for a in acts if a.elev_m and a.moving_s]
+    return (over / tot if tot else None), (sum(climbs) / len(climbs) if climbs else None)
+
+
+SNOW = {"ski tour", "nordic ski", "resort skiing"}
+BIKES = {"mountain bike", "road ride", "gravel ride", "trainer ride"}
+
+
+def alternatives(p: Profile, rx: Rx, chosen: str | None, include_chosen: bool = False) -> list[tuple]:
+    """Other ways to do today's session, from the things you actually do, each judged by what it
+    does to YOUR heart (your own sessions of that kind over the last year) and by the season.
+    Returns (title, note, tone, short name), best first. Same heart rate whatever you pick."""
+    if rx.verdict in (REST,) or not p.zones or rx.hr_ceiling is None:
+        return []
+    lo = rx.hr_low if rx.hr_low is not None else rx.hr_ceiling - 15
+    hi = rx.hr_ceiling
+    aim = round((lo + hi) / 2)
+    month = date.fromisoformat(rx.date).month
+    winter, deep = month in (11, 12, 1, 2, 3, 4), month in (12, 1, 2, 3)
+    stats = kind_stats(p, rx.date, 400)
+    runs30 = sum(1 for a in p.activities if a.sport == RUN and
+                 (date.fromisoformat(rx.date) - timedelta(days=30)).isoformat() <= a.date < rx.date)
+    out = []
+    for k, st in stats.items():
+        if (k == chosen and not include_chosen) or k == "walk" or st["n"] < 3:
+            continue
+        if k in SNOW and not winter:
+            continue
+        if rx.verdict == HARD and k in ("hike", "resort skiing", "nordic ski"):
+            continue
+        if rx.verdict == STEADY and k == "resort skiing":
+            continue
+        noun = NOUN.get(k, k)
+        hr, hr_hi = st["hr"], st["hr_hi"]
+        if rx.verdict == HARD:
+            mins = rx.max_minutes or 75
+            title = f"{noun[:1].upper() + noun[1:]}: 4 × 8 minutes at {lo}–{hi - 3}, {mins} minutes total"
+        elif k == "resort skiing":
+            title = "A few easy hours of resort laps"
+        else:
+            base = rx.max_minutes or 60
+            mins = base
+            if k in BIKES and rx.verdict == EASY:
+                mins = max(base, 60)                    # low impact: you can ride longer than you run
+            if k in ("run", "trail run") and runs30 < 6:
+                mins = min(mins, 40)
+            if k == "ski tour":
+                mins = max(base, 75)
+            title = f"{noun[:1].upper() + noun[1:]}, {mins} minutes at {aim} ({lo}–{hi})"
+        # how it fits your heart
+        if rx.verdict == HARD:
+            note, tone = ({"run": "On a flat road, a track or a treadmill, where nothing interrupts the efforts.",
+                           "trail run": "On a steady uphill trail, walking back down between efforts.",
+                           "ski tour": "On the skin track, up a steady slope: one effort per climb."}
+                          .get(k, "On a steady climb or a flat road where you control the effort."), "good")
+        elif k == "resort skiing":
+            note, tone = (f"Your ski days average {hr:.0f}: the lifts give you rest between runs, "
+                          f"so it counts as an easy day as long as you cruise."), "good"
+        elif lo - 3 <= hr <= hi + 3:
+            note, tone = f"Your {noun}s average {hr:.0f}, right in range.", "good"
+        elif hr > hi + 3:
+            note, tone = (f"Your {noun}s average {hr:.0f}, over today's {hi}. Pick a flat route and keep "
+                          f"it gentle, or it won't stay {'easy' if rx.verdict in (EASY, LIGHT) else 'in range'}."), "ok"
+        elif hr_hi >= lo:
+            note, tone = f"Your {noun}s usually average {hr:.0f}. Push the climbs a little to stay above {lo}.", "ok"
+        else:
+            if rx.verdict in (STEADY, HARD):
+                continue                                 # can't reach the range: not an option
+            note, tone = f"Your {noun}s average {hr:.0f}, under today's range: fine for an easy day.", "ok"
+        ov, climb = over_share(p, k, hi, rx.date) if rx.verdict in (EASY, STEADY) else (None, None)
+        if ov is not None and ov > 0.3:
+            where = f" and climb {round(climb / 50) * 50:,.0f} ft an hour" if climb else ""
+            note = (f"Your last {noun}s spent {ov * 100:.0f}% of the time over {hi}{where}. "
+                    f"{'Holding easy means walking every climb.' if rx.verdict == EASY else 'Expect to go over on the climbs.'}")
+            tone = "bad"
+        elif ov is not None and rx.verdict in (EASY, STEADY):
+            note += f" Your recent ones stayed under {hi} {100 - ov * 100:.0f}% of the time."
+        if k == "mountain bike" and rx.verdict in (EASY, LIGHT) and tone != "bad":
+            note += " Climbs spike it: spin, or walk the steep pitches."
+        if k == "mountain bike" and deep:
+            note += " Only if the trails are clear of snow."
+        if k in ("road ride", "gravel ride") and deep:
+            note += " If the roads are wet or icy, do it on the trainer."
+        if k in ("run", "trail run") and deep:
+            note += " If the trails are snowed in, a treadmill gives you the same session."
+        if k in ("run", "trail run") and runs30 < 3:
+            note += " Shorter on foot: your legs aren't used to running right now."
+        short = {"resort skiing": "a day of resort skiing"}.get(k, ("an " if noun[0] in "aeiou" else "a ") + noun)
+        out.append((title, note, tone, short, k))
+    out.sort(key=lambda o: (0 if o[4] == chosen else 1, {"good": 0, "ok": 1, "bad": 2}[o[2]]))
+    return out[:5]
 
 
 def _hm_short(h: float) -> str:
@@ -826,6 +1059,10 @@ def why_story(verdict: str, p: Profile, day: str, sb, reading) -> tuple[str, str
         bad.append(f"resting HR is creeping up ({rhr7:.0f} against your usual {rhr60:.0f})")
     if load_up:
         bad.append(f"your last week is {(y.atl / y.ctl - 1) * 100:.0f}% above your normal training")
+    from ..analysis import breathing as br
+    b = br.check(p.wellness, day)
+    if b.status in ("warning", "up"):
+        bad.insert(0, f"your breathing was up overnight ({b.last:.1f} a minute against your usual {b.usual:.1f})")
     if hrv_dir == "flat" and rhr_dir == "flat":
         good.append("HRV and resting HR are both holding")
     else:
@@ -840,7 +1077,10 @@ def why_story(verdict: str, p: Profile, day: str, sb, reading) -> tuple[str, str
     parts = []
     if bad:
         parts.append(join(bad)[0].upper() + join(bad)[1:] + ".")
-    if hrv_dir == "down" and (rhr_dir == "up" or debt >= 2.0):
+    if b.status == "warning":
+        parts.append("Breathing and resting HR rising together is often the first sign you're fighting "
+                     "something off, before you feel it. Keep today easy and see how tonight reads.")
+    elif hrv_dir == "down" and (rhr_dir == "up" or debt >= 2.0):
         parts.append("Together that means you're fatigued and not fully recovered. Easy work keeps the "
                      "fitness; anything harder digs the hole deeper.")
     elif hrv_dir == "down":

@@ -68,3 +68,16 @@ def test_cadence_match_reached_with_effort_is_kept():
     rec["dist"] = np.cumsum(rec["speed"])
     notes = check_record(rec, "foot")
     assert not any("left out" in n and "cadence" in n for n in notes)
+
+
+def test_coach_tables_are_per_athlete(tmp_path):
+    from fullrecord import db
+    from rx.store import Store
+    base = Store(tmp_path / "rx.db")
+    a, b = base.view("alice"), base.view("bob")
+    for s in (base, a, b):
+        db.ensure(s)
+    db.set_meta(a, "goals", "alice's goals")
+    assert db.get_meta(a, "goals") == "alice's goals"
+    assert db.get_meta(b, "goals") is None
+    assert db.get_meta(base, "goals") is None

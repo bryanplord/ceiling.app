@@ -1,0 +1,32 @@
+{% extends "_site.html" %}
+{% block sitehead %}
+<style>
+  .facts { margin-top:16px; }
+  .fact { display:grid; grid-template-columns:minmax(0, 5fr) minmax(0, 7fr); gap:56px; padding:48px 0; border-top:1px solid var(--rule); }
+  .fact h2 { color:var(--ink); font-size:clamp(24px, 2.8vw, 34px); margin:0; font-weight:600; line-height:1.15; }
+  .fact p { font-size:18px; line-height:1.55; margin:0 0 12px; max-width:58ch; color:#2a2a2d; }
+  .fact .src { font-size:14px; color:var(--lichen); }
+  @media (max-width: 860px) { .fact { grid-template-columns:1fr; gap:14px; padding:36px 0; } }
+</style>
+{% endblock %}
+{% block page %}
+<section class="hero"><h1>The science.</h1>
+  <p class="lede">Every call Ceiling makes comes from published research and your own data. Here's what it rests on.</p></section>
+<div class="facts">
+  <div class="fact"><h2>HRV against your own normal</h2><div>
+    <p>One low night is noise. A week below your own normal range, especially with resting heart rate rising, is a signal to back off. Ceiling compares you only to you.</p>
+    <p class="src">Plews et al., 2013; Kiviniemi et al., 2007.</p></div></div>
+  <div class="fact"><h2>Mostly easy, some hard</h2><div>
+    <p>Strong endurance athletes do most of their training easy and a small slice hard, and little in between. Ceiling shows where your time actually goes.</p>
+    <p class="src">Seiler, 2010; Stöggl & Sperlich, 2014.</p></div></div>
+  <div class="fact"><h2>Load, fatigue and fitness</h2><div>
+    <p>Every session adds load. Fitness builds slowly, fatigue fades fast. Ceiling tracks both from your heart rate and uses them to decide what today can absorb.</p>
+    <p class="src">Banister, 1975; Gabbett, 2016.</p></div></div>
+  <div class="fact"><h2>The least that keeps fitness</h2><div>
+    <p>Cut volume by up to two thirds and fitness holds, as long as intensity stays. That's where every Minimum comes from.</p>
+    <p class="src">Hickson et al., 1985; Spiering et al., 2021.</p></div></div>
+  <div class="fact"><h2>Sleep is training</h2><div>
+    <p>Short nights add up as debt, and a debt changes what you can absorb. Ceiling keeps the balance and tells you when to be in bed.</p>
+    <p class="src">Van Dongen et al., 2003; Fullagar et al., 2015.</p></div></div>
+</div>
+{% endblock %}

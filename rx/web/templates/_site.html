@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block nav %}
+<header class="bar">
+  <a href="/" aria-label="Ceiling home">{% include "_wordmark.html" %}</a>
+  <nav class="snav">
+    <a href="/how" class="{{ 'on' if active=='how' }}">How it works</a>
+    <a href="/science" class="{{ 'on' if active=='science' }}">The science</a>
+    <a href="/login" class="{{ 'on' if active=='login' }}">Sign in</a>
+    <a href="/join" class="cta">Join the waitlist</a>
+  </nav>
+</header>
+{% endblock %}
+{% block head %}
+<style>
+  .snav { display:flex; align-items:center; gap:28px; margin-left:auto; font-size:15px; }
+  .snav a { text-decoration:none; color:var(--lichen); white-space:nowrap; }
+  .snav a.on { color:var(--ink); }
+  .snav a.cta { color:#fff; background:var(--ink); padding:9px 16px; border-radius:999px; font-weight:600; }
+  .snav a.cta:hover { background:var(--ceiling); }
+  .hero { padding:72px 0 40px; }
+  .hero h1 { font-size:clamp(48px, 9vw, 128px); line-height:.95; }
+  .lede { font-size:clamp(20px, 2.4vw, 28px); line-height:1.35; max-width:30ch; margin:28px 0 0; text-wrap:pretty; }
+  .ctas { display:flex; flex-wrap:wrap; gap:14px; margin-top:36px; }
+  .btn { display:inline-block; text-decoration:none; font-weight:600; font-size:16px; padding:15px 24px; border-radius:999px; border:1.5px solid var(--ink); }
+  .btn.dark { background:var(--ink); color:#fff; } .btn.dark:hover { background:var(--ceiling); border-color:var(--ceiling); }
+  .btn.light:hover { border-color:var(--ceiling); color:var(--ceiling); }
+  .sec { padding:96px 0; border-top:1px solid var(--rule); display:grid; grid-template-columns:minmax(0, 5fr) minmax(0, 7fr); gap:64px; align-items:start; }
+  .sec h2 { color:var(--ink); font-size:clamp(32px, 4.4vw, 56px); font-weight:600; letter-spacing:-0.02em; line-height:1.05; margin:0; }
+  .sec p { font-size:19px; line-height:1.55; max-width:52ch; margin:0 0 16px; color:#2a2a2d; }
+  .foot { padding:48px 0 0; border-top:1px solid var(--rule); color:var(--lichen); font-size:14px; display:flex; flex-wrap:wrap; gap:24px; justify-content:space-between; }
+  .foot a { color:var(--lichen); }
+  @media (max-width: 860px) {
+    .sec { grid-template-columns:1fr; gap:28px; padding:64px 0; }
+    .snav { gap:16px; } .snav a:not(.cta) { display:none; } .snav a[href="/login"] { display:inline; }
+    .hero { padding:40px 0 24px; }
+  }
+</style>
+{% block sitehead %}{% endblock %}
+{% endblock %}
+{% block body %}{% block page %}{% endblock %}
+<footer class="foot"><span>Ceiling. Your daily workout prescription.</span>
+  <span><a href="/how">How it works</a> &nbsp; <a href="/science">The science</a> &nbsp; <a href="/join">Join the waitlist</a> &nbsp; <a href="/login">Sign in</a></span></footer>
+{% endblock %}

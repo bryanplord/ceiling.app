@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block head %}
+<style>
+  .plan-h { font-size:clamp(40px, 6vw, 72px); margin:12px 0 0; }
+  .plan-note { color:var(--lichen); font-size:18px; line-height:1.5; max-width:62ch; margin:20px 0 0; text-wrap:pretty; }
+  .week { display:grid; margin-top:18px !important; grid-template-columns:repeat({{ plan.days|length or 1 }}, minmax(0, 1fr)); gap:0;
+          margin-top:44px; border-top:2px solid var(--ink); }
+  .week { grid-template-rows:auto auto auto auto; }
+  .day { padding:18px 16px 22px; border-right:1px solid var(--rule); display:grid; grid-row:span 4;
+         grid-template-rows:subgrid; row-gap:0; align-content:start; }
+  .day .dw { align-self:start; }
+  .day > .conf { align-self:end; }
+  .day:last-child { border-right:0; }
+  .day .wd { font-size:14px; font-weight:600; color:var(--lichen); }
+  .day .dn { font-size:34px; font-weight:600; font-stretch:125%; line-height:1.1; margin-top:2px; font-variant-numeric:tabular-nums; }
+  .day .dh, .day .db, .day .dw { display:flex; flex-direction:column; }
+  .day .vbar { display:block; height:6px; margin:14px 0 12px; }
+  .day .kind { font-size:14px; font-weight:700; }
+  .day .ttl { font-size:16px; line-height:1.4; margin:4px 0 0; }
+  .day .why { font-size:13px; color:var(--lichen); margin:8px 0 0; line-height:1.4; }
+  .day .conf { margin-top:auto; padding-top:16px; font-size:12px; color:var(--lichen); }
+  .day.today .wd { color:var(--ink); }
+  .day.sketch { opacity:.55; }
+  .day details { margin-top:8px; }
+  .day summary { cursor:pointer; font-size:13px; color:var(--lichen); list-style:none; }
+  .day summary::-webkit-details-marker { display:none; }
+  .day details p { font-size:14px; line-height:1.45; margin:6px 0 0; }
+  .v-rest { background:#c9c9cd; } .v-light { background:#b3a6dc; } .v-easy { background:#7fa7d9; }
+  .v-steady { background:#46b07f; } .v-hard { background:#ec9550; }
+  .day .kind s.was { color:var(--lichen); font-weight:500; margin-left:6px; }
+  .day .why.chg { color:var(--ink); }
+  .was-card { margin-top:16px; padding-top:12px; border-top:1px dashed var(--rule); filter:grayscale(1); color:var(--lichen); }
+  .was-card .wl { display:block; font-size:12px; font-weight:600; }
+  .was-card .vbar { opacity:.5; margin:8px 0 8px; height:4px; }
+  .was-card .kind { color:var(--lichen); }
+  .was-card .ttl { color:var(--lichen); font-size:14px; }
+  .was-card .why { color:var(--lichen); }
+  .phase { font-weight:500; color:var(--lichen); font-size:12px; margin-left:6px; }
+  .opts { font-size:13px; color:var(--lichen); margin:6px 0 0; }
+  .tabs { display:flex; gap:24px; margin-top:24px; font-size:17px; }
+  .tabs a { text-decoration:none; color:var(--lichen); padding-bottom:4px; }
+  .tabs a.on { color:var(--ink); box-shadow:inset 0 -2px 0 var(--ink); }
+  .rowh { color:var(--ink); font-size:20px; margin:56px 0 4px; }
+  .rowsub { color:var(--lichen); margin:0; }
+  .week.past .day { min-height:0; }
+  .did { font-size:13px; color:var(--lichen); margin:10px 0 0; line-height:1.45; }
+  .chip { display:inline-block; align-self:flex-start; margin-top:10px; font-size:13px; font-weight:700; padding:3px 8px; border-radius:4px; }
+  .chip.t-good { background:#e3f2ea; color:#1d6b45; } .chip.t-bad { background:#fbe5e2; color:#a8321f; }
+  .chip.t-ok { background:#fbf0dc; color:#8a5a10; } .chip.t-muted { background:var(--frost); color:var(--lichen); }
+  .rec { font-size:13px; margin:8px 0 0; line-height:1.4; }
+  .rec.t-good { color:#1d6b45; } .rec.t-bad { color:#a8321f; } .rec.t-ok { color:#8a5a10; }
+  .head { font-size:14px; font-weight:700; margin:10px 0 0; line-height:1.35; }
+  .hist { margin-top:56px; max-width:820px; }
+  .hist h2 { color:var(--ink); font-size:20px; margin:0 0 6px; }
+  .hsub { color:var(--lichen); margin:0 0 14px; }
+  .hist ul { list-style:none; padding:0; margin:0; border-top:1px solid var(--rule); }
+  .hist li { display:grid; grid-template-columns:120px 160px 1fr; gap:16px; padding:12px 0; border-bottom:1px solid var(--rule); font-size:16px; }
+  .hist li.same { color:var(--lichen); }
+  .hist s { color:var(--lichen); }
+  .hdate { color:var(--lichen); }
+  @media (max-width: 700px) { .hist li { grid-template-columns:1fr; gap:2px; } }
+  .sub { margin-top:56px; padding-top:28px; border-top:1px solid var(--rule); max-width:640px; }
+  .sub h2 { color:var(--ink); font-size:20px; margin:0 0 8px; }
+  .sub p { color:var(--lichen); margin:0 0 16px; }
+  .sub .btns { display:flex; flex-wrap:wrap; gap:10px; }
+  .sub a.btn { text-decoration:none; font-size:15px; font-weight:600; padding:10px 16px; border:1px solid var(--ink); border-radius:8px; }
+  .sub a.btn:hover { background:var(--ink); color:#fff; }
+  .sub input { width:100%; font:inherit; font-size:13px; padding:10px 12px; border:1px solid var(--rule); border-radius:8px; margin-top:14px; color:var(--lichen); }
+  @media (max-width: 900px) {
+    .week, .week.past { grid-template-columns:1fr !important; grid-template-rows:none; }
+    .day { grid-row:auto; grid-template-rows:none; grid-template-columns:56px 1fr; column-gap:18px;
+           border-right:0; border-bottom:1px solid var(--rule); padding:16px 0; }
+    .day .dh { grid-row:1 / span 3; }
+    .day .db, .day .dw, .day > .conf { grid-column:2; }
+    .day .vbar { width:40px; margin:8px 0 0; }
+    .day .conf { padding-top:8px; }
+  }
+</style>
+{% endblock %}
+{% block body %}
+<h1 class="plan-h">Calendar</h1>
+<nav class="tabs"><a class="on" href="/calendar">Upcoming</a><a href="/calendar/history">History</a></nav>
+
+{% set K = {'rest':'Day off','light':'Walk','easy':'Easy','steady':'Steady','hard':'Hard'} %}
+<h2 class="rowh">The next {{ plan.horizon }} days</h2>
+<p class="rowsub">{{ plan.note }}</p>
+<div class="week">
+{% for d in plan.days %}{% set dd = date.fromisoformat(d.date) %}
+  <div class="day{{ ' today' if d.confidence == 'Today' }}{{ ' sketch' if d.confidence == 'Sketch' }}">
+    <div class="dh"><span class="wd">{{ 'Today' if d.confidence == 'Today' else dd.strftime('%a') }}</span>
+      <span class="dn">{{ dd.day }}</span><span class="vbar v-{{ d.verdict }}"></span></div>
+    <div class="db">{% set kind = {'rest':'Day off','light':'Walk','easy':'Easy','steady':'Steady','hard':'Hard'}[d.verdict] %}
+      <span class="kind">{{ kind }}{% if d.phase %} <span class="phase">{{ d.phase }}</span>{% endif %}</span>
+      {% if d.title != kind %}<p class="ttl">{{ d.title }}</p>{% endif %}
+      {% if d.options %}<p class="opts">{{ d.options }}</p>{% endif %}
+      {% if d.reason and not d.because and d.confidence != 'Today' %}<p class="why">{{ d.reason }}</p>{% endif %}
+      {% if d.verdict != 'rest' %}<details><summary>Details</summary><p>{{ d.detail }}</p></details>{% endif %}
+    </div>
+    <div class="dw">{% if d.was %}<div class="was-card"><span class="wl">Yesterday's plan</span>
+        <span class="vbar v-{{ d.was }}"></span>
+        <span class="kind">{{ {'rest':'Day off','light':'Walk','easy':'Easy','steady':'Steady','hard':'Hard'}[d.was] }}</span>
+        {% if d.was_title and d.was_title != {'rest':'Day off','light':'Walk','easy':'Easy','steady':'Steady','hard':'Hard'}[d.was] %}<p class="ttl">{{ d.was_title }}</p>{% endif %}
+        <p class="why">{{ d.because }}</p></div>{% endif %}
+    </div>
+    <span class="conf">{{ d.confidence }}</span>
+  </div>
+{% endfor %}
+</div>
+
+<section class="sub">
+  <h2>Put it on your calendar</h2>
+  {% if feed %}
+  <p>Subscribe once and the plan shows up as all-day events. It changes when the plan changes. Apple Calendar checks about every hour; Google Calendar can take up to a day.</p>
+  <div class="btns">
+    <a class="btn" href="webcal://{{ feed }}">Apple Calendar</a>
+    <a class="btn" href="https://calendar.google.com/calendar/r?cid={{ ('webcal://' ~ feed) | urlencode }}" target="_blank" rel="noopener">Google Calendar</a>
+  </div>
+  <input readonly value="https://{{ feed }}" onclick="this.select()" aria-label="Calendar link">
+  <p style="margin-top:10px;font-size:14px">The link is private to you. Anyone with it can see your plan, so don't share it.</p>
+  {% else %}
+  <p>Sign in to get your private calendar link.</p>
+  {% endif %}
+</section>
+{% endblock %}

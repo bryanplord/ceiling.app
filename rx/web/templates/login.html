@@ -16,6 +16,7 @@
   .go { margin-top:8px; font:inherit; font-weight:600; font-stretch:125%; letter-spacing:.08em; text-transform:uppercase;
         font-size:15px; padding:18px; border:0; border-radius:8px; background:var(--ink); color:#fff; cursor:pointer; }
   .go:hover { background:var(--ceiling); }
+  .alt { margin:6px 0 0; color:var(--lichen); font-size:15px; }
   .err { margin:0; color:var(--bad); font-weight:600; }
   @media (max-width: 820px) {
     .gate { grid-template-columns:1fr; gap:48px; min-height:auto; padding-top:32px; }
@@ -25,7 +26,7 @@
 {% block body %}
 <div class="gate">
   <div>
-    {% include "_wordmark.html" %}
+    <a href="/" style="text-decoration:none">{% include "_wordmark.html" %}</a>
     <p class="tag">This is how you train.</p>
     <p class="pitch">Your daily workout prescription, based on your own heart rate, HRV, sleep and training load.</p>
   </div>
@@ -34,6 +35,7 @@
     <label>Password<input class="field" type="password" name="password" required autocomplete="current-password"></label>
     {% if error %}<p class="err">That email and password don't match. Check both and try again.</p>{% endif %}
     <button type="submit" class="go">Sign in</button>
+    <p class="alt">No account yet? <a href="/join">Join the waitlist</a>.</p>
   </form>
 </div>
 {% endblock %}

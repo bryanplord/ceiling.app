@@ -84,3 +84,32 @@ if __name__ == "__main__":  # python -m rx.web.auth someone@example.com
     email = sys.argv[1].strip().lower()
     pw = getpass.getpass(f"Password for {email}: ")
     print(f"{email}={hash_password(pw)}")
+
+
+def seal(text: str) -> str:
+    """Encrypt a small secret (an API key) with RX_SECRET before it's stored:
+    SHA-256 in counter mode for the keystream, HMAC-SHA256 to detect tampering."""
+    if not text:
+        return ""
+    nonce = secrets.token_bytes(16)
+    data = text.encode()
+    stream = b"".join(hashlib.sha256(_secret() + nonce + i.to_bytes(4, "big")).digest()
+                      for i in range(len(data) // 32 + 1))
+    ct = bytes(a ^ b for a, b in zip(data, stream))
+    mac = hmac.new(_secret(), nonce + ct, hashlib.sha256).digest()
+    return "s1:" + base64.urlsafe_b64encode(nonce + mac + ct).decode()
+
+
+def unseal(token: str) -> str:
+    if not token or not token.startswith("s1:"):
+        return ""
+    try:
+        raw = base64.urlsafe_b64decode(token[3:])
+        nonce, mac, ct = raw[:16], raw[16:48], raw[48:]
+        if not hmac.compare_digest(mac, hmac.new(_secret(), nonce + ct, hashlib.sha256).digest()):
+            return ""
+        stream = b"".join(hashlib.sha256(_secret() + nonce + i.to_bytes(4, "big")).digest()
+                          for i in range(len(ct) // 32 + 1))
+        return bytes(a ^ b for a, b in zip(ct, stream)).decode()
+    except Exception:
+        return ""

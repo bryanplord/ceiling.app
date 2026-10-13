@@ -1,0 +1,32 @@
+{% extends "_site.html" %}
+{% block sitehead %}
+<style>
+  .join { display:grid; grid-template-columns:minmax(0, 6fr) minmax(0, 5fr); gap:72px; align-items:start; padding:72px 0 96px; }
+  .join h1 { font-size:clamp(44px, 7vw, 96px); }
+  form.j { display:grid; gap:16px; }
+  form.j label { display:grid; gap:8px; font-size:14px; font-weight:600; }
+  form.j input, form.j select { width:100%; font:inherit; font-size:18px; padding:14px 16px; border:1px solid #d4d4d8; border-radius:8px; background:#fff; }
+  form.j button { font:inherit; font-weight:600; font-size:16px; padding:16px; border:0; border-radius:999px; background:var(--ink); color:#fff; cursor:pointer; margin-top:6px; }
+  form.j button:hover { background:var(--ceiling); }
+  .ok { font-size:22px; line-height:1.4; }
+  @media (max-width: 860px) { .join { grid-template-columns:1fr; gap:36px; padding:40px 0 64px; } }
+</style>
+{% endblock %}
+{% block page %}
+<section class="join">
+  <div><h1>Join the waitlist.</h1>
+    <p class="lede">Ceiling is invite-only while we build it. Leave your email and we'll let you in as spots open.</p></div>
+  {% if done %}
+  <p class="ok">You're on the list. We'll email you when your spot opens.</p>
+  {% else %}
+  <form class="j" method="post" action="/join">
+    <label>Email<input type="email" name="email" required autocomplete="email"></label>
+    <label>Your watch
+      <select name="device"><option>Garmin</option><option>Apple Watch</option><option>Whoop</option><option>Oura</option><option>Coros</option><option>Polar</option><option>Other</option></select></label>
+    <label>Hours a week you train
+      <select name="hours"><option>Under 5</option><option selected>5 to 10</option><option>10 to 15</option><option>15 or more</option></select></label>
+    <button type="submit">Join the waitlist</button>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

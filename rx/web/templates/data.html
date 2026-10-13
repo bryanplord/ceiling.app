@@ -10,10 +10,39 @@
   .ok { color:var(--good); font-weight:650; }
   .note { font-size:17px; max-width:64ch; }
   .scroll { overflow-x:auto; }
+  .conn { margin:8px 0 40px; padding-bottom:32px; border-bottom:1px solid var(--rule); }
+  .ch { color:var(--ink); font-size:22px; margin:0 0 8px; }
+  .steps { font-size:17px; max-width:64ch; line-height:1.5; }
+  .cform { display:grid; gap:14px; max-width:420px; margin-top:20px; }
+  .cform label { display:grid; gap:6px; font-size:14px; font-weight:600; }
+  .cform input { font:inherit; font-size:17px; padding:12px 14px; border:1px solid #d4d4d8; border-radius:8px; }
+  .cform button { font:inherit; font-weight:600; font-size:15px; padding:14px; border:0; border-radius:8px; background:var(--ink); color:#fff; cursor:pointer; }
 </style>
 {% endblock %}
 {% block body %}
 <h1>Data</h1>
+{% if owner %}
+<section class="conn">
+  {% if msg == 'ok' %}<p class="note ok">Connected. Pulling your last year now: this takes a few minutes. Refresh this page to watch it fill in.</p>
+  {% elif msg == 'bad' %}<p class="note no">intervals.icu didn't accept that athlete ID and API key. Check both and try again.</p>
+  {% elif msg == 'missing' %}<p class="note no">Both the athlete ID and the API key are needed.</p>{% endif %}
+  {% if empty and not connected %}
+  <h2 class="ch">Connect your data</h2>
+  <p class="note">Ceiling reads your training, sleep and HRV from <a href="https://intervals.icu">intervals.icu</a>, a free service that pulls everything from Garmin Connect. Your data stays yours: it's kept in its own tables, and nobody else who signs in can see it.</p>
+  <ol class="steps">
+    <li>Sign up free at <a href="https://intervals.icu">intervals.icu</a> and, in its Settings, connect Garmin Connect. It brings in your history on its own.</li>
+    <li>In intervals.icu, open <b>Settings</b>, scroll to <b>Developer Settings</b>, and copy your <b>Athlete ID</b> (starts with i) and your <b>API Key</b>.</li>
+    <li>Paste both here.</li>
+  </ol>
+  {% else %}<h2 class="ch">Your connection</h2>
+  <p class="note">{% if connected %}Connected to intervals.icu as athlete {{ athlete }}.{% else %}Not connected.{% endif %} To change it, enter new details.</p>{% endif %}
+  <form method="post" action="/connect" class="cform">
+    <label>Athlete ID<input name="athlete" value="{{ athlete }}" placeholder="i123456" autocomplete="off" required></label>
+    <label>API key<input name="key" type="password" placeholder="Paste your API key" autocomplete="off" required></label>
+    <button type="submit">Connect</button>
+  </form>
+</section>
+{% endif %}
 <p class="note">What Ceiling has received from intervals.icu for the last 10 days. Last sync {{ 'never' if last is none else (last ~ ' min ago') }}: {{ state }}{% if progress %} ({{ progress }}){% endif %}.</p>
 {% set t = rows | selectattr('date', 'equalto', today) | list %}
 {% if not t or not (t[0].sleep or t[0].hrv) %}

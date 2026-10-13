@@ -40,6 +40,64 @@
   .tmr .t-bad { border-left-color:var(--ceiling); } .tmr .t-bad dt { color:var(--ceiling); }
   .tmr .t-muted dt { color:var(--lichen); }
   .rxl .steps { margin:0; font-size:18px; }
+  .done { margin-top:28px; padding:18px 0 4px; border-top:2px solid var(--ink); }
+  .dlab { font-size:15px; font-weight:700; color:var(--lichen); margin:0 0 12px; }
+  .dsess { display:grid; grid-template-columns:56px 1fr; gap:16px; margin-bottom:14px; }
+  .dg { font-size:44px; font-weight:600; font-stretch:125%; line-height:1; }
+  .dg.good { color:var(--good); } .dg.ok { color:var(--warn); } .dg.bad { color:var(--bad); } .dg.none { color:var(--rule); }
+  .dwhat { margin:0; font-size:19px; }
+  .dzbar { display:flex; height:10px; margin:8px 0; max-width:420px; }
+  .dzbar .z0 { background:#b3a6dc; } .dzbar .z1 { background:#7fa7d9; } .dzbar .z2 { background:#46b07f; }
+  .dzbar .z3 { background:#e3bd52; } .dzbar .z4 { background:#ec9550; } .dzbar .z5 { background:#de5f55; }
+  .dsum { margin:0; color:var(--lichen); font-size:16px; max-width:56ch; }
+  .dnext { font-size:19px; margin:10px 0 0; max-width:52ch; }
+  .dwas { color:var(--lichen); }
+  .jr { margin-top:36px; }
+  .jform { display:grid; gap:12px; }
+  .jrow { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+  .jk { width:72px; font-size:14px; font-weight:600; color:var(--lichen); }
+  .pill input { position:absolute; opacity:0; pointer-events:none; }
+  .pill span { display:inline-block; font-size:15px; padding:8px 14px; border:1px solid #d4d4d8; border-radius:999px; cursor:pointer; }
+  .pill input:checked + span { background:var(--ink); color:#fff; border-color:var(--ink); }
+  .pill input:focus-visible + span { outline:2px solid var(--ceiling); outline-offset:2px; }
+  .jnoteRow { display:flex; gap:10px; margin-top:4px; }
+  .jtext { flex:1; min-width:0; font:inherit; font-size:16px; padding:10px 14px; border:1px solid #d4d4d8; border-radius:8px; }
+  .jnoteRow button { margin-top:0 !important; }
+  .jr textarea { width:100%; font:inherit; font-size:17px; padding:14px; border:1px solid #d4d4d8; border-radius:8px; resize:vertical; }
+  .jr button { margin-top:10px; font:inherit; font-weight:600; font-size:15px; padding:10px 20px; border:0; border-radius:8px; background:var(--ink); color:#fff; cursor:pointer; }
+  .jsaved { margin:12px 0 0; font-size:15px; font-weight:600; color:var(--good); opacity:0; transform:translateY(-4px);
+            transition:opacity .25s ease, transform .25s ease; min-height:1.4em; }
+  .jsaved.show { opacity:1; transform:none; }
+  .jsaved.show::before { content:"✓"; display:inline-grid; place-items:center; width:20px; height:20px; margin-right:8px;
+            border-radius:50%; background:var(--good); color:#fff; font-size:12px; animation:pop .35s ease; }
+  @keyframes pop { 0% { transform:scale(.4); } 70% { transform:scale(1.15); } 100% { transform:scale(1); } }
+  @media (prefers-reduced-motion: reduce) { .jsaved, .jsaved.show::before { transition:none; animation:none; } }
+  .jlog { list-style:none; padding:0; margin:10px 0 0; font-size:14px; color:var(--lichen); display:flex; flex-wrap:wrap; gap:4px 18px; }
+  .jlog b { color:var(--ink); font-weight:600; margin-right:4px; }
+  .jtags { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0 0; }
+  .jtags span { font-size:13px; font-weight:600; padding:4px 10px; border-radius:999px; background:var(--frost); }
+  .jnote { font-size:16px; margin:12px 0 0; max-width:56ch; }
+  .jpat { font-size:16px; margin:12px 0 0; }
+  .jhint { color:var(--lichen); font-size:15px; margin:12px 0 0; max-width:56ch; }
+  .tiles { display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:0; margin:0 0 36px;
+           border-top:1px solid var(--rule); border-bottom:1px solid var(--rule); }
+  .tile { display:flex; flex-direction:column; gap:2px; padding:14px 14px 12px; text-decoration:none; border-right:1px solid var(--rule); min-width:0; }
+  .tile:last-child { border-right:0; }
+  .tile:hover { background:var(--frost); }
+  .tn { font-size:12px; font-weight:600; color:var(--lichen); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tv { font-size:24px; font-weight:600; font-stretch:115%; line-height:1.15; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ts { font-size:13px; font-weight:600; }
+  .ts.good { color:var(--good); } .ts.ok { color:var(--warn); } .ts.bad { color:var(--bad); } .ts.none { color:var(--lichen); }
+  .tsp svg { width:100%; height:26px; display:block; margin-top:6px; }
+  @media (max-width:760px) { .tiles { display:flex; overflow-x:auto; scroll-snap-type:x mandatory; margin:0 -20px 28px; padding:0 20px; }
+    .tile { flex:0 0 42%; scroll-snap-align:start; } }
+  .vrule { display:block; width:96px; height:6px; margin:18px 0 0; }
+  .vrule.v-rest { background:#c9c9cd; } .vrule.v-light { background:var(--s-rec); } .vrule.v-easy { background:var(--s-end); }
+  .vrule.v-steady { background:var(--s-aer); } .vrule.v-hard { background:var(--s-thr); }
+  .goalline { display:inline-block; margin:14px 0 0; font-size:15px; font-weight:600; text-decoration:none; color:var(--ink); border-bottom:2px solid var(--ceiling); }
+  .goalline.muted { color:var(--lichen); border-color:var(--rule); }
+  .gnote { font-size:17px; margin:10px 0 0; color:var(--lichen); max-width:52ch; }
+  .whatalt { margin:6px 0 0; color:var(--lichen); font-size:16px; }
   .rowd { border-bottom:1px solid var(--rule); }
   .rowd > summary { display:grid; grid-template-columns:110px 1fr 18px; gap:20px; padding:16px 0; cursor:pointer; list-style:none; align-items:start; }
   .rowd > summary::-webkit-details-marker { display:none; }
@@ -206,31 +264,91 @@
 {% if waiting %}
 <p class="waiting">Waiting on last night's sleep and HRV. Open Garmin Connect on your phone so your watch syncs; Ceiling checks every 10 minutes. Until it lands, today is built from yesterday's data.</p>
 {% endif %}
-<section class="hero">
+<nav class="tiles" aria-label="Your status">
+  <a class="tile" href="#rx"><span class="tn">Today</span><span class="tv">{{ {'rest':'Day off','light':'Walk','easy':'Easy','steady':'Steady','hard':'Hard'}[rx.verdict] }}</span><span class="ts {{ d.recovery.tone }}">{{ d.recovery.state }}</span></a>
+  {% set T = [(d.hrv, '/trends#hrv'), (d.rhr, '/trends#rhr'), (d.sleep, '/trends#sleep'), (d.freshness, '/trends#load'), (d.fitness, '/progress')] %}
+  {% for m, href in T %}
+  <a class="tile" href="{{ href }}">
+    <span class="tn">{{ m.name }}</span>
+    <span class="tv">{{ m.value }}</span>
+    <span class="ts {{ m.tone }}">{{ m.state }}</span>
+    {% if m.series %}<span class="tsp">{{ spark(m.series[-30:], 120, 26, m.band) | safe }}</span>{% endif %}
+  </a>
+  {% endfor %}
+  {% if p.program %}<a class="tile" href="/plan"><span class="tn">Goal</span><span class="tv">{{ p.program.days_left if p.program.days_left is not none else '∞' }}</span><span class="ts none">{{ 'days to go' if p.program.days_left is not none else p.program.phase }}</span></a>{% endif %}
+</nav>
+<section class="hero" id="rx">
   <div>
     <div class="date">{{ day_label }}
       {% if syncing %}<span class="upd syncing">Syncing your Garmin data… this page refreshes itself.</span>
       {% else %}{% if updated is not none %}<span class="upd"> Updated {{ 'just now' if updated < 2 else (updated ~ ' min ago' if updated < 120 else (updated // 60) ~ ' hours ago') }}.</span>{% endif %}
       <form method="post" action="/sync" class="syncf"><button type="submit">Sync now</button></form>{% endif %}
     </div>
+    {% if p.program %}<a class="goalline" href="/plan">{{ p.program.title }}{% if p.program.days_left is not none %}: {{ p.program.days_left }} days{% endif %}{% if p.program.phase %}, {{ p.program.phase }} week{% endif %}</a>{% else %}<a class="goalline muted" href="/plan">Set a goal and Ceiling builds the programme →</a>{% endif %}
     <h1 class="verdict">{{ rx.headline }}</h1>
+    <span class="vrule v-{{ rx.verdict }}" aria-hidden="true"></span>
     {% if rx.diagnosis %}<p class="diag">{{ rx.diagnosis }}</p>{% endif %}
+    {% if rx.goal_note %}<p class="gnote">{{ rx.goal_note }}</p>{% endif %}
+    {% if after and after.done %}
+    <section class="done">
+      <p class="dlab">Done today</p>
+      {% for s in after.sessions %}
+      <div class="dsess">
+        <span class="dg {{ s.tone or 'none' }}">{{ s.grade or '–' }}</span>
+        <div><p class="dwhat">{{ s.name }}, {{ s.dur }}{% if s.avg %}, average {{ s.avg }}{% endif %}.</p>
+          {% if s.zones %}<div class="dzbar">{% for n, c, mm, sh in s.zones %}{% if sh > 0.5 %}<span class="{{ c }}" style="width:{{ sh }}%" title="{{ n }} {{ mm }} min"></span>{% endif %}{% endfor %}</div>
+          <p class="dsum">{{ s.summary }} {{ s.cost }}</p>{% endif %}</div>
+      </div>
+      {% endfor %}
+    </section>
+    {% endif %}
+    {% if after and after.done %}
+    <p class="dnext">Tomorrow{% if after.changed %}, re-planned {{ after.why }}{% endif %}: {{ after.tomorrow }}.{% if after.changed and after.was %} <span class="dwas">Was {{ after.was }}.</span>{% endif %}</p>
+    {% endif %}
     <div class="pad">
-      <details class="rowd"><summary><span class="rxk">What</span><p class="rxv">{{ rx.what or rx.do }}</p><i class="chev" aria-hidden="true"></i></summary>
-        <div class="rowb">{% if rx.activity_why %}<p class="actwhy">{{ rx.activity_why }}</p>{% endif %}</div></details>
+      <details class="rowd"><summary><span class="rxk">What</span><div class="rxv"><p class="rxv">{{ rx.what or rx.do }}</p>{% if rx.options_short %}<p class="whatalt">{{ rx.options_short }}</p>{% endif %}</div><i class="chev" aria-hidden="true"></i></summary>
+        <div class="rowb">{% if rx.options %}<dl class="tmr">{% for title, note, tone, short, k in rx.options %}<div class="t-{{ 'good' if loop.first else ('bad' if tone == 'bad' else 'muted') }}"><dt>{{ title }}{% if loop.first %}: our pick{% endif %}</dt><dd>{{ note }}</dd></div>{% endfor %}</dl>{% endif %}
+        {% if rx.activity_why %}<p class="actwhy">{{ rx.activity_why }}</p>{% endif %}</div></details>
       <details class="rowd"><summary><span class="rxk">How</span><p class="rxv">{{ rx.how_short }}</p><i class="chev" aria-hidden="true"></i></summary>
         <div class="rowb"><ul class="rxlist">{% for h in rx.how_more %}<li>{{ h }}</li>{% endfor %}</ul></div></details>
       {% if rx.reading %}<details class="rowd"><summary><span class="rxk">Why</span><p class="rxv">{{ rx.why_need }} {{ rx.why_story }}</p><i class="chev" aria-hidden="true"></i></summary>
         <div class="rowb"><p class="whyhead"><b class="{{ rx.why_tone }}">{{ rx.why_title }}.</b> {{ rx.why_says }}</p>
-          <ul class="rxlist facts">{% for e in rx.reading.evidence[:4] %}<li><b>{{ e.name }}</b> {{ e.line.split('. ')[0].rstrip('.') }}.</li>{% endfor %}
+          <ul class="rxlist facts">{% for e in rx.reading.evidence[:5] %}<li><b>{{ e.name }}</b> {{ e.line.split('. ')[0].rstrip('.') }}.</li>{% endfor %}
           {% if rx.sleep and rx.sleep.state not in ('even', 'unknown', 'surplus') %}{% set sd = rx.sleep.says.split('. ')[0].rstrip('.') %}<li><b>Sleep debt</b> {{ sd[:1] | upper }}{{ sd[1:] }}.</li>{% endif %}</ul></div></details>{% endif %}
       {% if rx.minimum %}{% set ms = rx.minimum.split('. ') %}<details class="rowd"><summary><span class="rxk">Minimum</span><p class="rxv">{{ ms[0].rstrip('.') }}.</p><i class="chev" aria-hidden="true"></i></summary>
         <div class="rowb"><p class="actwhy">{{ ms[1:]|join('. ') }}</p></div></details>{% endif %}
-      {% if rx.tomorrow %}<details class="rowd"><summary><span class="rxk">Tomorrow</span><p class="rxv">{{ rx.tomorrow_short }}</p><i class="chev" aria-hidden="true"></i></summary>
+      {% if rx.maximum %}{% set mx = rx.maximum.split('. ') %}<details class="rowd"><summary><span class="rxk">Maximum</span><p class="rxv">{{ mx[0].rstrip('.') }}.</p><i class="chev" aria-hidden="true"></i></summary>
+        <div class="rowb"><p class="actwhy">{{ mx[1:]|join('. ') }}</p></div></details>{% endif %}
+      {% if rx.tomorrow %}<details class="rowd"><summary><span class="rxk">Tomorrow</span><p class="rxv">{% if after %}{{ "Re-planned " ~ after.why ~ ": t" if after.changed else "T" }}omorrow is {{ after.tomorrow }}.{% else %}{{ rx.tomorrow_short }}{% endif %}</p><i class="chev" aria-hidden="true"></i></summary>
         <div class="rowb"><dl class="tmr">{% for label, tone, text in rx.tomorrow %}<div class="t-{{ tone }}"><dt>{{ label }}</dt><dd>{{ text }}</dd></div>{% endfor %}</dl>
         <p class="actwhy">Assumes a normal night. Re-read tomorrow morning with your sleep and HRV.</p></div></details>{% endif %}
+      {% if p.program and p.program.nutrition %}<details class="rowd"><summary><span class="rxk">Fuel</span><p class="rxv">{{ 'Fuel today: carbs before and after, no calorie gap on a hard day.' if rx.verdict == 'hard' else p.program.nutrition[0] }}</p><i class="chev" aria-hidden="true"></i></summary>
+        <div class="rowb"><ul class="rxlist">{% for n in p.program.nutrition[1:] %}<li>{{ n }}</li>{% endfor %}</ul></div></details>{% endif %}
       {% if rx.sleep and rx.sleep.lights_out %}<div class="rxl"><span class="rxk">Tonight</span><p class="rxv">In bed by {{ rx.sleep.lights_out }} for {{ rx.sleep_if[0][0][9:] if rx.sleep_if else '' }} of sleep. Do that, and {{ rx.sleep_if[0][2] if rx.sleep_if }}.</p></div>{% endif %}
     </div>
+    <section class="jr" id="journal">
+      <p class="dlab">How are you today?</p>
+      {% set tp = entry.taps if entry and entry.taps else {} %}
+      <form method="post" action="/journal" class="jform">
+        <div class="jrow"><span class="jk">Feeling</span>
+          {% for v, l in [('good','Energized'),('normal','Normal'),('tired','Tired'),('sick','Sick')] %}
+          <label class="pill"><input type="radio" name="feel" value="{{ v }}" {{ 'checked' if tp.feel == v }}><span>{{ l }}</span></label>{% endfor %}</div>
+        <div class="jrow"><span class="jk">Drinks</span>
+          {% for v, l in [('0','None'),('2','1 or 2'),('3','3 or more')] %}
+          <label class="pill"><input type="radio" name="drinks" value="{{ v }}" {{ 'checked' if tp.drinks == v }}><span>{{ l }}</span></label>{% endfor %}</div>
+        <div class="jrow"><span class="jk">Food</span>
+          {% for v, l in [('good','Ate well'),('ok','OK'),('poor','Ate poorly')] %}
+          <label class="pill"><input type="radio" name="food" value="{{ v }}" {{ 'checked' if tp.food == v }}><span>{{ l }}</span></label>{% endfor %}</div>
+        <div class="jnoteRow"><input class="jtext" name="text" id="jtext" value="" placeholder="Anything else? Pizza and a beer, long day at work…">
+          <button type="submit">Save</button></div>
+      </form>
+      <p class="jsaved" id="jsaved" role="status" aria-live="polite"></p>
+      <p class="jtags" id="jtags">{% for t in entry_tags %}<span>{{ t }}</span>{% endfor %}</p>
+      <ol class="jlog" id="jlog">{% if entry and entry.log %}{% for e in entry.log[-8:] %}{% if e.at %}<li><b>{{ e.at }}</b> {{ ((e.taps.feel or '')|replace('good','Energized')|replace('tired','Tired')|replace('sick','Sick')|replace('normal','Normal')) }}{{ ' · ' ~ e.text if e.text }}</li>{% endif %}{% endfor %}{% endif %}</ol>
+      {% if after and after.journal_note %}<p class="jnote">{{ after.journal_note }}</p>{% endif %}
+      {% if patterns %}<ul class="jpat">{% for x in patterns %}<li>{{ x }}</li>{% endfor %}</ul>
+      {% else %}<p class="jhint">Log a line most days. After a few weeks Ceiling shows you what drinks, food, stress and late nights actually do to your recovery.</p>{% endif %}
+    </section>
   </div>
   {% if room %}
   <div>
@@ -370,4 +488,35 @@
     {% for n in rx.notes %}<p class="note">{{ n }}</p>{% endfor %}
   </div>
 </section>
+
+<script>
+(() => {
+  const form = document.querySelector('.jform');
+  if (!form) return;
+  const saved = document.getElementById('jsaved'), tags = document.getElementById('jtags'),
+        log = document.getElementById('jlog'), text = document.getElementById('jtext');
+  let timer;
+  async function send(extra) {
+    const body = new URLSearchParams(extra);
+    try {
+      const r = await fetch('/journal', {method: 'POST', body, headers: {'Accept': 'application/json'}});
+      const j = await r.json();
+      tags.innerHTML = j.tags.map(t => `<span>${t}</span>`).join('');
+      log.innerHTML = j.log.filter(e => e.at).map(e => `<li><b>${e.at}</b> ${e.what}</li>`).join('');
+      saved.textContent = `Got it, ${j.at}. Add more any time.`;
+      saved.classList.remove('show'); void saved.offsetWidth; saved.classList.add('show');
+      clearTimeout(timer); timer = setTimeout(() => saved.classList.remove('show'), 2600);
+    } catch (e) {
+      saved.textContent = "Couldn't save. Check your connection and tap again.";
+      saved.classList.add('show');
+    }
+  }
+  form.querySelectorAll('input[type=radio]').forEach(r => r.addEventListener('change', () => send({[r.name]: r.value})));
+  form.addEventListener('submit', ev => {
+    ev.preventDefault();
+    if (!text.value.trim()) return;
+    send({text: text.value.trim()}); text.value = '';
+  });
+})();
+</script>
 {% endblock %}
