@@ -36,8 +36,8 @@ FAMILY = {"cycling": "bike", "e_biking": "bike", "swimming": "swim"}
 # when far above it, "lo" (times) when far below it. Every limit is computed
 # from that person's own sessions; nobody is compared with anyone else.
 CHECKED = {"climb_vert_mh": "hi", "bike_climb_vert_mh": "hi", "foot_flat_speed_ms": "hi",
-           "bike_flat_speed_ms": "hi", "fastest_foot_1k_s": "lo", "fastest_foot_5k_s": "lo",
-           "fastest_bike_10k_s": "lo"}
+           "bike_flat_speed_ms": "hi", "fastest_foot_1mi_s": "lo", "fastest_foot_3mi_s": "lo",
+           "fastest_bike_10mi_s": "lo"}
 
 
 def session_card(act, tz, bl):
@@ -133,15 +133,15 @@ def session_card(act, tz, bl):
 
     # fastest stretches, measured only where the blocks show that movement
     t = rec["t"]
-    for mode, dists in (("foot", (1000, 5000)), ("bike", (10000,))):
+    for mode, dists in (("foot", ((1, "1mi"), (3, "3mi"))), ("bike", ((10, "10mi"),))):
         mask = np.zeros(len(t), dtype=bool)
         for b in live:
             if b["mode"] == mode:
                 mask |= (t >= b["start"]) & (t < b["end"])
-        for m in dists:
-            v = fastest(rec, m, mask)
+        for miles, label in dists:
+            v = fastest(rec, miles * 1609.344, mask)
             if v:
-                card[f"fastest_{mode}_{m // 1000}k_s"] = round(v)
+                card[f"fastest_{mode}_{label}_s"] = round(v)
 
     notes = []
     jumps = sum(1 for b in live if b.get("alt_jump"))

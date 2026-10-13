@@ -116,7 +116,7 @@ def main(argv=None):
         print(f"  nights with overnight data: {meta['nights']}")
         print(f"  record size: {len(text):,} characters, about {len(text) // 4:,} tokens")
         print(f"  sessions with a value removed as far outside your own range: {removed}")
-        print(f"  altitude-jump limits from your own data (m/h): {meta['limits']['altitude_jump_caps_m_per_h']}")
+        print(f"  altitude-jump limits from your own data, feet per hour: {dict((k, round(v / 0.3048) if v else None) for k, v in meta['limits']['altitude_jump_caps_m_per_h'].items())}")
     finally:
         shutil.rmtree(work, ignore_errors=True)
 

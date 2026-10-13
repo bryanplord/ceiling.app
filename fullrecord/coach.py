@@ -31,7 +31,8 @@ FORMAT = """Reply with one JSON object and nothing else, in a ```json block, wit
   "markers": a list of {"name", "now": its current value, "expect": the direction you expect, "why"}
   "tests": a list of {"assumption", "test": the session that tests it, "when"}
   "sources": a list of {"claim", "basis": "record" or "general", "evidence": dates and numbers from the record, or the general principle}
-Every sentence is a full English sentence."""
+Every sentence is a full English sentence. Use US units throughout: miles, feet, minutes per mile,
+miles per hour and feet climbed per hour, never kilometres or metres."""
 
 
 def configured() -> str | None:

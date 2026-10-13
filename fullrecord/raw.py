@@ -49,10 +49,29 @@ def dur_str(seconds):
     return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
 
 
+# Everything is measured in metres and seconds and written in US units.
+MILE = 1609.344
+FOOT = 0.3048
+YARD = 0.9144
+
+
+def mi(m):
+    return round(m / MILE, 2)
+
+
+def ft(m):
+    return int(round(m / FOOT))
+
+
+def mph(ms):
+    return ms * 3600 / MILE
+
+
 def pace_str(ms):
+    """Minutes per mile."""
     if not ok(ms) or ms < 0.2:
         return None
-    sec = int(round(1000.0 / ms))
+    sec = int(round(MILE / ms))
     return f"{sec // 60}:{sec % 60:02d}"
 
 
@@ -60,11 +79,12 @@ def speed_str(mode, ms):
     if not ok(ms) or ms <= 0:
         return ""
     if mode in ("bike", "fast"):
-        return f"{ms * 3.6:.1f} km/h"
+        return f"{mph(ms):.1f} mph"
     if mode == "swim":
-        return f"{int(round(100 / ms)) // 60}:{int(round(100 / ms)) % 60:02d}/100m"
+        sec = int(round(100 * YARD / ms))
+        return f"{sec // 60}:{sec % 60:02d}/100yd"
     p = pace_str(ms)
-    return f"{p}/km" if p else ""
+    return f"{p}/mi" if p else ""
 
 
 # ---------------------------------------------------------------- altitude
@@ -457,7 +477,7 @@ def seg_text(s):
         if s.get("grade_pct") is not None and abs(s["grade_pct"]) >= 3:
             bits.append(f"{s['grade_pct']:+.0f}%")
         if s.get("vert_mh") and abs(s["vert_mh"]) >= 150:
-            bits.append(f"{s['vert_mh']:+d} m/h")
+            bits.append(f"{ft(s['vert_mh']):+d} ft/h")
     return f"{dur_str(s['dur_s'])} {s['mode']}" + (f" ({', '.join(bits)})" if bits else "")
 
 

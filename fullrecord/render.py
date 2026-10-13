@@ -6,14 +6,14 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from .raw import dur_str, pace_str, seg_text
+from .raw import dur_str, ft, mi, mph, pace_str, seg_text
 
 RECENT_DAYS = 14
 
 
 def _pace(ms):
     p = pace_str(ms)
-    return f"{p}/km" if p else None
+    return f"{p}/mi" if p else None
 
 
 def card_line(c):
@@ -25,24 +25,24 @@ def card_line(c):
         bits.append(f"paused {dur_str(c['paused_min'] * 60)}")
     bits.append(mins)
     if c["distance_km"] >= 0.1:
-        bits.append(f"{c['distance_km']} km")
+        bits.append(f"{mi(c['distance_km'] * 1000)} mi")
     if c["up_m"] or c["down_m"]:
-        bits.append(f"+{c['up_m']}/-{c['down_m']} m")
+        bits.append(f"+{ft(c['up_m'])}/-{ft(c['down_m'])} ft")
     if c.get("foot_speed_ms"):
         bits.append(f"foot {_pace(c['foot_speed_ms'])}")
     if c.get("foot_flat_speed_ms"):
         bits.append(f"flat {_pace(c['foot_flat_speed_ms'])} at HR {c.get('foot_flat_hr')}")
     if c.get("climb_vert_mh"):
-        bits.append(f"steep climbing {c['climb_vert_mh']} m/h at HR {c.get('climb_hr')}")
+        bits.append(f"steep climbing {ft(c['climb_vert_mh'])} ft/h at HR {c.get('climb_hr')}")
     if c.get("bike_speed_ms"):
-        bits.append(f"bike {c['bike_speed_ms'] * 3.6:.1f} km/h")
+        bits.append(f"bike {mph(c['bike_speed_ms']):.1f} mph")
     if c.get("bike_flat_speed_ms"):
-        bits.append(f"bike flat {c['bike_flat_speed_ms'] * 3.6:.1f} km/h at HR {c.get('bike_flat_hr')}")
+        bits.append(f"bike flat {mph(c['bike_flat_speed_ms']):.1f} mph at HR {c.get('bike_flat_hr')}")
     if c.get("bike_climb_vert_mh"):
-        bits.append(f"bike climbing {c['bike_climb_vert_mh']} m/h at HR {c.get('bike_climb_hr')}")
+        bits.append(f"bike climbing {ft(c['bike_climb_vert_mh'])} ft/h at HR {c.get('bike_climb_hr')}")
     if c.get("swim_speed_ms"):
-        sec = int(round(100 / c["swim_speed_ms"]))
-        bits.append(f"swim {sec // 60}:{sec % 60:02d}/100m")
+        sec = int(round(91.44 / c["swim_speed_ms"]))
+        bits.append(f"swim {sec // 60}:{sec % 60:02d}/100yd")
     if c.get("hr_moving"):
         bits.append(f"HR moving {c['hr_moving']}")
     if c.get("hr_peak_1min"):
@@ -54,12 +54,12 @@ def card_line(c):
         bits.append(f"{c['foot_spm']} spm")
     if c.get("power_w"):
         bits.append(f"{c['power_w']} W")
-    for key, label in (("fastest_foot_1k_s", "fastest foot 1k"), ("fastest_foot_5k_s", "fastest foot 5k"),
-                       ("fastest_bike_10k_s", "fastest bike 10k")):
+    for key, label in (("fastest_foot_1mi_s", "fastest foot mile"), ("fastest_foot_3mi_s", "fastest foot 3 miles"),
+                       ("fastest_bike_10mi_s", "fastest bike 10 miles")):
         if c.get(key):
             bits.append(f"{label} {dur_str(c[key])}")
     if c.get("alt_m"):
-        bits.append(f"alt {c['alt_m'][0]}-{c['alt_m'][1]} m")
+        bits.append(f"alt {ft(c['alt_m'][0])}-{ft(c['alt_m'][1])} ft")
     if c.get("watch_temp_c") is not None:
         bits.append(f"watch {c['watch_temp_c']} C")
     if c.get("days_since_prev") is not None:
@@ -84,9 +84,10 @@ def render(meta, env, rel, weekly, cards, seg_rows, today, night_rows=()):
              "the watch ('recorded as'), and only to tell rides and swims from movement on foot. "
              "Movement is classified in 30-second blocks: 'bike' or 'swim' (moving, in a session "
              "recorded as cycling or swimming), 'foot' (moving, any other session), 'fast' (moving "
-             "faster than 6 m/s in a session not recorded as cycling: a vehicle, lift or ski run), "
-             "'still' (under 10 m per block), 'paused' (no records). Climb and descent count "
-             "altitude changes of 3 m or more within unbroken recording. Plausibility is judged only "
+             "faster than 13 mph in a session not recorded as cycling: a vehicle, lift or ski run), "
+             "'still' (under 33 feet per block), 'paused' (no records). Climb and descent count "
+             "altitude changes of 10 feet or more within unbroken recording. Units are US: miles, "
+             "feet, minutes per mile, miles per hour, feet climbed per hour. Plausibility is judged only "
              "against this person's own data: a value far outside their own spread (beyond the "
              "quartile plus three interquartile ranges, on a log scale) is removed and named in a "
              "NOTE, and blocks whose two-minute climb rate is far outside their own spread are left "
@@ -97,7 +98,7 @@ def render(meta, env, rel, weekly, cards, seg_rows, today, night_rows=()):
     if lim:
         caps = lim.get("altitude_jump_caps_m_per_h", {})
         L.append("This person's own limits: altitude jumps above " + ", ".join(
-            f"{k.replace('_', ' ')} {v} m/h" for k, v in caps.items() if v) + "; card values beyond " + ", ".join(
+            f"{k.replace('_', ' ')} {ft(v)} ft/h" for k, v in caps.items() if v) + "; card values beyond " + ", ".join(
             f"{k} {v['fence']}" for k, v in lim.items() if isinstance(v, dict) and v.get("fence")) + ".")
     L.append("")
 
@@ -112,18 +113,18 @@ def render(meta, env, rel, weekly, cards, seg_rows, today, night_rows=()):
     L.append("")
 
     L.append("## What each heart rate bought, by month")
-    labels = {"foot_flat": "On foot, flat (grade within 2%): pace in each 10-bpm band",
-              "foot_climb": "On foot, steep (grade 8% or more): metres climbed per hour in each band",
-              "bike_flat": "On a bike, flat: km/h in each band"}
+    labels = {"foot_flat": "On foot, flat (grade within 2%): minutes per mile in each 10-bpm band",
+              "foot_climb": "On foot, steep (grade 8% or more): feet climbed per hour in each band",
+              "bike_flat": "On a bike, flat: mph in each band"}
     for kind, months in rel["by_kind"].items():
         L.append(f"### {labels.get(kind, kind)}")
         for mo, row in months.items():
             if kind == "foot_flat":
                 cells = [f"{b}: {pace_str(v)}" for b, v in row.items()]
             elif kind == "bike_flat":
-                cells = [f"{b}: {v * 3.6:.1f}" for b, v in row.items()]
+                cells = [f"{b}: {mph(v):.1f}" for b, v in row.items()]
             else:
-                cells = [f"{b}: {v}" for b, v in row.items()]
+                cells = [f"{b}: {ft(v)}" for b, v in row.items()]
             L.append(f"- {mo}: " + "; ".join(cells))
     if rel["steady_drift"]:
         L.append("### Heart-rate drift in steady stretches of 15 minutes or more on level ground "
@@ -133,7 +134,7 @@ def render(meta, env, rel, weekly, cards, seg_rows, today, night_rows=()):
                                               for mo, v in months.items()))
     L.append("")
 
-    L.append("## Weeks (Monday date: sessions; hours by movement; km; climb; hours by 10-bpm band)")
+    L.append("## Weeks (Monday date: sessions; hours by movement; miles; feet climbed; hours by 10-bpm band)")
     for w in weekly:
         if len(w) == 1:
             L.append(f"- {w['week_of']}: none")
@@ -141,7 +142,7 @@ def render(meta, env, rel, weekly, cards, seg_rows, today, night_rows=()):
         modes = ", ".join(f"{k[:-2]} {w[k]}h" for k in ("foot_h", "bike_h", "swim_h", "fast_h", "still_h") if w.get(k))
         bands = " ".join(f"{k[2:]}:{w[k]}" for k in w if k.startswith("hr") and w[k] >= 0.1)
         L.append(f"- {w['week_of']}: {int(w.get('sessions', 0))} sessions; {modes}; "
-                 f"{w.get('km', 0)} km; +{int(w.get('up_m', 0))} m; HR h {bands}")
+                 f"{mi(w.get('km', 0) * 1000)} mi; +{ft(w.get('up_m', 0))} ft; HR h {bands}")
     L.append("")
 
     L.append("## Every session, oldest first (second line: segments where the data changed; "
@@ -187,9 +188,9 @@ def render(meta, env, rel, weekly, cards, seg_rows, today, night_rows=()):
         for g in s["segments"]:
             extra = []
             if g.get("dist_m"):
-                extra.append(f"{g['dist_m']} m")
+                extra.append(f"{mi(g['dist_m'])} mi")
             if g.get("up_m") or g.get("down_m"):
-                extra.append(f"+{g.get('up_m', 0)}/-{g.get('down_m', 0)} m")
+                extra.append(f"+{ft(g.get('up_m', 0))}/-{ft(g.get('down_m', 0))} ft")
             if g.get("spm"):
                 extra.append(f"{g['spm']} spm")
             if g.get("power"):
