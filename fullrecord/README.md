@@ -27,9 +27,16 @@ unless `FULLRECORD_GARMIN_NIGHTLY=1`.
     pip install -e ".[coach]"
     python -m fullrecord.ingest path/to/garmin-export.zip
 
-Then set `ANTHROPIC_API_KEY` (and on Render, change the build command to
-`pip install ".[coach]"`). Without the key the page says it is off.
-`COACH_MODEL` picks the model (default `claude-opus-5-5`).
+Claude runs on your own Claude subscription, the same plan you use in the
+Claude app, so there is no API key and no per-use bill. On a computer where you
+are logged in to Claude Code there is nothing more to do. For Render, run
+`claude setup-token` once on your own computer, then in Render set the token it
+prints as `CLAUDE_CODE_OAUTH_TOKEN` and change the build command to
+`pip install ".[coach]"`. Without a login the page says it is off.
+
+`COACH_MODEL` picks the model (default `claude-opus-5-5`). To pay per use
+through the API instead, install `".[coach-api]"` and set `COACH_BACKEND=api`
+and `ANTHROPIC_API_KEY`.
 
 ## Files
 
