@@ -59,6 +59,7 @@ class Rx:
     skip_short: str = ""
     example: str = ""
     minimum: str = ""
+    tomorrow: list = field(default_factory=list)   # (label, tone, text): as written / overdo / skip
     why_title: str = ""
     why_tone: str = "none"
     why_says: str = ""
@@ -245,6 +246,7 @@ def build_rx(p: Profile, day: str | None = None) -> Rx:
     rx.minimum = minimum_dose(p, rx, kind)
     rx.scenarios = scenarios(p, rx)
     rx.if_skip, rx.if_overdo = consequences(p, rx)
+    rx.tomorrow = tomorrow_plan(p, rx, kind)
     rx.compress, rx.stretch = flex(p, rx)
     if not p.max_hr.confirmed and p.max_hr.bpm:
         rx.notes.append(f"Max HR {p.max_hr.bpm} is from a single day; ranges firm up as it's matched.")
@@ -410,6 +412,88 @@ def consequences(p: Profile, rx: Rx) -> tuple[str | None, str | None]:
                f"and {lost_4:.0f}% if you skip the next 4 days too. "
                f"You'd be fresher tomorrow ({TOMORROW[nv_skip]}), but that's a trade, not a win.")
     return if_skip, if_overdo
+
+
+def _session(p: Profile, v: str) -> tuple[str, float]:
+    """What a verdict looks like as an actual session for you, and roughly what it costs."""
+    z = p.zones
+    if v == HARD:
+        lo, hi = z.bottom("Z4 Threshold"), z.top("Z4 Threshold")
+        return (f"your hard day: 4 × 8 minutes at {lo}–{hi}",
+                _est_load(p, 32, (lo + hi) / 2) + _est_load(p, 43, z.top("Z1 Recovery")))
+    if v == STEADY:
+        lo, hi = z.bottom("Z2 Aerobic"), z.top("Z2 Aerobic")
+        return f"a steady day: up to 90 minutes at {lo}–{hi}, no intervals", _est_load(p, 90, (lo + hi) / 2)
+    if v == EASY:
+        lo, hi = easy_band(z)
+        return f"an easy hour at {lo}–{hi}", _est_load(p, 60, (lo + hi) / 2)
+    if v == LIGHT:
+        return "a walk, nothing more", _est_load(p, 45, z.top("Z1 Recovery") - 15)
+    return "a day off", 0.0
+
+
+def tomorrow_plan(p: Profile, rx: Rx, kind: str | None = None) -> list:
+    """Tomorrow three ways: do today as written, overdo it, skip it.
+    Each path is projected two days out, so the trade is visible: what you gain today
+    against what it costs tomorrow. Assumes a normal night; re-read tomorrow morning."""
+    if not p.ready or not p.yesterday or not p.zones:
+        return []
+    y, nxt = p.yesterday, (date.fromisoformat(rx.date) + timedelta(days=1)).isoformat()
+    rx_load = _rx_load(p, rx)
+    if rx.verdict in (REST, LIGHT):
+        sport = p.sport_mix[0] if p.sport_mix and p.sport_mix[0] != WALK else BIKE
+        over_load = _est_load(p, p.typical_minutes.get(sport, 75), p.zones.bottom("Z3 Tempo"))
+        over_what = f"Train anyway (a normal {LABEL[sport].lower()})."
+    else:
+        over_min = int((rx.max_minutes or 60) * 1.5)
+        over_load = _est_load(p, over_min, rx.hr_ceiling + 8)
+        over_what = f"Go {over_min} minutes or drift over {rx.hr_ceiling}."
+
+    def path(today_load):
+        v = _next_verdict(p, rx, today_load)
+        txt, tl = _session(p, v)
+        d1 = la.step(y, today_load, rx.date)
+        d2 = la.step(d1, tl, nxt)
+        return v, txt, d2
+
+    v_rx, t_rx, d_rx = path(rx_load)
+    v_ov, t_ov, d_ov = path(over_load)
+    out = [("Do it as written", "good", f"Tomorrow is {t_rx}.")]
+
+    # Overdo: what tomorrow becomes, what your body does, and the two-day trade.
+    parts = []
+    if ORDER.index(v_ov) < ORDER.index(v_rx):
+        parts.append(f"Tomorrow drops to {t_ov}.")
+    else:
+        parts.append(f"Tomorrow can still be {t_ov}, but only after a full night's sleep.")
+    r, rel = p.response, (over_load / y.ctl if y.ctl > 1 else None)
+    pct = r.hrv_change_pct(rel) if (r and r.fitted and rel is not None) else None
+    if pct is not None and pct < -2:
+        parts.append(f"A day that size has cost you about {abs(pct):.0f}% of HRV the next morning.")
+    fit = (d_ov.ctl - d_rx.ctl) / max(d_rx.ctl, 1) * 100
+    tired = (d_ov.atl - d_rx.atl) / max(d_rx.atl, 1) * 100
+    dropped = ORDER.index(v_ov) < ORDER.index(v_rx)
+    if fit < 0.5:
+        parts.append(f"Two days out you're no fitter, just {tired:.0f}% more tired.")
+    elif dropped:
+        parts.append(f"Two days out you carry {tired:.0f}% more fatigue for {fit:.0f}% more fitness, "
+                     f"and you've lost tomorrow's session to get it.")
+    else:
+        parts.append(f"Two days out you carry {tired:.0f}% more fatigue for {fit:.0f}% more fitness.")
+    out.append(("Overdo it", "bad", f"{over_what} " + " ".join(parts)))
+
+    # Skip.
+    if rx.verdict in (REST, LIGHT):
+        out.append(("Skip it", "muted", f"Tomorrow is still {t_rx}. Skipping a light day costs nothing."))
+    else:
+        v_sk, t_sk, d_sk = path(0.0)
+        lost = (d_rx.ctl - d_sk.ctl) / max(d_rx.ctl, 1) * 100
+        same = ORDER.index(v_sk) <= ORDER.index(v_rx)
+        out.append(("Skip it", "muted",
+                    (f"Tomorrow is still {t_sk}, so you gain nothing by resting. " if same
+                     else f"Tomorrow opens up to {t_sk}, so you've only moved today. ")
+                    + f"Two days out you're {lost:.0f}% less fit than if you'd done it."))
+    return out
 
 
 def _assume_green(s):
