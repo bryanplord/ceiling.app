@@ -3,7 +3,7 @@
 <style>
   .plan-h { font-size:clamp(40px, 6vw, 72px); margin:12px 0 0; }
   .plan-note { color:var(--lichen); font-size:18px; line-height:1.5; max-width:62ch; margin:20px 0 0; text-wrap:pretty; }
-  .week { display:grid; grid-template-columns:repeat({{ plan.days|length or 1 }}, minmax(0, 1fr)); gap:0;
+  .week { display:grid; margin-top:18px !important; grid-template-columns:repeat({{ plan.days|length or 1 }}, minmax(0, 1fr)); gap:0;
           margin-top:44px; border-top:2px solid var(--ink); }
   .day { padding:18px 16px 22px; border-right:1px solid var(--rule); min-height:300px; display:flex; flex-direction:column; }
   .day:last-child { border-right:0; }
@@ -25,6 +25,16 @@
   .v-steady { background:#46b07f; } .v-hard { background:#ec9550; }
   .day .kind s.was { color:var(--lichen); font-weight:500; margin-left:6px; }
   .day .why.chg { color:var(--ink); }
+  .rowh { color:var(--ink); font-size:20px; margin:56px 0 4px; }
+  .rowsub { color:var(--lichen); margin:0; }
+  .week.past .day { min-height:0; }
+  .did { font-size:13px; color:var(--lichen); margin:10px 0 0; line-height:1.45; }
+  .chip { display:inline-block; align-self:flex-start; margin-top:10px; font-size:13px; font-weight:700; padding:3px 8px; border-radius:4px; }
+  .chip.t-good { background:#e3f2ea; color:#1d6b45; } .chip.t-bad { background:#fbe5e2; color:#a8321f; }
+  .chip.t-ok { background:#fbf0dc; color:#8a5a10; } .chip.t-muted { background:var(--frost); color:var(--lichen); }
+  .rec { font-size:13px; margin:8px 0 0; line-height:1.4; }
+  .rec.t-good { color:#1d6b45; } .rec.t-bad { color:#a8321f; } .rec.t-ok { color:#8a5a10; }
+  .head { font-size:14px; font-weight:700; margin:10px 0 0; line-height:1.35; }
   .hist { margin-top:56px; max-width:820px; }
   .hist h2 { color:var(--ink); font-size:20px; margin:0 0 6px; }
   .hsub { color:var(--lichen); margin:0 0 14px; }
@@ -51,9 +61,33 @@
 </style>
 {% endblock %}
 {% block body %}
-<h1 class="plan-h">The next {{ plan.horizon }} days</h1>
-<p class="plan-note">{{ plan.note }}</p>
+<h1 class="plan-h">Calendar</h1>
 
+{% set K = {'rest':'Day off','light':'Walk','easy':'Easy','steady':'Steady','hard':'Hard'} %}
+<h2 class="rowh">The last 7 days</h2>
+<p class="rowsub">What each morning prescribed, what you did, and whether you recovered from it.</p>
+{% if hist %}
+<div class="week past" style="grid-template-columns:repeat({{ hist|length }}, minmax(0, 1fr))">
+{% for h in hist %}{% set hd = date.fromisoformat(h.date) %}
+  <div class="day">
+    <div class="dh"><span class="wd">{{ hd.strftime('%a') }}</span><span class="dn">{{ hd.day }}</span>
+      <span class="vbar v-{{ h.now }}"></span></div>
+    <div class="db">
+      <span class="kind">{{ K[h.now] }}{% if h.changed %} <s class="was">{{ K[h.was] }}</s>{% endif %}</span>
+      <p class="ttl">{{ h.what }}</p>
+      {% if h.changed %}<p class="why chg">Changed: {{ h.why }}</p>{% endif %}
+      <p class="did">{% if h.did %}{% for x in h.did %}{{ x }}<br>{% endfor %}{% else %}Nothing recorded{% endif %}</p>
+      <span class="chip t-{{ h.work_tone }}">{{ h.work }}</span>
+      {% if h.rec %}<p class="rec t-{{ h.rec_tone }}">{{ h.rec }}</p>{% endif %}
+      {% if h.head %}<p class="head">{{ h.head }}</p>{% endif %}
+    </div>
+  </div>
+{% endfor %}
+</div>
+{% else %}<p class="rowsub">Working it out from the last week. Refresh in a minute.</p>{% endif %}
+
+<h2 class="rowh">The next {{ plan.horizon }} days</h2>
+<p class="rowsub">{{ plan.note }}</p>
 <div class="week">
 {% for d in plan.days %}{% set dd = date.fromisoformat(d.date) %}
   <div class="day{{ ' today' if d.confidence == 'Today' }}{{ ' sketch' if d.confidence == 'Sketch' }}">
@@ -69,18 +103,6 @@
   </div>
 {% endfor %}
 </div>
-
-{% set K = {'rest':'Day off','light':'Walk','easy':'Easy','steady':'Steady','hard':'Hard'} %}
-<section class="hist">
-  <h2>How the plan has changed</h2>
-  <p class="hsub">Each morning against what the plan said the day before.</p>
-  {% if hist %}
-  <ul>{% for h in hist|reverse %}{% set hd = date.fromisoformat(h.date) %}
-    <li class="{{ 'same' if not h.changed }}"><span class="hdate">{{ hd.strftime('%a %b %-d') }}</span>
-      <span class="hwhat">{% if h.changed %}<s>{{ K[h.was] }}</s> <b>{{ K[h.now] }}</b>{% else %}{{ K[h.now] }}{% endif %}</span>
-      <span class="hwhy">{{ h.why }}</span></li>{% endfor %}</ul>
-  {% else %}<p class="hsub">Working it out from the last week. Refresh in a minute.</p>{% endif %}
-</section>
 
 <section class="sub">
   <h2>Put it on your calendar</h2>
