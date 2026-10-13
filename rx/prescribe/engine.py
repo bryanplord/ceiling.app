@@ -159,11 +159,11 @@ def build_rx(p: Profile, day: str | None = None) -> Rx:
             dont = "No training. A walk is the whole day."
     elif verdict == EASY:
         low, ceiling = z.top("Z1 Recovery") - 10, z.bottom("Z2 Aerobic") + 6
-        do = f"{LABEL[sport]}, HR {low}–{ceiling}. Never above {ceiling}. {mins} minutes max."
+        do = f"{LABEL[sport]}, {mins} minutes max. HR {low}–{ceiling}, average about {round((low + ceiling) / 2)}. Never above {ceiling}."
         dont = f"No climbs that push you past {ceiling}. Walk or soft-pedal them."
     elif verdict == STEADY:
         low, ceiling = z.bottom("Z2 Aerobic"), z.top("Z2 Aerobic")
-        do = f"{LABEL[sport]}, HR {low}–{ceiling}. Never above {ceiling}. {mins} minutes max — no longer."
+        do = f"{LABEL[sport]}, {mins} minutes max. HR {low}–{ceiling}, average about {round((low + ceiling) / 2)}. Never above {ceiling}."
         dont = f"No efforts above {ceiling}. No intervals today."
     else:  # HARD
         z4lo, z4hi = z.bottom("Z4 Threshold"), z.top("Z4 Threshold")
@@ -263,18 +263,18 @@ def flex(p: Profile, rx: Rx) -> tuple[str | None, str | None]:
     z, ceil = p.zones, rx.hr_ceiling
     if rx.verdict in (REST, LIGHT):
         top = rx.max_minutes + 30
-        return (f"Short on time: 15 minutes of walking still counts. Keep HR under {ceil}.",
-                f"Feeling good: walk up to {top} minutes, as long as HR stays under {ceil}. "
+        return (f"15 minutes of walking still counts. Keep HR under {ceil}.",
+                f"Walk up to {top} minutes, as long as HR stays under {ceil}. "
                 f"The moment it's a workout, it stops being recovery.")
     if rx.verdict == HARD:
         z4lo, z4hi = z.bottom("Z4 Threshold"), z.top("Z4 Threshold")
         three = _est_load(p, 24, (z4lo + z4hi) / 2) + _est_load(p, 36, z.top("Z1 Recovery"))
         five = _est_load(p, 40, (z4lo + z4hi) / 2) + _est_load(p, 50, z.top("Z1 Recovery"))
         ok5 = ORDER.index(_next_verdict(p, rx, five)) >= ORDER.index(_next_verdict(p, rx, _rx_load(p, rx)))
-        stretch = (f"Feeling strong: a fifth 8-minute rep is fine. Tomorrow stays the same."
+        stretch = (f"A fifth 8-minute rep is fine. Tomorrow stays the same."
                    if ok5 else
                    f"Don't add reps. A fifth one changes tomorrow to {TOMORROW[_next_verdict(p, rx, five)]}.")
-        return (f"Short on time: 3 × 8 min at {z4lo}–{z4hi}, 60 minutes total, still gets most of the benefit.",
+        return (f"3 × 8 min at {z4lo}–{z4hi}, 60 minutes total, still gets most of the benefit.",
                 stretch)
 
     mid = ((rx.hr_low or ceil - 15) + ceil) / 2
@@ -285,10 +285,10 @@ def flex(p: Profile, rx: Rx) -> tuple[str | None, str | None]:
             break
         most = m
     shortest = max(30, _round5(rx.max_minutes * 0.5))
-    compress = (f"Short on time: {shortest} minutes at the same HR {rx.hr_low}–{ceil} still counts. "
+    compress = (f"{shortest} minutes at the same HR {rx.hr_low}–{ceil} still counts. "
                 f"Don't make up for it by going harder.")
     if most > rx.max_minutes:
-        stretch = (f"Feeling good: you can go to {most} minutes, ceiling unchanged at {ceil}, "
+        stretch = (f"You can go to {most} minutes, ceiling unchanged at {ceil}, "
                    f"without changing tomorrow.")
     else:
         stretch = (f"Don't stretch it. Even 15 more minutes changes tomorrow. "

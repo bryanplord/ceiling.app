@@ -14,6 +14,7 @@ from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse,
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from .. import dashboard
 from .. import profile as prof
 from ..service import open_store, recovery_history, scored_day, today_rx
 from ..clock import local_today
@@ -146,8 +147,25 @@ def today(request: Request, d: str | None = None):
     if not _signed_in(request):
         return _login(request)
     _refresh_in_background()
-    _, rx = today_rx(open_store(), d)
-    return _page(request, "today.html", rx=rx)
+    store = open_store()
+    p, rx = today_rx(store, d)
+    dash = dashboard.build(store, p, rx)
+    when = date.fromisoformat(rx.date)
+    recent = []
+    for a in sorted(p.activities, key=lambda a: a.start_local or a.date, reverse=True):
+        if a.date >= rx.date:
+            continue
+        ad = date.fromisoformat(a.date)
+        label = "Yesterday" if (when - ad).days == 1 else ad.strftime("%a %b %-d")
+        h, m = divmod(round(a.moving_s / 60), 60)
+        dur = f"{h}h {m:02d}m" if h else f"{m} min"
+        hr = f", {a.avg_hr:.0f} bpm" if a.avg_hr else ""
+        recent.append({"when": label, "what": a.name or a.sport.capitalize(), "stats": dur + hr})
+        if len(recent) == 5:
+            break
+    return _page(request, "today.html", rx=rx, d=dash, p=p, recent=recent,
+                 spark=dashboard.spark, ceiling_band=dashboard.ceiling_band(rx, p),
+                 day_label=when.strftime("%A, %B %-d"))
 
 
 @app.get("/yesterday", response_class=HTMLResponse)

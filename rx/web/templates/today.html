@@ -1,40 +1,117 @@
 {% extends "base.html" %}
 {% block body %}
-<h1>{{ rx.headline }}</h1>
+<section class="hero">
+  <p class="date">{{ day_label }}</p>
+  <h1>{{ rx.headline }}</h1>
+  <p class="move">{{ rx.do }}</p>
+  {% if rx.steps %}
+  <ol class="steps">{% for s in rx.steps %}<li>{{ s }}</li>{% endfor %}</ol>
+  {% endif %}
+  {{ ceiling_band | safe }}
+  <p class="dont">{{ rx.dont }}</p>
+</section>
 
-<h2>Ideal</h2>
-<p class="big">{{ rx.do }}</p>
-{% if rx.steps %}<ul>{% for s in rx.steps %}<li>{{ s }}</li>{% endfor %}</ul>{% endif %}
+{% if not d.has_data %}
+<section class="empty">
+  <h2>Your history is loading.</h2>
+  <p>Ceiling is pulling your activities and nights from intervals.icu. Refresh in a few minutes.</p>
+</section>
+{% else %}
 
-<h2>Don't</h2>
-<p class="big">{{ rx.dont }}</p>
+<section class="split">
+  <div class="col">
+    <h2>Activity <span>what you've done</span></h2>
+    {% for m in [d.load, d.fitness, d.freshness] %}
+    <div class="metric">
+      <div class="mhead">
+        <span class="mname">{{ m.name }}</span>
+        <span class="state {{ m.tone }}">{{ m.state }}</span>
+      </div>
+      <div class="mrow">
+        <span class="mval">{{ m.value }}</span>
+        <div class="chart">{{ spark(m.series) | safe }}</div>
+      </div>
+      <p class="mdetail">{{ m.detail }}</p>
+    </div>
+    {% endfor %}
 
-<h2>Why</h2>
-{% for w in rx.why %}<p>{{ w }}</p>{% endfor %}
+    {% if d.mix %}
+    <div class="metric">
+      <div class="mhead"><span class="mname">Intensity, last 4 weeks</span>
+        <span class="state">{{ '%.1f' % d.weekly_hours }} h a week</span></div>
+      <div class="mix" role="img" aria-label="Easy {{ (d.mix.easy*100)|round|int }}%, middle {{ (d.mix.middle*100)|round|int }}%, hard {{ (d.mix.hard*100)|round|int }}%">
+        <span class="easy" style="flex: {{ d.mix.easy }}"></span>
+        <span class="middle" style="flex: {{ d.mix.middle }}"></span>
+        <span class="hard" style="flex: {{ d.mix.hard }}"></span>
+      </div>
+      <p class="mdetail mixkey">
+        <span><i class="k easy"></i>Easy {{ (d.mix.easy*100)|round|int }}%</span>
+        <span><i class="k middle"></i>Middle {{ (d.mix.middle*100)|round|int }}%</span>
+        <span><i class="k hard"></i>Hard {{ (d.mix.hard*100)|round|int }}%</span>
+      </p>
+    </div>
+    {% endif %}
 
-{% if rx.compress %}
-<h2>Compress</h2>
-<p>{{ rx.compress }}</p>
-<h2>Stretch</h2>
-<p>{{ rx.stretch }}</p>
+    {% if recent %}
+    <div class="recent">
+      {% for a in recent %}
+      <div class="row"><span>{{ a.when }}</span><span>{{ a.what }}</span><span class="num">{{ a.stats }}</span></div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="col">
+    <h2>Recovery <span>how you're absorbing it</span></h2>
+    <div class="metric lead">
+      <div class="mhead"><span class="mname">Last night</span></div>
+      <div class="mrow"><span class="mval big {{ d.recovery.tone }}">{{ d.recovery.state }}</span></div>
+      <p class="mdetail">{{ d.recovery.detail }}</p>
+    </div>
+    {% for m in [d.hrv, d.rhr] %}
+    <div class="metric">
+      <div class="mhead">
+        <span class="mname">{{ m.name }}</span>
+        <span class="state {{ m.tone }}">{{ m.state }}</span>
+      </div>
+      <div class="mrow">
+        <span class="mval">{{ m.value }}</span>
+        <div class="chart">{{ spark(m.series, band=m.band) | safe }}</div>
+      </div>
+      <p class="mdetail">{{ m.detail }}</p>
+    </div>
+    {% endfor %}
+    <div class="metric">
+      <div class="mhead"><span class="mname">Sleep, 14 nights</span>
+        <span class="state {{ d.sleep.tone }}">{{ d.sleep.state }}</span></div>
+      <div class="mrow">
+        <span class="mval">{{ d.sleep.value }}</span>
+        <div class="chart">{{ spark(d.sleep.series, bars=True) | safe }}</div>
+      </div>
+      <p class="mdetail">{{ d.sleep.detail }}</p>
+    </div>
+  </div>
+</section>
+
+<section class="priority">
+  <h2>What matters most right now</h2>
+  <p class="pcall">{{ d.priority.headline }}</p>
+  <p class="pwhy">{{ d.priority.why }}</p>
+  <ul>{% for t in d.priority.this_week %}<li>{{ t }}</li>{% endfor %}</ul>
+</section>
 {% endif %}
 
-{% if rx.if_skip %}
-<h2>If you skip it</h2>
-<p>{{ rx.if_skip }}</p>
-{% endif %}
-{% if rx.if_overdo %}
-<h2>If you overdo it</h2>
-<p>{{ rx.if_overdo }}</p>
-{% endif %}
-
-<h2>Tonight</h2>
-<p>{{ rx.tonight }}</p>
-
-{% if rx.scenarios %}
-<h2>If / then</h2>
-{% for s in rx.scenarios %}<p>{{ s }}</p>{% endfor %}
-{% endif %}
-
-{% for n in rx.notes %}<p class="muted">{{ n }}</p>{% endfor %}
+<section class="detail">
+  <h2>Today, in detail</h2>
+  <dl>
+    <dt>Why</dt><dd>{{ rx.why | join(' ') }}</dd>
+    {% if rx.compress %}<dt>Short on time</dt><dd>{{ rx.compress }}</dd>
+    <dt>Feeling strong</dt><dd>{{ rx.stretch }}</dd>{% endif %}
+    {% if rx.if_skip %}<dt>If you skip it</dt><dd>{{ rx.if_skip }}</dd>{% endif %}
+    {% if rx.if_overdo %}<dt>If you overdo it</dt><dd>{{ rx.if_overdo }}</dd>{% endif %}
+    <dt>Tonight</dt><dd>{{ rx.tonight }}</dd>
+    {% if rx.scenarios %}<dt>Tomorrow</dt><dd>{% for s in rx.scenarios %}<p>{{ s }}</p>{% endfor %}</dd>{% endif %}
+  </dl>
+  {% for n in rx.notes %}<p class="note">{{ n }}</p>{% endfor %}
+</section>
 {% endblock %}
