@@ -18,6 +18,7 @@ import requests
 
 from ..sports import normalize
 from ..store import Activity, Store, Wellness
+from ..clock import local_today
 
 BASE = "https://intervals.icu/api/v1"
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) rx/0.1"
@@ -93,7 +94,7 @@ def wellness_from_icu(w: dict) -> Wellness:
 
 def sync(client: IntervalsClient, store: Store, days: int = 365,
          with_streams: bool = True, log=print) -> dict:
-    newest = date.today()
+    newest = local_today()
     oldest = newest - timedelta(days=days)
     counts = {"activities": 0, "streams": 0, "wellness": 0}
 

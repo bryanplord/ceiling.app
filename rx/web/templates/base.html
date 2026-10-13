@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Rx</title>
+<title>Ceiling</title>
 <style>
   :root { --fg:#111; --muted:#6e6e73; --line:#e5e5ea; --bg:#fff;
           --green:#1f9d55; --amber:#c27c0e; --red:#d0342c; --unknown:#aeaeb2; }
@@ -34,6 +34,7 @@
 </style>
 </head>
 <body>
+{% block nav %}
 <nav>
   <a href="/" class="{{ 'on' if active=='today' }}">Today</a>
   <a href="/yesterday" class="{{ 'on' if active=='yesterday' }}">Yesterday</a>
@@ -41,6 +42,7 @@
   <a href="/progress" class="{{ 'on' if active=='progress' }}">Progress</a>
   <a href="/profile" class="{{ 'on' if active=='profile' }}">Profile</a>
 </nav>
+{% endblock %}
 <main>{% block body %}{% endblock %}</main>
 </body>
 </html>

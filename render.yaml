@@ -1,0 +1,35 @@
+# Render blueprint: https://render.com/docs/blueprint-spec
+# Creates the web service with a persistent disk for the SQLite database.
+services:
+  - type: web
+    name: ceiling
+    runtime: python
+    plan: starter            # a paid plan is required for the persistent disk
+    buildCommand: pip install .
+    startCommand: uvicorn rx.web.app:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /healthz
+    disk:
+      name: data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      - key: RX_DATA_DIR
+        value: /var/data
+      - key: RX_TZ
+        value: America/Los_Angeles
+      - key: INTERVALS_ATHLETE_ID
+        value: "0"
+      - key: INTERVALS_API_KEY
+        sync: false          # entered by hand in the Render dashboard, never in git
+      - key: RX_SECRET
+        generateValue: true  # Render creates a random secret; signs sign-in links and sessions
+      - key: RX_BASE_URL
+        value: https://ceiling.app
+      - key: RX_ALLOWED_EMAILS
+        sync: false          # the two addresses allowed to sign in, comma-separated
+      - key: RESEND_API_KEY
+        sync: false          # from resend.com; sends the sign-in emails
+      - key: RX_FROM_EMAIL
+        value: "Ceiling <signin@ceiling.app>"

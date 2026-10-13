@@ -7,6 +7,7 @@ from datetime import date, timedelta
 from .config import settings
 from .service import open_store, scored_day, today_rx
 from . import profile as prof
+from .clock import local_today
 
 
 def cmd_sync(a):
@@ -77,7 +78,7 @@ def cmd_today(a):
 
 
 def cmd_score(a):
-    day = a.date or (date.today() - timedelta(days=1)).isoformat()
+    day = a.date or (local_today() - timedelta(days=1)).isoformat()
     rx, sessions = scored_day(open_store(), day)
     print(f"{day}: prescribed — {rx.do}")
     if not sessions:

@@ -9,6 +9,7 @@ from .config import settings
 from .prescribe.engine import build_rx
 from .prescribe.score import score
 from .store import Store
+from .clock import local_today
 
 
 def open_store() -> Store:
@@ -16,7 +17,7 @@ def open_store() -> Store:
 
 
 def today_rx(store: Store, day: str | None = None):
-    day = day or date.today().isoformat()
+    day = day or local_today().isoformat()
     p = prof.build(store, day)
     return p, build_rx(p, day)
 
@@ -35,5 +36,5 @@ def scored_day(store: Store, day: str):
 
 def recovery_history(store: Store, days: int = 30):
     ws = store.wellness()
-    end = date.today()
+    end = local_today()
     return [assess(ws, (end - timedelta(days=i)).isoformat()) for i in range(days - 1, -1, -1)]

@@ -14,6 +14,7 @@ from .analysis import response as resp
 from .analysis.recovery import resting_hr_baseline
 from .sports import BIKE, RUN, SKI, WALK
 from .store import Activity, Store, Wellness
+from .clock import local_today
 
 
 @dataclass
@@ -48,7 +49,7 @@ class Profile:
 
 
 def build(store: Store, as_of: str | None = None) -> Profile:
-    as_of = as_of or date.today().isoformat()
+    as_of = as_of or local_today().isoformat()
     acts = [a for a in store.activities() if a.date <= as_of]
     wellness = [w for w in store.wellness() if w.date <= as_of]
     past_acts = [a for a in acts if a.date < as_of]   # the morning view: today's sessions don't count yet

@@ -44,6 +44,11 @@ CREATE TABLE IF NOT EXISTS wellness (
     raw         TEXT,
     PRIMARY KEY (date, source)
 );
+
+CREATE TABLE IF NOT EXISTS meta (
+    key   TEXT PRIMARY KEY,
+    value TEXT
+);
 """
 
 # When several sources report the same day, the first non-null value wins.
@@ -149,6 +154,14 @@ class Store:
             return None
         return (json.loads(r["time"]), json.loads(r["hr"]),
                 json.loads(r["cadence"]) if r["cadence"] else None)
+
+    def get_meta(self, key: str) -> str | None:
+        r = self.db.execute("SELECT value FROM meta WHERE key=?", (key,)).fetchone()
+        return r["value"] if r else None
+
+    def set_meta(self, key: str, value: str) -> None:
+        self.db.execute("INSERT OR REPLACE INTO meta VALUES (?,?)", (key, value))
+        self.db.commit()
 
     def speed(self, activity_id: str) -> list | None:
         r = self.db.execute("SELECT speed FROM streams WHERE activity_id=?", (activity_id,)).fetchone()

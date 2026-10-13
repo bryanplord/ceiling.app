@@ -15,6 +15,7 @@ from pathlib import Path
 
 from ..sports import normalize
 from ..store import Activity, Store, Wellness
+from ..clock import local_today
 
 
 def _lib():
@@ -102,7 +103,7 @@ def sync(api, store: Store, days: int = 60, activities: bool = False, log=print)
     """Wellness by default. Activities only if intervals.icu isn't covering them,
     otherwise the same session would be stored twice."""
     counts = {"wellness": 0, "activities": 0}
-    today = date.today()
+    today = local_today()
     for i in range(days, -1, -1):
         day = (today - timedelta(days=i)).isoformat()
         w, raw = wellness_for(api, day)
