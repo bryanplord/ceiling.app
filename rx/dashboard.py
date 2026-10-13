@@ -374,7 +374,8 @@ def room(rx: Rx, p: Profile, hist=None, usual: float | None = None, mode: str = 
     L0, L1 = 52, 296                # zones panel
     SC = 330                        # the day's slider
     R0, R1 = 368, 640               # where-you-trained panel
-    segs = [(knee, band_lo, 1.0), (band_lo, c, 2.6), (c, top, 1.0)]
+    stretch = max(1.0, min(2.6, 26 / max(1, c - band_lo)))   # a narrow range gets room; a wide one doesn't squeeze the rest
+    segs = [(knee, band_lo, 1.0), (band_lo, c, stretch), (c, top, 1.0)]
     units = sum((bb - aa) * w for aa, bb, w in segs if bb > aa)
 
     zb_ = [(floor if i == 0 else zlo, (top if i == len(p.zones.bounds) - 1 else zhi + 1))
