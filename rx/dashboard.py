@@ -427,9 +427,13 @@ def room(rx: Rx, p: Profile, hist=None, usual: float | None = None, mode: str = 
     for v in range((knee // 10 + 1) * 10, top, 10):
         if all(abs(Y(v) - Y(e)) >= 24 for e in nums):
             nums.append(v)
+    for v in range((knee // 5 + 1) * 5, top, 5):
+        if v not in nums:
+            o.append(f'<line class="hash minor" x1="{L0 - 5}" x2="{L0}" y1="{Y(v):.1f}" y2="{Y(v):.1f}"/>')
     for v in sorted(nums):
         cls = "tick strong" if v in bounds else "tick"
         o.append(f'<text class="{cls}" x="{AX}" y="{Y(v) + 4.5:.1f}" text-anchor="end">{v}</text>')
+        o.append(f'<line class="hash{" major" if v in bounds else ""}" x1="{AX + 3}" x2="{L0}" y1="{Y(v):.1f}" y2="{Y(v):.1f}"/>')
     if mode == "stretch":
         o.append(f'<path class="brk" d="M{AX - 20},{KY + 3:.1f} l5,-5 l5,5 l5,-5 l5,5"/>')
     o.append(f'<line class="ref" x1="{L0}" x2="{W}" y1="{Y(mx):.1f}" y2="{Y(mx):.1f}"/>')
@@ -439,8 +443,13 @@ def room(rx: Rx, p: Profile, hist=None, usual: float | None = None, mode: str = 
 
     # SLIDER: a track from resting to max, and today's range as the fixed thumb
     o.append(f'<rect class="track" x="{SC - 3}" y="{Y(mx):.1f}" width="6" height="{Y(rest) - Y(mx):.1f}"/>')
-    zi = zone_of(round((band_lo + c) / 2))
-    o.append(f'<rect class="thumb z{zi}" x="{SC - 24}" y="{yt:.1f}" width="48" height="{yb - yt:.1f}"/>')
+    o.append(f'<rect fill="#fff" x="{SC - 24}" y="{yt:.1f}" width="48" height="{yb - yt:.1f}"/>')
+    # one segment per zone it crosses, each in that zone's own color
+    for i, (_, zlo, zhi) in enumerate(p.zones.bounds):
+        a_ = max(band_lo, floor if i == 0 else zlo)
+        b_ = min(c + 1, top if i == len(p.zones.bounds) - 1 else zhi + 1)
+        if b_ > a_:
+            o.append(f'<rect class="thumb z{i + 1}" x="{SC - 24}" y="{Y(b_):.1f}" width="48" height="{Y(a_) - Y(b_):.1f}"/>')
     o.append(f'<text class="bnum" x="{SC}" y="{yt + 16:.1f}" text-anchor="middle">{c}</text>')
     if lo is not None:
         o.append(f'<text class="bnum" x="{SC}" y="{yb - 7:.1f}" text-anchor="middle">{band_lo}</text>')
