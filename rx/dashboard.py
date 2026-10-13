@@ -354,7 +354,7 @@ ZONE_FEEL = {"Z1 Recovery": "barely working", "Z2 Aerobic": "all day, full sente
              "Z5 Max": "all out, no words"}
 
 
-def room(rx: Rx, p: Profile, hist=None, usual: float | None = None) -> str:
+def room(rx: Rx, p: Profile, hist=None, usual: float | None = None, mode: str = "stretch") -> str:
     """Your heart today, built around a center spine of heart-rate numbers.
     Left: your zones, named and colored, reading out from the spine.
     Right: where you actually trained the last 4 weeks, one bar per 2 beats, colored by zone.
@@ -377,7 +377,18 @@ def room(rx: Rx, p: Profile, hist=None, usual: float | None = None) -> str:
     segs = [(knee, band_lo, 1.0), (band_lo, c, 2.6), (c, top, 1.0)]
     units = sum((bb - aa) * w for aa, bb, w in segs if bb > aa)
 
+    zb_ = [(floor if i == 0 else zlo, (top if i == len(p.zones.bounds) - 1 else zhi + 1))
+           for i, (_, zlo, zhi) in enumerate(p.zones.bounds)]
+
     def Y(v):
+        if mode == "linear":
+            return B - (B - T) * (v - floor) / (top - floor)
+        if mode == "equal":
+            n = len(zb_)
+            for i, (a_, b_) in enumerate(zb_):
+                if v <= b_ or i == n - 1:
+                    f = (min(max(v, a_), b_) - a_) / max(1, b_ - a_)
+                    return B - (B - T) * (i + f) / n
         if v <= knee:
             return B - (B - KY) * (v - floor) / max(1, knee - floor)
         u = 0.0
@@ -426,7 +437,8 @@ def room(rx: Rx, p: Profile, hist=None, usual: float | None = None) -> str:
             continue
         o.append(f'<text class="tick{" strong" if v in (band_lo, c) else ""}" x="{SX}" y="{y + 5:.1f}" text-anchor="middle">{v}</text>')
         last_y = y
-    o.append(f'<path class="brk" d="M{SX - 10},{KY + 3:.1f} l5,-5 l5,5 l5,-5 l5,5"/>')
+    if mode == "stretch":
+        o.append(f'<path class="brk" d="M{SX - 10},{KY + 3:.1f} l5,-5 l5,5 l5,-5 l5,5"/>')
     o.append(f'<line class="ref" x1="0" x2="{W}" y1="{Y(mx):.1f}" y2="{Y(mx):.1f}"/>')
     o.append(f'<text class="reft" x="{W}" y="{Y(mx) - 6:.1f}" text-anchor="end">your max {mx}</text>')
     o.append(f'<line class="ref" x1="0" x2="{W}" y1="{Y(rest):.1f}" y2="{Y(rest):.1f}"/>')

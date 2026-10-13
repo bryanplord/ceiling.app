@@ -192,7 +192,7 @@ def build_rx(p: Profile, day: str | None = None) -> Rx:
                   f"Heart rate under {ceiling}.")
             dont = "No training at all today. Resting is the workout."
     elif verdict == EASY:
-        low, ceiling = z.top("Z1 Recovery") - 10, z.bottom("Z2 Aerobic") + 6
+        low, ceiling = easy_band(z)
         do = (f"{verb} easy, {mins} minutes max, heart rate {low}–{ceiling}. It should feel almost too easy: "
               f"full sentences the whole way.")
         dont = f"Don't let the climbs drag you over {ceiling}. Shift down, spin, or walk them."
@@ -520,12 +520,20 @@ def _mix(p: Profile, day: str, days: int) -> dict[str, float]:
     return out
 
 
+def easy_band(z) -> tuple[int, int]:
+    """Easy day: the top of Recovery into the bottom of Aerobic, staying clear of the top of
+    Aerobic (your aerobic threshold) by at least 4 beats. Easy should never brush tempo."""
+    low = z.top("Z1 Recovery") - 8
+    ceiling = min(z.bottom("Z2 Aerobic") + 2, z.top("Z2 Aerobic") - 4)
+    return low, max(ceiling, low + 8)
+
+
 def _band(verdict: str, p: Profile) -> tuple[int, int] | None:
     z = p.zones
     if not z:
         return None
     if verdict == EASY:
-        return z.top("Z1 Recovery") - 10, z.bottom("Z2 Aerobic") + 6
+        return easy_band(z)
     if verdict == STEADY:
         return z.bottom("Z2 Aerobic"), z.top("Z2 Aerobic")
     return None
