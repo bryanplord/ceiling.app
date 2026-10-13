@@ -198,8 +198,7 @@ def healthz():
                 f"activities: {n['activities']}  with heart-rate streams: {n['streams']}  "
                 f"days of sleep/HRV: {n['wellness']}\n"
                 f"nights with breathing rate (last 30): "
-                f"{sum(1 for w in s.wellness((local_today() - timedelta(days=30)).isoformat()) if w.breathing)}\n"
-                f"wellness fields with values: {_resp_keys(s)}")
+                f"{sum(1 for w in s.wellness((local_today() - timedelta(days=30)).isoformat()) if w.breathing)}")
     except Exception as e:
         return f"ok\nstore unavailable: {type(e).__name__}"
 
