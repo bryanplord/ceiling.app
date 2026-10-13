@@ -58,6 +58,8 @@ class Rx:
     reading: Reading | None = None
     skip_short: str = ""
     example: str = ""
+    what: str = ""
+    how: list = field(default_factory=list)
     sleep: object = None
     sleep_if: list = field(default_factory=list)
     overdo_short: str = ""
@@ -214,8 +216,8 @@ def build_rx(p: Profile, day: str | None = None) -> Rx:
             low, ceiling, mins, steps, recovery=rec, reading=reading)
     sb = sleepbank.bank(p.wellness, p.daily_load, day, verdict)   # tonight's need depends on today's session
     rx.sleep = sb
-    rx.tonight = (f"Lights out by {sb.lights_out}. You need {sleepbank._hm(sb.need_tonight)} tonight: "
-                  + ", ".join(sb.parts) + f". That's for a {sb.wake} wake-up.")
+    rx.tonight = (f"In bed by {sb.lights_out}, up at {sb.wake}. That gets you the "
+                  f"{sleepbank._hm(sb.need_tonight)} of sleep you need tonight: " + ", ".join(sb.parts) + ".")
     if sb.no_technical and sport in (BIKE, SKI):
         rx.dont += " No technical descents today: under 5 hours of sleep, reaction time goes first."
     need = round(sb.need_tonight * 4) / 4
@@ -227,6 +229,7 @@ def build_rx(p: Profile, day: str | None = None) -> Rx:
                                          LIGHT: "tomorrow is a stroll at most",
                                          REST: "tomorrow is a day off"}[cap]))
     rx.example = example_ride(p, sport, verdict, mins, ceiling)
+    rx.what, rx.how = what_how(rx, kind, mins, low, ceiling, steps)
     rx.scenarios = scenarios(p, rx)
     rx.if_skip, rx.if_overdo = consequences(p, rx)
     rx.compress, rx.stretch = flex(p, rx)
@@ -449,3 +452,40 @@ def example_ride(p: Profile, sport: str, verdict: str, mins: int, ceiling: int |
     if verdict in (EASY, STEADY):
         s += " Bring a friend: if you can't hold a conversation on the climbs, you're going too hard."
     return s
+
+
+NOUN = {"mountain bike": "mountain bike ride", "road ride": "road ride", "gravel ride": "gravel ride",
+        "trainer ride": "trainer ride", "trail run": "trail run", "run": "run", "ski tour": "ski tour",
+        "nordic ski": "nordic ski", "hike": "hike", "walk": "walk"}
+
+
+def what_how(rx: Rx, kind: str | None, mins: int, low, ceiling, steps) -> tuple[str, list[str]]:
+    """What to do (one line), and how to do it (a few plain instructions)."""
+    noun = NOUN.get(kind or "", None) or {BIKE: "ride", RUN: "run", SKI: "ski tour", WALK: "walk"}.get(rx.sport, "session")
+    v = rx.verdict
+    if v == REST:
+        what = "Day off."
+        how = [f"If you want to move, a slow walk of {mins} minutes at most. Heart rate under {ceiling}."]
+    elif v == LIGHT:
+        what = f"No workout. A relaxed walk, {mins} minutes at most."
+        how = [f"Heart rate under {ceiling}. A stroll, not a power walk.",
+               "No riding, no running, no speed-walking to rack up steps."]
+    elif v == EASY:
+        what = f"An easy {noun}, {mins} minutes."
+        how = [f"Heart rate {low}–{ceiling}, around {round((low + ceiling) / 2)}. It should feel almost too easy: "
+               f"full sentences the whole way.",
+               f"Never over {ceiling}. Shift down, spin or walk the steep pitches."]
+    elif v == STEADY:
+        what = f"A steady {noun}, up to {mins} minutes."
+        how = [f"Heart rate {low}–{ceiling}, settling around {round((low + ceiling) / 2)}. All-day pace: you can "
+               f"talk, just not sing.",
+               f"No chasing, no attacking climbs, no intervals. Never over {ceiling}."]
+    else:
+        what = f"A hard {noun}: 4 × 8 minutes at threshold, {mins} minutes total."
+        how = list(steps) + [f"Never over {ceiling}, even on the last one."]
+    if rx.sport in (BIKE, SKI) and v in (EASY, STEADY):
+        how.append(f"A spike on a steep pitch is fine if it's under 30 seconds. Over {ceiling} for a full minute "
+                   f"means back off.")
+    if rx.example:
+        how.insert(1, rx.example)
+    return what, how

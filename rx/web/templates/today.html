@@ -33,6 +33,12 @@
   .rxv b.good { color:var(--good); } .rxv b.ok { color:var(--warn); } .rxv b.bad { color:var(--bad); }
   .rxl.over .rxk { color:var(--ceiling); }
   .rxl .steps { margin:0; font-size:18px; }
+  .rxlist { margin:0; padding-left:18px; font-size:18px; line-height:1.45; max-width:54ch; }
+  .rxlist li { margin:0 0 8px; }
+  .rxlist.facts { font-size:15px; color:var(--lichen); margin-top:8px; }
+  .rxlist.facts b { color:var(--ink); font-weight:600; margin-right:4px; }
+  .whyhead { margin:0; font-size:18px; line-height:1.45; }
+  .whyhead b.good { color:var(--good); } .whyhead b.ok { color:var(--warn); } .whyhead b.bad { color:var(--bad); }
   .room { width:100%; max-width:540px; display:block; margin-left:auto; overflow:visible; font-family:var(--face); }
   .room .zt { opacity:.07; } .room .zr { opacity:1; }
   .room .z1 { fill:var(--z1); } .room .z2 { fill:var(--z2); } .room .z3 { fill:var(--z3); }
@@ -183,16 +189,17 @@
     </div>
     <h1 class="verdict">{{ rx.headline }}</h1>
     <div class="pad">
-      <div class="rxl"><span class="rxk">Do</span>
-        <p class="rxv strong">{{ rx.do }}</p></div>
-      {% if rx.steps %}<div class="rxl"><span class="rxk"></span><ol class="steps">{% for s in rx.steps %}<li>{{ s }}</li>{% endfor %}</ol></div>{% endif %}
-      {% if rx.example %}<div class="rxl"><span class="rxk">Where</span><p class="rxv">{{ rx.example }}</p></div>{% endif %}
-      <div class="rxl"><span class="rxk">Don't</span><p class="rxv">{{ rx.dont }}</p></div>
-      {% if rx.reading %}<div class="rxl"><span class="rxk">Because</span>
-        <p class="rxv"><b class="{{ rx.reading.tone }}">{{ rx.reading.title }}.</b> {{ rx.reading.says.split('. ')[0] }}.</p></div>{% endif %}
+      <div class="rxl"><span class="rxk">What</span>
+        <p class="rxv strong">{{ rx.what or rx.do }}</p></div>
+      <div class="rxl"><span class="rxk">How</span>
+        <ul class="rxlist">{% for h in rx.how %}<li>{{ h }}</li>{% endfor %}</ul></div>
+      {% if rx.reading %}<div class="rxl"><span class="rxk">Why</span>
+        <div class="rxv"><p class="whyhead"><b class="{{ rx.reading.tone }}">{{ rx.reading.title }}.</b> {{ rx.reading.says.split('. ')[0] }}.</p>
+          <ul class="rxlist facts">{% for e in rx.reading.evidence[:4] %}<li><b>{{ e.name }}</b> {{ e.line.split('. ')[0].rstrip('.') }}.</li>{% endfor %}
+          {% if rx.sleep and rx.sleep.state not in ('even', 'unknown', 'surplus') %}{% set sd = rx.sleep.says.split('. ')[0].rstrip('.') %}<li><b>Sleep debt</b> {{ sd[:1] | upper }}{{ sd[1:] }}.</li>{% endif %}</ul></div></div>{% endif %}
       {% if rx.skip_short %}<div class="rxl"><span class="rxk">Skip it</span><p class="rxv">{{ rx.skip_short }}</p></div>{% endif %}
-      {% if rx.sleep and rx.sleep.lights_out %}<div class="rxl"><span class="rxk">Tonight</span><p class="rxv">Lights out by <b>{{ rx.sleep.lights_out }}</b>. {{ rx.sleep_if[0][0] if rx.sleep_if }} and {{ rx.sleep_if[0][2] if rx.sleep_if }}.</p></div>{% endif %}
       {% if rx.overdo_short %}<div class="rxl over"><span class="rxk">Overdo it</span><p class="rxv">{{ rx.overdo_short }}</p></div>{% endif %}
+      {% if rx.sleep and rx.sleep.lights_out %}<div class="rxl"><span class="rxk">Tonight</span><p class="rxv">In bed by <b>{{ rx.sleep.lights_out }}</b> for {{ rx.sleep_if[0][0][9:] if rx.sleep_if else '' }} of sleep. Do that, and {{ rx.sleep_if[0][2] if rx.sleep_if }}.</p></div>{% endif %}
     </div>
   </div>
   {% if room %}

@@ -81,7 +81,7 @@ def test_bad_night_turns_into_rest(store):
     rx = eng.build_rx(p)
     assert rx.verdict in (eng.REST, eng.LIGHT)
     assert "Walk" in rx.do and "No running" in rx.dont or "No training" in rx.dont
-    assert rx.tonight.startswith("Lights out by")
+    assert rx.tonight.startswith("In bed by")
 
 
 def test_score_penalizes_ceiling_and_duration():

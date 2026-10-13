@@ -32,7 +32,7 @@ import math
 KEEP = math.exp(-1 / 4)   # debt carried night to night (τ ≈ 4 days)
 NIGHTS = 14               # shown
 HISTORY = 40              # modelled
-EFFICIENCY = 0.9          # time asleep / time in bed
+EFFICIENCY = 0.93         # time asleep / time in bed (Garmin's duration already excludes wake)
 TONIGHT_ADD = {REST: 0, LIGHT: 0, EASY: 15, STEADY: 20, HARD: 30}
 
 
@@ -98,11 +98,11 @@ def _training_add(load: float, avg: float) -> float:
 
 
 def _wake() -> tuple[int, int, str]:
-    raw = os.getenv("RX_WAKE", "6:30 AM").strip().upper()
+    raw = os.getenv("RX_WAKE", "7:00 AM").strip().upper()
     try:
         t = datetime.strptime(raw, "%I:%M %p")
     except ValueError:
-        t = datetime.strptime("6:30 AM", "%I:%M %p")
+        t = datetime.strptime("7:00 AM", "%I:%M %p")
     return t.hour, t.minute, t.strftime("%-I:%M %p")
 
 
@@ -219,9 +219,12 @@ def bank(wellness, daily_load: dict[str, float], day: str, verdict: str | None =
         b.says += " Under 5 hours, reaction time goes first: skip technical descents today."
 
     # Tonight
-    payback = min(1.0, max(0.0, bal) / 3)
+    # Realistic: pay back at most 45 minutes a night, and never ask for more than 9h 15m asleep.
+    # Nobody falls asleep at 7:30 PM on command; debt is repaid over several nights.
+    payback = min(0.75, max(0.0, bal) / 3)
     add = TONIGHT_ADD.get(verdict or STEADY, 15) / 60
-    b.need_tonight = base + add + payback
+    b.need_tonight = min(9.25, base + add + payback)
+    payback = max(0.0, b.need_tonight - base - add)
     b.parts = [f"{_hm(base)} your baseline"]
     if add:
         b.parts.append(f"{_hm(add)} for today's session")
