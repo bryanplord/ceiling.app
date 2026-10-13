@@ -167,7 +167,8 @@ def healthz():
         state = s.get_meta("sync_state") or "never run (sign in to start it)"
         last = s.get_meta("last_sync")
         ago = f"{int((time.time() - float(last)) / 60)} min ago" if last else "never"
-        return (f"ok\nsync: {state}\nlast complete sync: {ago}\n"
+        ver = (os.getenv("RENDER_GIT_COMMIT") or "local")[:7]
+        return (f"ok\nversion: {ver}\nsync: {state}\nlast complete sync: {ago}\n"
                 f"activities: {n['activities']}  with heart-rate streams: {n['streams']}  "
                 f"days of sleep/HRV: {n['wellness']}")
     except Exception as e:
