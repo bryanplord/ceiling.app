@@ -358,7 +358,7 @@ def room(rx: Rx, p: Profile, hist=None, usual: float | None = None, mode: str = 
     """Your heart today, built around a center spine of heart-rate numbers.
     Left: your zones, named and colored, reading out from the spine.
     Right: where you actually trained the last 4 weeks, one bar per 2 beats, colored by zone.
-    Today's range: a highlighted band across both sides."""
+    Today's range: a black bar on the spine."""
     if rx.hr_ceiling is None or not p.zones:
         return ""
     c = rx.hr_ceiling
@@ -408,7 +408,6 @@ def room(rx: Rx, p: Profile, hist=None, usual: float | None = None, mode: str = 
          f'aria-label="Your heart today: {band_lo} to {c}. Resting {rest}, max {mx}.">']
 
     # today's band across the whole chart, behind everything
-    o.append(f'<rect class="xsec" x="0" y="{yt:.1f}" width="{W}" height="{yb - yt:.1f}" rx="8"/>')
 
     # LEFT: zones, colored, labels reading out from the spine
     for i, (name, zlo, zhi) in enumerate(p.zones.bounds):
@@ -444,7 +443,7 @@ def room(rx: Rx, p: Profile, hist=None, usual: float | None = None, mode: str = 
         v0, v1 = max(floor, knee), min(mx + 1, len(hist))
         k = _np.exp(-0.5 * (_np.arange(-8, 9) / 2.5) ** 2)
         dens = _np.convolve(_np.asarray(hist, float), k / k.sum(), mode="same")
-        span = (R1 - R0) * 0.62
+        span = (R1 - R0) * 0.5
         peak = float(dens[v0:v1].max()) or 1.0
         X = lambda v: R0 + span * float(dens[min(max(int(v), 0), len(dens) - 1)]) / peak
 
@@ -459,14 +458,15 @@ def room(rx: Rx, p: Profile, hist=None, usual: float | None = None, mode: str = 
             za = v0 if i == 0 else max(zlo, v0)
             zb = (v1 - 1) if i == len(p.zones.bounds) - 1 else min(zhi + 1, v1 - 1)
             area(za, zb, f"hc z{i + 1}")
-            area(max(za, band_lo), min(zb, c + 1), f"hc in z{i + 1}")
         line = " ".join(f"{'M' if v == v0 else 'L'}{X(v):.1f},{Y(v):.1f}" for v in range(v0, v1))
         o.append(f'<path class="hl" d="{line}"/>')
         o.append(f'<text class="small" x="{R0}" y="{B + 18}">where you trained, last 4 weeks</text>')
         o.append(f'<text class="small" x="{L0}" y="{B + 18}">your zones</text>')
 
     # today's range: one outline across both sides, so a zone never looks like two
-    o.append(f'<rect class="xout" x="0.75" y="{yt:.1f}" width="{W - 1.5}" height="{yb - yt:.1f}" rx="8"/>')
+
+    # today's range: a black bracket on the spine, nothing else, so every zone keeps one color
+    o.append(f'<rect class="tbar" x="{L1 + 5}" y="{yt:.1f}" width="5" height="{yb - yt:.1f}" rx="2.5"/>')
 
     # today's label, right side of the band
     mid = (yt + yb) / 2

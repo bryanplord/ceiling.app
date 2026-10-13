@@ -730,7 +730,8 @@ def choose_activity(verdict: str, p: Profile, day: str) -> tuple[str, str | None
     band = _band(verdict, p)
 
     if verdict == HARD or not band or not stats:
-        main = max(stats, key=lambda k: stats[k]["n"]) if stats else None
+        pool = {k: v for k, v in stats.items() if SPORT_OF.get(k) != WALK} or stats
+        main = max(pool, key=lambda k: pool[k]["n"]) if pool else None
         return (SPORT_OF.get(main, BIKE), main,
                 "Do the hard efforts on a steady climb or a flat road where you control the effort. "
                 "Technical trail breaks intervals into spikes and rests.", None)
