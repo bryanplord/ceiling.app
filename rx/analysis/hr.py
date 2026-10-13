@@ -206,8 +206,8 @@ class Zones:
         return next(lo for n, lo, hi in self.bounds if n == name)
 
 
-# What people see. Easy = well under your aerobic threshold; Steady = up to it.
-ZONE_LABEL = {"Z1 Recovery": "Easy", "Z2 Aerobic": "Steady", "Z3 Tempo": "Tempo",
+# What people see: the standard five-zone names.
+ZONE_LABEL = {"Z1 Recovery": "Recovery", "Z2 Aerobic": "Aerobic", "Z3 Tempo": "Tempo",
               "Z4 Threshold": "Threshold", "Z5 Max": "Max"}
 
 
