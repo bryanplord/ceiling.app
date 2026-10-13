@@ -56,6 +56,7 @@ class Rx:
     notes: list[str] = field(default_factory=list)
     reading: Reading | None = None
     skip_short: str = ""
+    example: str = ""
     overdo_short: str = ""
 
 
@@ -157,7 +158,10 @@ def build_rx(p: Profile, day: str | None = None) -> Rx:
 
     z = p.zones
     steps: list[str] = []
-    verb = {BIKE: "Ride", RUN: "Run", SKI: "Skin", WALK: "Walk"}.get(sport, LABEL[sport])
+    kind = usual_kind(p, sport)
+    verb = {"mountain bike": "Mountain bike", "road ride": "Road ride", "gravel ride": "Gravel ride",
+            "trail run": "Trail run", "ski tour": "Skin"}.get(kind or "", None) or \
+        {BIKE: "Ride", RUN: "Run", SKI: "Skin", WALK: "Walk"}.get(sport, LABEL[sport])
     if verdict in (REST, LIGHT):
         ceiling = z.top("Z1 Recovery")
         low = None
@@ -200,6 +204,7 @@ def build_rx(p: Profile, day: str | None = None) -> Rx:
         else "Normal bedtime. Aim for 8 hours in bed."
     rx = Rx(day, verdict, HEADLINE[verdict], why[:3], do, dont, tonight, sport,
             low, ceiling, mins, steps, recovery=rec, reading=reading)
+    rx.example = example_ride(p, sport, verdict, mins, ceiling)
     rx.scenarios = scenarios(p, rx)
     rx.if_skip, rx.if_overdo = consequences(p, rx)
     rx.compress, rx.stretch = flex(p, rx)
@@ -372,3 +377,53 @@ def consequences(p: Profile, rx: Rx) -> tuple[str | None, str | None]:
 def _assume_green(s):
     from ..analysis.recovery import Signal
     return Signal(s.name, GREEN, s.today, s.baseline, "assumed normal")
+
+
+SUBTYPE = {"MountainBikeRide": "mountain bike", "EMountainBikeRide": "mountain bike", "mountain_biking": "mountain bike",
+           "Ride": "road ride", "road_biking": "road ride", "GravelRide": "gravel ride", "gravel_cycling": "gravel ride",
+           "VirtualRide": "trainer ride", "Run": "run", "TrailRun": "trail run", "trail_running": "trail run",
+           "BackcountrySki": "ski tour", "backcountry_skiing": "ski tour", "NordicSki": "nordic ski",
+           "Hike": "hike", "Walk": "walk"}
+
+
+def usual_kind(p: Profile, sport: str) -> str | None:
+    """What this athlete actually does in this sport lately: MTB vs road, trail vs road run."""
+    cutoff = (date.fromisoformat(p.as_of) - timedelta(days=60)).isoformat()
+    kinds = [SUBTYPE.get(a.raw_type or "") for a in p.activities if a.sport == sport and a.date >= cutoff]
+    kinds = [k for k in kinds if k]
+    return max(set(kinds), key=kinds.count) if kinds else None
+
+
+def example_ride(p: Profile, sport: str, verdict: str, mins: int, ceiling: int | None) -> str:
+    """Point at a real ride from your history that fits today, and say how today differs."""
+    if verdict in (REST, LIGHT) or ceiling is None:
+        return ""
+    kind = usual_kind(p, sport)
+    cutoff = (date.fromisoformat(p.as_of) - timedelta(days=180)).isoformat()
+    pool = [a for a in p.activities if a.sport == sport and a.date >= cutoff and a.date < p.as_of
+            and a.moving_s and 0.7 * mins <= a.moving_s / 60 <= 1.3 * mins
+            and (kind is None or SUBTYPE.get(a.raw_type or "") == kind)]
+    if not pool:
+        return ""
+    names = [a.name for a in pool if a.name]
+    usual = max(set(names), key=names.count) if names else None
+    group = [a for a in pool if a.name == usual] if usual and names.count(usual) >= 2 else pool
+    pick = (max(group, key=lambda a: a.elev_m or 0) if verdict == HARD
+            else min(group, key=lambda a: a.avg_hr or 999))
+    h, m = divmod(round(pick.moving_s / 60), 60)
+    dur = f"{h}h {m:02d}m" if h else f"{m} min"
+    climb = f", {round(pick.elev_m * 3.281 / 50) * 50:,} ft of climbing" if pick.elev_m else ""
+    when = date.fromisoformat(pick.date).strftime("%b %-d")
+    label = pick.name or f"{kind or LABEL[sport].lower()} on {when}"
+    lead = f"Your usual {label}" if usual and pick.name == usual and names.count(usual) >= 2 else f"Something like your {label} ({when})"
+    s = f"{lead} works: {dur}{climb}."
+    if pick.avg_hr and verdict in (EASY, STEADY):
+        diff = round(pick.avg_hr - ceiling)
+        if diff > 2:
+            s += (f" You averaged {pick.avg_hr:.0f} that day. Today the same route sits {diff}+ beats lower, "
+                  f"so climb slower than you want to.")
+        else:
+            s += f" You averaged {pick.avg_hr:.0f} that day, right where today should be."
+    if verdict in (EASY, STEADY):
+        s += " Bring a friend: if you can't hold a conversation on the climbs, you're going too hard."
+    return s

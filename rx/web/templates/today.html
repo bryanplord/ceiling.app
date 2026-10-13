@@ -24,17 +24,22 @@
   .rxl.over .rxk { color:var(--ceiling); }
   .rxl .steps { margin:0; font-size:18px; }
   .room { width:100%; max-width:420px; display:block; margin-left:auto; overflow:visible; font-family:var(--face); }
-  .room .z0 { fill:var(--frost); } .room .z1 { fill:var(--frost2); }
-  .room .zl { fill:var(--lichen); font-size:13px; }
+  .room .zf { opacity:.16; } .room .zon { opacity:.95; }
+  .room .z1 { fill:var(--z1); } .room .z2 { fill:var(--z2); } .room .z3 { fill:var(--z3); }
+  .room .z4 { fill:var(--z4); } .room .z5 { fill:var(--z5); }
+  .room .zn { fill:var(--lichen); font-size:16px; font-weight:650; }
+  .room .zd { fill:var(--lichen); font-size:13px; }
+  .room .zn.on, .room .zd.on { fill:#0d1114; }
+  .room .avgl { stroke:#0d1114; stroke-width:2; stroke-dasharray:6 4; }
   .room .tick { fill:var(--lichen); font-size:14px; font-variant-numeric:tabular-nums; }
-  .room .band { fill:var(--ink); }
-  .room .avg { fill:var(--snow); opacity:.9; }
   .room .side { fill:var(--lichen); font-size:16px; font-variant-numeric:tabular-nums; }
   .room .side.strong { fill:var(--ink); font-weight:650; }
   .room .lol { stroke:var(--lichen); stroke-width:1.5; }
   .room .maxl { stroke:var(--lichen); stroke-width:1.5; stroke-dasharray:3 5; }
   .room .ceil { fill:var(--ceiling); }
   .room .cnum { fill:var(--ceiling); font-size:72px; font-weight:850; font-stretch:68%; font-variant-numeric:tabular-nums; }
+  .roomh { font-size:22px; font-weight:750; margin:0 0 2px; text-align:right; }
+  .roomsub { color:var(--lichen); font-size:15px; margin:0 0 10px; text-align:right; }
   .roomcap { text-align:right; color:var(--lichen); font-size:15px; margin:6px 0 0; }
   .roomcap b { color:var(--ceiling); font-weight:650; }
 
@@ -121,7 +126,7 @@
   @media (max-width: 900px) {
     .hero { grid-template-columns:1fr; gap:36px; padding:12px 0 48px; }
     .room { margin:0; max-width:380px; }
-    .roomcap { text-align:left; }
+    .roomcap, .roomh, .roomsub { text-align:left; }
     .split, .trade, .next, .twocol { grid-template-columns:1fr; gap:36px; }
     .hist .lbl, .hist .tick { font-size:30px; } .hist .lbl.strong { font-size:34px; }
     .hist .hline { stroke-width:4; }
@@ -149,6 +154,7 @@
       <div class="rxl"><span class="rxk">Do</span>
         <p class="rxv strong">{{ rx.do }}</p></div>
       {% if rx.steps %}<div class="rxl"><span class="rxk"></span><ol class="steps">{% for s in rx.steps %}<li>{{ s }}</li>{% endfor %}</ol></div>{% endif %}
+      {% if rx.example %}<div class="rxl"><span class="rxk">Where</span><p class="rxv">{{ rx.example }}</p></div>{% endif %}
       <div class="rxl"><span class="rxk">Don't</span><p class="rxv">{{ rx.dont }}</p></div>
       {% if rx.reading %}<div class="rxl"><span class="rxk">Because</span>
         <p class="rxv"><b class="{{ rx.reading.tone }}">{{ rx.reading.title }}.</b> {{ rx.reading.says.split('. ')[0] }}.</p></div>{% endif %}
@@ -158,8 +164,10 @@
   </div>
   {% if room %}
   <div>
+    <p class="roomh">Your heart today</p>
+    <p class="roomsub">Your own zones, from your rides and runs. Today is the lit band.</p>
     {{ room | safe }}
-    <p class="roomcap">Today's range in black. <b>Never above {{ rx.hr_ceiling }}.</b>{% if rx.max_minutes %} {{ rx.max_minutes }} minutes max.{% endif %}</p>
+    <p class="roomcap">Stay in the lit band. <b>Never above {{ rx.hr_ceiling }}.</b>{% if rx.max_minutes %} {{ rx.max_minutes }} minutes max.{% endif %}</p>
   </div>
   {% endif %}
 </section>

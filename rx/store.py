@@ -70,6 +70,19 @@ class Activity:
     avg_hr: float | None = None
     max_hr: float | None = None
     device: str | None = None
+    elev_m: float | None = None      # climbing, from the source's summary (not a column)
+
+
+def _from_row(r) -> "Activity":
+    cols = [k for k in Activity.__dataclass_fields__.keys() if k != "elev_m"]
+    a = Activity(**{k: r[k] for k in cols})
+    try:
+        raw = json.loads(r["raw"]) if r["raw"] else {}
+        g = raw.get("total_elevation_gain") or raw.get("elevationGain")
+        a.elev_m = float(g) if g else None
+    except (ValueError, TypeError, KeyError):
+        pass
+    return a
 
 
 @dataclass
@@ -212,14 +225,13 @@ class Store:
             q += " WHERE date >= ?"
             args = (since,)
         q += " ORDER BY start_local, date"
-        cols = Activity.__dataclass_fields__.keys()
-        return [Activity(**{k: r[k] for k in cols}) for r in self.db.execute(q, args)]
+        return [_from_row(r) for r in self.db.execute(q, args)]
 
     def activity(self, activity_id: str) -> Activity | None:
         r = self._one("SELECT * FROM activities WHERE id=?", (activity_id,))
         if not r:
             return None
-        return Activity(**{k: r[k] for k in Activity.__dataclass_fields__.keys()})
+        return _from_row(r)
 
     def has_stream(self, activity_id: str) -> bool:
         return self._one("SELECT 1 FROM streams WHERE activity_id=?", (activity_id,)) is not None

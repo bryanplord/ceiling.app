@@ -349,47 +349,55 @@ def ceiling_band(rx: Rx, p: Profile) -> str:
 
 ZONE_SHORT = {"Z1 Recovery": "Recovery", "Z2 Aerobic": "Aerobic", "Z3 Tempo": "Tempo",
               "Z4 Threshold": "Threshold", "Z5 Max": "Max"}
+ZONE_FEEL = {"Z1 Recovery": "barely working", "Z2 Aerobic": "all day, full sentences",
+             "Z3 Tempo": "comfortably hard, short sentences", "Z4 Threshold": "hard, a few words",
+             "Z5 Max": "all out, no words"}
 
 
 def room(rx: Rx, p: Profile) -> str:
-    """Today's heart rate as a room: your zones as floors, today's band in ink,
-    and the ceiling drawn as the brand's orange line. Vertical, because a ceiling is above you."""
+    """Your heart today: your own zones in color, today's range lit, everything else
+    dimmed, and the ceiling drawn as the brand's orange line across the top."""
     if rx.hr_ceiling is None or not p.zones:
         return ""
     c = rx.hr_ceiling
     lo = rx.hr_low
-    top = int(p.max_bpm) + 4
-    floor = max(int(p.rest_hr) + 10, (lo if lo is not None else c - 30) - 22)
+    top = int(p.max_bpm) + 3
+    floor = max(int(p.rest_hr) + 10, (lo if lo is not None else c - 30) - 24)
     floor -= floor % 10
-    W, H, T, B = 400, 520, 34, 500          # T/B: y of top and bottom of the scale
-    X0, X1 = 58, 252                         # the column
+    W, H, T, B = 460, 560, 30, 540
+    X0, X1 = 52, 330
     Y = lambda v: B - (B - T) * (v - floor) / (top - floor)
     o = [f'<svg class="room" viewBox="0 0 {W} {H}" role="img" '
-         f'aria-label="Heart rate {lo if lo is not None else floor} to {c}. Never above {c}. Your max is {int(p.max_bpm)}.">']
-    # zones as floors
+         f'aria-label="Your heart today: {lo if lo is not None else floor} to {c}. Never above {c}. Your max is {int(p.max_bpm)}.">']
+    band_lo = lo if lo is not None else floor
     for i, (name, zlo, zhi) in enumerate(p.zones.bounds):
         a, b = max(zlo, floor), min(zhi + 1, top)
         if b <= a:
             continue
-        o.append(f'<rect class="z{i % 2}" x="{X0}" y="{Y(b):.1f}" width="{X1 - X0}" height="{Y(a) - Y(b):.1f}"/>')
-        o.append(f'<text class="zl" x="{X1 - 10}" y="{(Y(a) + Y(b)) / 2 + 5:.1f}" text-anchor="end">{ZONE_SHORT.get(name, name)}</text>')
-    # bpm ticks
+        o.append(f'<rect class="zf z{i + 1}" x="{X0}" y="{Y(b):.1f}" width="{X1 - X0}" height="{Y(a) - Y(b):.1f}"/>')
+        # today's slice of this zone, lit
+        la_, lb = max(a, band_lo), min(b, c + 1)
+        if lb > la_:
+            o.append(f'<rect class="zon z{i + 1}" x="{X0}" y="{Y(lb):.1f}" width="{X1 - X0}" height="{Y(la_) - Y(lb):.1f}"/>')
+        on = lb > la_
+        ym = (Y(a) + Y(b)) / 2
+        if Y(a) - Y(b) >= 34:
+            o.append(f'<text class="zn{" on" if on else ""}" x="{X0 + 14}" y="{ym - 2:.1f}">{ZONE_SHORT.get(name, name)}</text>')
+            o.append(f'<text class="zd{" on" if on else ""}" x="{X0 + 14}" y="{ym + 17:.1f}">{ZONE_FEEL.get(name, "")}</text>')
+        elif Y(a) - Y(b) >= 16:
+            o.append(f'<text class="zn{" on" if on else ""}" x="{X0 + 14}" y="{ym + 6:.1f}">{ZONE_SHORT.get(name, name)}</text>')
     for v in range(floor, top + 1, 10):
-        o.append(f'<text class="tick" x="{X0 - 12}" y="{Y(v) + 5:.1f}" text-anchor="end">{v}</text>')
-    # max
+        o.append(f'<text class="tick" x="{X0 - 10}" y="{Y(v) + 5:.1f}" text-anchor="end">{v}</text>')
     mx = int(p.max_bpm)
     o.append(f'<line class="maxl" x1="{X0}" x2="{W}" y1="{Y(mx):.1f}" y2="{Y(mx):.1f}"/>')
-    o.append(f'<text class="side" x="{X1 + 14}" y="{Y(mx) - 8:.1f}">your max {mx}</text>')
-    # today's band
+    o.append(f'<text class="side" x="{W}" y="{Y(mx) - 8:.1f}" text-anchor="end">your max {mx}</text>')
     if lo is not None:
-        o.append(f'<rect class="band" x="{X0}" y="{Y(c):.1f}" width="{X1 - X0}" height="{Y(lo) - Y(c):.1f}"/>')
         avg = round((lo + c) / 2)
-        o.append(f'<rect class="avg" x="{X0}" y="{Y(avg) - 1.5:.1f}" width="{X1 - X0}" height="3"/>')
-        o.append(f'<text class="side strong" x="{X1 + 14}" y="{Y(avg) + 6:.1f}">avg {avg}</text>')
+        o.append(f'<line class="avgl" x1="{X1 - 70}" x2="{X1 + 8}" y1="{Y(avg):.1f}" y2="{Y(avg):.1f}"/>')
+        o.append(f'<text class="side strong" x="{X1 + 14}" y="{Y(avg) + 6:.1f}">aim {avg}</text>')
         o.append(f'<text class="side" x="{X1 + 14}" y="{Y(lo) + 6:.1f}">{lo}</text>')
         o.append(f'<line class="lol" x1="{X1}" x2="{X1 + 8}" y1="{Y(lo):.1f}" y2="{Y(lo):.1f}"/>')
-    # the ceiling
-    o.append(f'<rect class="ceil" x="{X0 - 6}" y="{Y(c) - 3.5:.1f}" width="{W - X0 + 6}" height="7" rx="3.5"/>')
+    o.append(f'<rect class="ceil" x="{X0 - 6}" y="{Y(c) - 4:.1f}" width="{W - X0 + 6}" height="8" rx="4"/>')
     o.append(f'<text class="cnum" x="{W}" y="{Y(c) - 16:.1f}" text-anchor="end">{c}</text>')
     o.append("</svg>")
     return "".join(o)
