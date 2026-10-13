@@ -121,3 +121,29 @@ def sync(client: IntervalsClient, store: Store, days: int = 365,
         log(f"  {cur} → {end}: {counts}")
         cur = end + timedelta(days=1)
     return counts
+
+
+def has_power(raw: dict) -> bool:
+    return bool(raw.get("device_watts") or raw.get("icu_average_watts") or raw.get("average_watts")
+                or raw.get("icu_weighted_avg_watts"))
+
+
+def backfill_power(client: IntervalsClient, store: Store, limit: int = 80, log=print) -> int:
+    """Fetch power streams for rides that have power, newest first, a batch per run."""
+    n = 0
+    for a in sorted(store.activities(), key=lambda a: a.date, reverse=True):
+        if n >= limit:
+            break
+        if a.sport != "bike" or not a.id.startswith("icu:") or store.has_power(a.id):
+            continue
+        raw = store.raw(a.id)
+        if not has_power(raw):
+            continue
+        st = client.streams(a.id[4:], types=("time", "watts"))
+        w = st.get("watts") or []
+        t = st.get("time") or list(range(len(w)))
+        store.upsert_power(a.id, t if w else [], w)
+        n += 1
+    if n:
+        log(f"  power streams: {n}")
+    return n

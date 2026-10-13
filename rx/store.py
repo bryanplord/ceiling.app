@@ -34,6 +34,12 @@ CREATE TABLE IF NOT EXISTS streams (
     speed       TEXT                   -- JSON array, m/s, or null
 );
 
+CREATE TABLE IF NOT EXISTS power (
+    activity_id TEXT PRIMARY KEY,
+    time        TEXT NOT NULL,         -- JSON array, seconds
+    watts       TEXT NOT NULL          -- JSON array; [] means "checked, none"
+);
+
 CREATE TABLE IF NOT EXISTS wellness (
     date        TEXT NOT NULL,
     source      TEXT NOT NULL,
@@ -242,6 +248,28 @@ class Store:
             return None
         return (json.loads(r["time"]), json.loads(r["hr"]),
                 json.loads(r["cadence"]) if r["cadence"] else None)
+
+    def upsert_power(self, activity_id: str, time: list, watts: list) -> None:
+        self.db.execute("INSERT OR REPLACE INTO power (activity_id, time, watts) VALUES (?,?,?)",
+                        (activity_id, json.dumps(time), json.dumps(watts)))
+        self.db.commit()
+
+    def has_power(self, activity_id: str) -> bool:
+        return self._one("SELECT 1 FROM power WHERE activity_id=?", (activity_id,)) is not None
+
+    def power(self, activity_id: str) -> tuple[list, list] | None:
+        r = self._one("SELECT time, watts FROM power WHERE activity_id=?", (activity_id,))
+        if not r:
+            return None
+        w = json.loads(r["watts"])
+        return (json.loads(r["time"]), w) if w else None
+
+    def raw(self, activity_id: str) -> dict:
+        r = self._one("SELECT raw FROM activities WHERE id=?", (activity_id,))
+        try:
+            return json.loads(r["raw"]) if r and r["raw"] else {}
+        except ValueError:
+            return {}
 
     def get_meta(self, key: str) -> str | None:
         r = self._one("SELECT value FROM meta WHERE key=?", (key,))

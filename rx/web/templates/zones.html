@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block head %}
+<style>
+  main.narrow { max-width:1100px; }
+  .zh1 { font-size:clamp(56px, 9vw, 120px); margin:24px 0 20px; }
+  .zverdict { font-size:clamp(22px, 2.6vw, 30px); line-height:1.3; font-weight:600; max-width:34ch; margin:0 0 8px; text-wrap:pretty; }
+  .zsec { border-top:1px solid var(--rule); padding:48px 0 56px; margin-top:40px; }
+  .zsec h2 { color:var(--ink); font-size:26px; font-weight:750; margin:0 0 6px; }
+  .basis { color:var(--lichen); font-size:15px; margin:0 0 28px; max-width:70ch; }
+  .key { display:flex; gap:22px; flex-wrap:wrap; color:var(--lichen); font-size:14px; margin:0 0 18px; }
+  .key i { display:inline-block; width:22px; height:10px; border-radius:3px; margin-right:8px; vertical-align:0; }
+  .key .kn { background:var(--lichen); } .key .kt { border:2px dashed var(--lichen); height:12px; }
+  .zrow { display:grid; grid-template-columns:220px 1fr 150px; gap:24px; align-items:center;
+          padding:16px 0; border-bottom:1px solid var(--rule); }
+  .zrow:last-of-type { border-bottom:0; }
+  .zl b { display:block; font-size:18px; }
+  .zl span { color:var(--lichen); font-size:14px; }
+  .zbars { display:grid; gap:6px; justify-items:start; }
+  .zb { height:18px; border-radius:4px; min-width:3px; }
+  .zb.t { background:transparent !important; border:2px dashed; height:14px; }
+  .c1 { background:var(--z1); border-color:var(--z1); } .c2 { background:var(--z2); border-color:var(--z2); }
+  .c3 { background:var(--z3); border-color:var(--z3); } .c4 { background:var(--z4); border-color:var(--z4); }
+  .c5 { background:var(--z5); border-color:var(--z5); } .c6 { background:#9b2c6f; border-color:#9b2c6f; }
+  .zn { text-align:right; font-variant-numeric:tabular-nums; }
+  .zn b { font-size:22px; font-weight:800; font-stretch:72%; }
+  .zn span { color:var(--lichen); font-size:15px; }
+  .zn em { display:block; font-style:normal; font-size:14px; font-weight:650; }
+  .more { color:var(--good); } .less { color:var(--bad); } .same { color:var(--lichen); }
+  .how { margin-top:36px; display:grid; grid-template-columns:220px 1fr; gap:24px; }
+  .how h3 { margin:4px 0 0; font-size:18px; }
+  .how ol { margin:0; padding-left:22px; font-size:18px; line-height:1.5; max-width:62ch; }
+  .how li { margin:0 0 12px; }
+  .trendwrap { margin-top:40px; }
+  .trendwrap h3 { font-size:18px; margin:0 0 4px; }
+  .trendwrap p { color:var(--lichen); margin:0 0 14px; font-size:15px; }
+  .trend { display:block; width:100%; height:auto; font-family:var(--face); overflow:visible; }
+  .trend .z1 { fill:var(--z1); } .trend .z2 { fill:var(--z2); } .trend .z3 { fill:var(--z3); }
+  .trend .z4 { fill:var(--z4); } .trend .z5 { fill:var(--z5); } .trend .z6 { fill:#9b2c6f; }
+  .trend .empty { fill:var(--frost); }
+  .trend .tk { fill:var(--lichen); font-size:13px; } .trend .hrs { fill:var(--ink); font-size:13px; font-weight:650; }
+  .trend .target { stroke:var(--ink); stroke-width:2; stroke-dasharray:7 5; }
+  .trend .tl { fill:var(--ink); font-size:14px; font-weight:650; }
+  .nopower { color:var(--lichen); font-size:18px; max-width:60ch; }
+  @media (max-width: 760px) {
+    .zrow { grid-template-columns:1fr auto; gap:8px 16px; }
+    .zrow .zbars { grid-column:1 / -1; grid-row:2; }
+    .how { grid-template-columns:1fr; gap:12px; }
+    .trend .tk, .trend .hrs { font-size:26px; } .trend .tl { font-size:26px; }
+  }
+</style>
+{% endblock %}
+{% block body %}
+<h1 class="zh1">Where your time goes.</h1>
+{% if hr %}<p class="zverdict">{{ hr.verdict }}</p>
+<p class="muted">Last 4 weeks, {{ '%.1f' % hr.weekly_h }} hours a week with heart rate.</p>{% endif %}
+
+{% macro block(d, title) %}
+<section class="zsec">
+  <h2>{{ title }}</h2>
+  <p class="basis">{{ d.basis }}</p>
+  <p class="key"><span><i class="kn"></i>You, last 4 weeks</span><span><i class="kt"></i>Where it should be, same hours</span></p>
+  {% set top = (d.rows | map(attribute='now_h') | list + d.rows | map(attribute='target_h') | list) | max %}
+  {% for r in d.rows %}
+  {% set gap = r.target_h - r.now_h %}
+  <div class="zrow">
+    <div class="zl"><b>{{ r.name }}</b><span>{{ r.range }}{% if d.kind == 'hr' %} bpm{% endif %}, {{ r.feel }}</span></div>
+    <div class="zbars">
+      <div class="zb c{{ r.color }}" style="width: {{ (100 * r.now_h / top) | round(1) }}%"></div>
+      <div class="zb t c{{ r.color }}" style="width: {{ (100 * r.target_h / top) | round(1) }}%"></div>
+    </div>
+    <div class="zn"><b>{{ '%.1f' % r.now_h }}h</b> <span>→ {{ '%.1f' % r.target_h }}h</span>
+      <em class="{{ 'more' if gap >= 0.3 else 'less' if gap <= -0.3 else 'same' }}">{{ ('Add %.1fh' % gap) if gap >= 0.3 else ('Cut %.1fh' % -gap) if gap <= -0.3 else 'On target' }}</em></div>
+  </div>
+  {% endfor %}
+  <div class="how">
+    <h3>How to get there</h3>
+    <ol>{% for m in d.moves %}<li>{{ m }}</li>{% endfor %}</ol>
+  </div>
+  <div class="trendwrap">
+    <h3>The trend, week by week</h3>
+    <p>Each column is a week, split by zone; the number on top is hours. Blue and green should reach the dashed line ({{ 'about 80%' if d.kind == 'hr' else 'about 75%' }} easy), and most of that should be green.</p>
+    {{ trend(d) | safe }}
+  </div>
+</section>
+{% endmacro %}
+
+{% if hr %}{{ block(hr, "Heart rate") }}{% else %}<p class="nopower">Your heart-rate zones aren't built yet. Sync more history.</p>{% endif %}
+{% if pw %}{{ block(pw, "Power") }}
+{% else %}
+<section class="zsec"><h2>Power</h2>
+<p class="nopower">No power data yet. Ceiling is pulling power from your rides that have a power meter, a batch each hour. If your bikes don't have one, heart rate covers it, and power zones will appear here when it does.</p></section>
+{% endif %}
+{% endblock %}

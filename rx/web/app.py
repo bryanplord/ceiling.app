@@ -99,6 +99,10 @@ def _refresh_in_background() -> None:
             client = intervals.IntervalsClient(key, os.getenv("INTERVALS_ATHLETE_ID", "0"))
             intervals.sync(client, store, days=days,
                            log=lambda msg: store.set_meta("sync_progress", str(msg).strip()))
+            try:
+                intervals.backfill_power(client, store, log=lambda msg: store.set_meta("sync_progress", str(msg).strip()))
+            except Exception as e:
+                print(f"power backfill failed: {e}")
             store.set_meta("last_sync", str(time.time()))
             after = store.counts()
             if after["activities"] or after["wellness"]:
@@ -185,6 +189,16 @@ def today(request: Request, d: str | None = None):
                  spark=dashboard.spark, room=dashboard.room(rx, p),
                  st=st, hist=storymod.history_chart(st),
                  day_label=when.strftime("%A, %B %-d"))
+
+
+@app.get("/zones", response_class=HTMLResponse)
+def zones(request: Request):
+    from ..analysis import distribution as dist
+    store = open_store()
+    p, rx = today_rx(store)
+    hr = cached(store, "hrdist", rx.date, lambda: dist.hr_distribution(store, p))
+    pw = cached(store, "pwdist", rx.date, lambda: dist.power_distribution(store, p))
+    return _page(request, "zones.html", hr=hr, pw=pw, trend=dist.trend_chart)
 
 
 @app.get("/yesterday", response_class=HTMLResponse)
