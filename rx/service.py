@@ -55,8 +55,30 @@ _built: dict = {}
 _build_lock = threading.RLock()
 
 
+_ver_cache: dict = {}
+
+
+def bust(store: Store | None = None) -> None:
+    """Forget the remembered data version (after a sync, a check-in or a goal change)."""
+    if store is None:
+        _ver_cache.clear()
+    else:
+        _ver_cache.pop(store.owner, None)
+
+
 def data_version(store: Store) -> tuple:
-    """Changes whenever a sync brings anything in; cheap to read."""
+    """Changes whenever a sync brings anything in. Every cached page is keyed on it, so it's
+    read many times per request: remembered for 20 seconds rather than queried each time."""
+    import time as _t
+    hit = _ver_cache.get(store.owner)
+    if hit and _t.time() - hit[0] < 20:
+        return hit[1]
+    v = _data_version(store)
+    _ver_cache[store.owner] = (_t.time(), v)
+    return v
+
+
+def _data_version(store: Store) -> tuple:
     c = store.counts()
     # Fingerprint of what the pages are built from, NOT the time of the last sync: the morning
     # pull runs every 10 minutes and must not throw away every cached page when nothing changed.

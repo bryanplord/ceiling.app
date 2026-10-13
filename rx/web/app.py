@@ -18,7 +18,7 @@ from .. import dashboard, story as storymod
 from ..analysis import sleep as sleepmod
 from ..analysis import distribution as dist
 from .. import profile as prof
-from ..service import today_after, current_owner, owner_of, cached, peek, plan_history, plan_with_changes, open_store, profile_for, recovery_history, scored_day, today_rx
+from ..service import bust, today_after, current_owner, owner_of, cached, peek, plan_history, plan_with_changes, open_store, profile_for, recovery_history, scored_day, today_rx
 from ..clock import local_today
 from . import auth
 
@@ -215,6 +215,7 @@ def _refresh_in_background(force: bool = False, owner: str | None = None) -> Non
                 store.set_meta("sync_state", "ok, but intervals.icu returned no activities or wellness")
                 store.set_meta("last_sync", "0")   # try again on the next visit
             store.sync()
+            bust(store)
             _warm(store)
         except Exception as e:  # never take the site down over a sync
             print(f"sync failed: {e}")
@@ -237,16 +238,29 @@ def _warm(store=None) -> None:
         cached(store, "dash", rx.date, lambda: dashboard.build(store, p, rx))
         cached(store, "story", rx.date, lambda: storymod.build(store, p))
         cached(store, "planx", rx.date, lambda: plan_with_changes(store))
-        cached(store, "planhist", rx.date, lambda: plan_history(store))
-        from .. import workouts as wk
+        from .. import workouts as wk, motivation as mv, history as histmod, journal as jr
         cached(store, "workouts", rx.date, lambda: wk.build(store))
+        cached(store, "motivation", rx.date, lambda: mv.build(p, rx, store))
+        cached(store, "calls", rx.date, lambda: mv.calls(p, store, rx.date))
+        cached(store, "patterns", rx.date, lambda: jr.patterns(store, p.wellness))
+        cached(store, "hrhist", rx.date, lambda: dist.hr_histogram(store, p))
+        ym = rx.date[:7]
+        cached(store, f"month:{ym}", rx.date, lambda: histmod.month(p, ym, rx.date, _live_rx(store, ym)))
     except Exception as e:
         print(f"warm failed: {e}")
 
 
 @app.on_event("startup")
 def _startup() -> None:
-    threading.Thread(target=_warm, daemon=True).start()
+    def all_():
+        for o in _all_owners():
+            try:
+                st = open_store(o)
+                if st.counts()["activities"]:
+                    _warm(st)
+            except Exception as e:
+                print(f"warm {o or 'primary'} failed: {e}")
+    threading.Thread(target=all_, daemon=True).start()
 
 
 @app.post("/sync")
@@ -378,6 +392,7 @@ async def plan_goal_save(request: Request):
         g.start_weight = num(f.get("w_now")) or g.start_weight
         g.target_weight = num(f.get("w_target")) or g.target_weight
     gl.save(open_store(), g)
+    bust(open_store())
     return RedirectResponse("/plan", status_code=303)
 
 
@@ -385,7 +400,20 @@ async def plan_goal_save(request: Request):
 def plan_goal_clear():
     from .. import goals as gl
     gl.clear(open_store())
+    bust(open_store())
     return RedirectResponse("/plan", status_code=303)
+
+
+def _live_rx(store, ym: str) -> dict:
+    """The prescriptions Ceiling actually gave each morning of a month (saved from today on)."""
+    import json as _json
+    out = {}
+    for r in store.db.execute("SELECT key, value FROM meta WHERE key LIKE ?", (f"rx:{ym}-%",)):
+        try:
+            out[r["key"][3:]] = tuple(_json.loads(r["value"]))
+        except Exception:
+            pass
+    return out
 
 
 @app.get("/calendar/history", response_class=HTMLResponse)
@@ -394,17 +422,7 @@ def history_page(request: Request, m: str | None = None):
     store = open_store()
     p, rx = today_rx(store)
     ym = m if (m and len(m) == 7) else rx.date[:7]
-    def live():
-        import json as _json
-        out = {}
-        y_, m_ = map(int, ym.split("-"))
-        for dd in range(1, 32):
-            k = f"{ym}-{dd:02d}"
-            v = store.get_meta(f"rx:{k}")
-            if v:
-                out[k] = tuple(_json.loads(v))
-        return out
-    mon = cached(store, f"month:{ym}", rx.date, lambda: histmod.month(p, ym, rx.date, live()))
+    mon = cached(store, f"month:{ym}", rx.date, lambda: histmod.month(p, ym, rx.date, _live_rx(store, ym)))
     return _page(request, "history.html", mon=mon, active="calendar")
 
 
@@ -414,9 +432,7 @@ def plan_page(request: Request):
     store = open_store()
     p, rx = today_rx(store)
     pl, changed = cached(store, "planx", rx.date, lambda: plan_with_changes(store))
-    hist = peek(store, "planhist", rx.date)
-    if hist is None:
-        threading.Thread(target=lambda: cached(store, "planhist", rx.date, lambda: plan_history(store)), daemon=True).start()
+    hist = None
     email = auth.verify("session", request.cookies.get(auth.COOKIE)) if auth.enabled() else None
     feed = None
     if email:
