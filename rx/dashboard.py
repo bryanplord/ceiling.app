@@ -438,11 +438,12 @@ def room(rx: Rx, p: Profile, hist=None, usual: float | None = None, mode: str = 
     o.append(f'<text class="reft" x="{W}" y="{Y(rest) - 6:.1f}" text-anchor="end">resting</text>')
 
     # SLIDER: a track from resting to max, and today's range as the fixed thumb
-    o.append(f'<rect class="track" x="{SC - 4}" y="{Y(mx):.1f}" width="8" height="{Y(rest) - Y(mx):.1f}" rx="4"/>')
-    o.append(f'<rect class="thumb" x="{SC - 14}" y="{yt:.1f}" width="28" height="{yb - yt:.1f}" rx="14"/>')
+    o.append(f'<rect class="track" x="{SC - 3}" y="{Y(mx):.1f}" width="6" height="{Y(rest) - Y(mx):.1f}"/>')
+    zi = zone_of(round((band_lo + c) / 2))
+    o.append(f'<rect class="thumb z{zi}" x="{SC - 24}" y="{yt:.1f}" width="48" height="{yb - yt:.1f}"/>')
+    o.append(f'<text class="bnum" x="{SC}" y="{yt + 16:.1f}" text-anchor="middle">{c}</text>')
     if lo is not None:
-        ym = Y(round((band_lo + c) / 2))
-        o.append(f'<line class="notch" x1="{SC - 7}" x2="{SC + 7}" y1="{ym:.1f}" y2="{ym:.1f}"/>')
+        o.append(f'<text class="bnum" x="{SC}" y="{yb - 7:.1f}" text-anchor="middle">{band_lo}</text>')
 
     # RIGHT: where you trained, a smooth curve colored by zone, full color inside today's band
     if hist is not None and hist.sum() > 0:
