@@ -40,6 +40,14 @@
   .tmr .t-bad { border-left-color:var(--ceiling); } .tmr .t-bad dt { color:var(--ceiling); }
   .tmr .t-muted dt { color:var(--lichen); }
   .rxl .steps { margin:0; font-size:18px; }
+  .more { margin-top:8px; }
+  .more summary { cursor:pointer; font-size:15px; font-weight:600; color:var(--lichen); list-style:none; display:inline-flex; gap:6px; align-items:center; }
+  .more summary::-webkit-details-marker { display:none; }
+  .more summary::after { content:"+"; font-weight:500; }
+  .more[open] summary::after { content:"–"; }
+  .more summary:hover { color:var(--ink); }
+  .more > :not(summary) { margin-top:12px; }
+  .whyhead.rest { color:var(--ink); }
   .diag { font-size:clamp(22px, 2.4vw, 28px); line-height:1.3; font-weight:600; letter-spacing:-0.01em;
           margin:28px 0 0; max-width:34ch; text-wrap:pretty; }
   .actwhy { margin:10px 0 0; font-size:17px; line-height:1.45; color:var(--lichen); max-width:52ch; }
@@ -199,17 +207,22 @@
     <div class="pad">
       <div class="rxl"><span class="rxk">What</span>
         <div class="rxv"><p class="rxv strong">{{ rx.what or rx.do }}</p>
-        {% if rx.activity_why %}<p class="actwhy">{{ rx.activity_why }}</p>{% endif %}</div></div>
+        {% if rx.activity_why %}<details class="more"><summary>Why this activity</summary><p class="actwhy">{{ rx.activity_why }}</p></details>{% endif %}</div></div>
       <div class="rxl"><span class="rxk">How</span>
-        <ul class="rxlist">{% for h in rx.how %}<li>{{ h }}</li>{% endfor %}</ul></div>
-      {% if rx.reading %}<div class="rxl"><span class="rxk">Why</span>
-        <div class="rxv"><p class="whyhead"><b class="{{ rx.why_tone }}">{{ rx.why_title }}.</b> {{ rx.why_says }}</p>
+        <div class="rxv"><p class="rxv">{{ rx.how_short }}</p>
+        {% if rx.how_more %}<details class="more"><summary>More</summary><ul class="rxlist">{% for h in rx.how_more %}<li>{{ h }}</li>{% endfor %}</ul></details>{% endif %}</div></div>
+      {% if rx.reading %}{% set ws = rx.why_says.split('. ') %}<div class="rxl"><span class="rxk">Why</span>
+        <div class="rxv"><p class="whyhead"><b class="{{ rx.why_tone }}">{{ rx.why_title }}.</b> {{ ws[0].rstrip('.') }}.</p>
+          <details class="more"><summary>More</summary>{% if ws|length > 1 %}<p class="whyhead rest">{{ ws[1:]|join('. ') }}</p>{% endif %}
           <ul class="rxlist facts">{% for e in rx.reading.evidence[:4] %}<li><b>{{ e.name }}</b> {{ e.line.split('. ')[0].rstrip('.') }}.</li>{% endfor %}
-          {% if rx.sleep and rx.sleep.state not in ('even', 'unknown', 'surplus') %}{% set sd = rx.sleep.says.split('. ')[0].rstrip('.') %}<li><b>Sleep debt</b> {{ sd[:1] | upper }}{{ sd[1:] }}.</li>{% endif %}</ul></div></div>{% endif %}
-      {% if rx.minimum %}<div class="rxl"><span class="rxk">Minimum</span><p class="rxv">{{ rx.minimum }}</p></div>{% endif %}
+          {% if rx.sleep and rx.sleep.state not in ('even', 'unknown', 'surplus') %}{% set sd = rx.sleep.says.split('. ')[0].rstrip('.') %}<li><b>Sleep debt</b> {{ sd[:1] | upper }}{{ sd[1:] }}.</li>{% endif %}</ul></details></div></div>{% endif %}
+      {% if rx.minimum %}{% set ms = rx.minimum.split('. ') %}<div class="rxl"><span class="rxk">Minimum</span>
+        <div class="rxv"><p class="rxv">{{ ms[0].rstrip('.') }}.</p>
+        {% if ms|length > 1 %}<details class="more"><summary>More</summary><p class="actwhy">{{ ms[1:]|join('. ') }}</p></details>{% endif %}</div></div>{% endif %}
       {% if rx.tomorrow %}<div class="rxl"><span class="rxk">Tomorrow</span>
-        <div class="rxv"><dl class="tmr">{% for label, tone, text in rx.tomorrow %}<div class="t-{{ tone }}"><dt>{{ label }}</dt><dd>{{ text }}</dd></div>{% endfor %}</dl>
-        <p class="actwhy">Assumes a normal night. Re-read tomorrow morning with your sleep and HRV.</p></div></div>{% endif %}
+        <div class="rxv"><p class="rxv">{{ rx.tomorrow_short }}</p>
+        <details class="more"><summary>Full session, and if you overdo or skip today</summary><dl class="tmr">{% for label, tone, text in rx.tomorrow %}<div class="t-{{ tone }}"><dt>{{ label }}</dt><dd>{{ text }}</dd></div>{% endfor %}</dl>
+        <p class="actwhy">Assumes a normal night. Re-read tomorrow morning with your sleep and HRV.</p></details></div></div>{% endif %}
       {% if rx.sleep and rx.sleep.lights_out %}<div class="rxl"><span class="rxk">Tonight</span><p class="rxv">In bed by <b>{{ rx.sleep.lights_out }}</b> for {{ rx.sleep_if[0][0][9:] if rx.sleep_if else '' }} of sleep. Do that, and {{ rx.sleep_if[0][2] if rx.sleep_if }}.</p></div>{% endif %}
     </div>
   </div>

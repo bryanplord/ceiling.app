@@ -59,6 +59,9 @@ class Rx:
     skip_short: str = ""
     example: str = ""
     minimum: str = ""
+    tomorrow_short: str = ""
+    how_short: str = ""
+    how_more: list = field(default_factory=list)
     tomorrow: list = field(default_factory=list)   # (label, tone, text): as written / overdo / skip
     why_title: str = ""
     why_tone: str = "none"
@@ -244,6 +247,9 @@ def build_rx(p: Profile, day: str | None = None) -> Rx:
     rx.why_title, rx.why_tone, rx.why_says = why_lead(verdict, p, day, reading)
     rx.what, rx.how = what_how(rx, kind, mins, low, ceiling, steps)
     rx.minimum = minimum_dose(p, rx, kind)
+    key = next((i for i, h in enumerate(rx.how) if "×" in h), 0) if verdict == HARD else 0
+    rx.how_short = rx.how[key] if rx.how else rx.do
+    rx.how_more = [h for i, h in enumerate(rx.how) if i != key]
     rx.scenarios = scenarios(p, rx)
     rx.if_skip, rx.if_overdo = consequences(p, rx)
     rx.tomorrow = tomorrow_plan(p, rx, kind)
@@ -426,6 +432,31 @@ def _session(p: Profile, v: str, day: str | None = None) -> tuple[str, float]:
         except Exception:
             pass
     Noun = noun[:1].upper() + noun[1:]
+    txt, load = _session_full(p, v, z, Noun)
+    return txt, load
+
+
+def _session_short(p: Profile, v: str, day: str | None = None) -> str:
+    """One line: the kind of day, the activity, the numbers that matter."""
+    z = p.zones
+    noun = "session"
+    if day and v not in (REST, LIGHT):
+        try:
+            sport, kind, _, _ = choose_activity(v, p, day)
+            noun = NOUN.get(kind or "", None) or {BIKE: "ride", RUN: "run", SKI: "ski tour", WALK: "walk"}.get(sport, "session")
+        except Exception:
+            pass
+    if v == HARD:
+        return f"a hard day: a {noun} with 4 × 8 minutes at {z.bottom('Z4 Threshold')}–{z.top('Z4 Threshold')}"
+    if v == STEADY:
+        return f"a steady day: a {noun} up to 90 minutes at {z.bottom('Z2 Aerobic')}–{z.top('Z2 Aerobic')}"
+    if v == EASY:
+        lo, hi = easy_band(z)
+        return f"an easy day: a 60-minute {noun} at {lo}–{hi}"
+    return "a walk day" if v == LIGHT else "a day off"
+
+
+def _session_full(p: Profile, v: str, z, Noun: str) -> tuple[str, float]:
     if v == HARD:
         lo, hi = z.bottom("Z4 Threshold"), z.top("Z4 Threshold")
         return (f"a hard day. {Noun}, 75 minutes on a steady climb or flat road: 15 easy under "
@@ -471,6 +502,7 @@ def tomorrow_plan(p: Profile, rx: Rx, kind: str | None = None) -> list:
     v_rx, t_rx, d_rx = path(rx_load)
     v_ov, t_ov, d_ov = path(over_load)
     out = [("Do it as written", "good", f"Tomorrow is {t_rx}.")]
+    rx.tomorrow_short = f"Do today as written and tomorrow is {_session_short(p, v_rx, nxt)}."
 
     # The minimum: what it does to tomorrow.
     if rx.minimum and rx.verdict not in (REST, LIGHT):
