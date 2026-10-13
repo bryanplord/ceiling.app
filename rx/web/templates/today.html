@@ -2,7 +2,7 @@
 {% block body %}
 <h1>{{ rx.headline }}</h1>
 
-<h2>Do</h2>
+<h2>Ideal</h2>
 <p class="big">{{ rx.do }}</p>
 {% if rx.steps %}<ul>{% for s in rx.steps %}<li>{{ s }}</li>{% endfor %}</ul>{% endif %}
 
@@ -11,6 +11,22 @@
 
 <h2>Why</h2>
 {% for w in rx.why %}<p>{{ w }}</p>{% endfor %}
+
+{% if rx.compress %}
+<h2>Compress</h2>
+<p>{{ rx.compress }}</p>
+<h2>Stretch</h2>
+<p>{{ rx.stretch }}</p>
+{% endif %}
+
+{% if rx.if_skip %}
+<h2>If you skip it</h2>
+<p>{{ rx.if_skip }}</p>
+{% endif %}
+{% if rx.if_overdo %}
+<h2>If you overdo it</h2>
+<p>{{ rx.if_overdo }}</p>
+{% endif %}
 
 <h2>Tonight</h2>
 <p>{{ rx.tonight }}</p>

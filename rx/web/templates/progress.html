@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>{{ p.progress.headline }}</h1>
+{% for m in p.progress.measures %}
+<h2>{{ m.name }}</h2>
+<p class="big">{{ m.sentence }}</p>
+<p class="muted">{{ m.trend | capitalize }}</p>
+{% endfor %}
+<p class="muted">Each measure compares the last few weeks with about two months earlier, against your own history only.</p>
+{% endblock %}

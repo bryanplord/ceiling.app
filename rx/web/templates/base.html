@@ -13,7 +13,7 @@
   * { box-sizing:border-box; }
   body { margin:0; background:var(--bg); color:var(--fg);
          font:17px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif; }
-  nav { display:flex; gap:24px; padding:20px 24px; font-size:15px; }
+  nav { display:flex; gap:20px; padding:20px 24px; font-size:15px; overflow-x:auto; }
   nav a { color:var(--muted); text-decoration:none; }
   nav a.on { color:var(--fg); font-weight:600; }
   main { max-width:760px; margin:0 auto; padding:48px 24px 96px; }
@@ -38,6 +38,7 @@
   <a href="/" class="{{ 'on' if active=='today' }}">Today</a>
   <a href="/yesterday" class="{{ 'on' if active=='yesterday' }}">Yesterday</a>
   <a href="/recovery" class="{{ 'on' if active=='recovery' }}">Recovery</a>
+  <a href="/progress" class="{{ 'on' if active=='progress' }}">Progress</a>
   <a href="/profile" class="{{ 'on' if active=='profile' }}">Profile</a>
 </nav>
 <main>{% block body %}{% endblock %}</main>

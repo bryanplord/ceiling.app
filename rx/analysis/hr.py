@@ -158,6 +158,8 @@ def estimate_threshold(efforts: list[tuple[str, float | None, float | None]]) ->
 class Zones:
     lthr: int
     bounds: list[tuple[str, int, int]]
+    measured: bool = False
+    basis: str = ""
 
     def top(self, name: str) -> int:
         return next(hi for n, lo, hi in self.bounds if n == name)
@@ -166,8 +168,30 @@ class Zones:
         return next(lo for n, lo, hi in self.bounds if n == name)
 
 
+def zones_from_anchors(lt1: int, lthr: int, max_hr: int | None) -> Zones:
+    """Zones from two measured points: aerobic threshold (LT1) and threshold (LT2).
+
+    Z2 tops out exactly at your measured LT1, Z4 exactly at your threshold.
+    The splits inside each band are halfway points between your own anchors.
+    """
+    cap = max_hr or round(lthr * 1.1)
+    gap = max(6, lthr - lt1)
+    z1_top = lt1 - round(gap / 2)
+    mid = lt1 + round(gap / 2)
+    z = [
+        ("Z1 Recovery", 0, z1_top),
+        ("Z2 Aerobic", z1_top + 1, lt1),
+        ("Z3 Tempo", lt1 + 1, mid),
+        ("Z4 Threshold", mid + 1, lthr),
+        ("Z5 Max", lthr + 1, cap),
+    ]
+    return Zones(lthr, z, measured=True,
+                 basis=f"Measured: aerobic threshold {lt1}, threshold {lthr}, max {cap}.")
+
+
 def zones_from_lthr(lthr: int, max_hr: int | None) -> Zones:
-    """Five zones anchored on the athlete's own threshold."""
+    """PROVISIONAL: used only until an aerobic threshold has been measured.
+    Percentages of the athlete's own threshold, not of a formula."""
     cap = max_hr or round(lthr * 1.1)
     z = [
         ("Z1 Recovery", 0, round(lthr * 0.81)),
@@ -176,4 +200,6 @@ def zones_from_lthr(lthr: int, max_hr: int | None) -> Zones:
         ("Z4 Threshold", round(lthr * 0.93) + 1, round(lthr * 1.00)),
         ("Z5 Max", round(lthr * 1.00) + 1, cap),
     ]
-    return Zones(lthr, z)
+    return Zones(lthr, z, measured=False,
+                 basis="Provisional: aerobic threshold not measured yet, so bands below threshold "
+                       "are estimated. They're replaced as soon as steady sessions measure it.")

@@ -10,6 +10,19 @@ Endurance athletes pay for Strava, Garmin Connect+, TrainingPeaks and trail apps
 4. **Adjust** — today's prescription changes based on last night.
 5. **If/then** — what today's choice sets up for tomorrow.
 
+## What the athlete cares about (the bar for every feature)
+1. **Real metrics.** Measured from their own data. No "medium", no "average", no assigned defaults.
+2. **Am I progressing?** Answered with measures only fitness can move.
+3. **An engaged, accurate coach** that says exactly what to do and not do.
+4. **The price of not following it:** what skipping costs, what overdoing costs, and how it shows up.
+
+## Every prescription, in order
+1. **Ideal** — the exact session: sport, HR range, hard ceiling, max duration.
+2. **Compress** — the shortest version that still does the job.
+3. **Stretch** — the most that can be added without making tomorrow worse (computed by projecting tomorrow).
+4. **If you skip it** — fitness given up today, and over 4 more skipped days.
+5. **If you overdo it** — what tomorrow becomes, plus the athlete's own measured HRV cost and recovery time.
+
 ## The prescription format (non-negotiable)
 Every prescription has five parts:
 
@@ -31,7 +44,11 @@ Rules for the copy:
 ## Physiology principles
 - **Nothing from device zones, Peloton zones, power zones or 220-minus-age.** Every number comes from the athlete's own data.
 - **Max HR** = highest *credible* sustained heart rate observed: 15-second sustained peaks, spikes rejected, cadence lock rejected, smooth ramp required. Reported as a floor ("proven"), with corroboration status.
-- **Threshold HR (LTHR)** from the best sustained 20–60 minute efforts. Zones are built from LTHR.
+- **Threshold HR (LTHR)** from the best sustained 20–60 minute efforts.
+- **Aerobic threshold (LT1)** = the highest steady HR held with <5% decoupling (speed-per-beat drift, first half vs second half) on runs, walks and road rides. MTB and skiing excluded: terrain drives their speed.
+- **Zones** are anchored on measured LT1 and LT2: Z2 ends exactly at LT1, Z4 exactly at LT2. Until LT1 is measured, zones are flagged provisional.
+- **Progress**: aerobic efficiency at the same HR, resting HR, HRV, HR recovery after hard efforts, 6-week load — last few weeks vs ~2 months earlier.
+- **Personal response**: next-morning HRV vs yesterday's relative load, fitted per athlete; plus mornings-to-baseline after their biggest days. This is what makes "the price" personal.
 - **Recovery** is always relative to the athlete's own baseline (HRV ln-RMSSD vs 60-day mean ± SD; resting HR vs 60-day median; sleep score vs personal median). Never compare HRV across devices or people.
 - **Load**: Banister TRIMP per session from second-by-second HR; fatigue (7-day) and fitness (42-day) exponential averages; form = fitness − fatigue.
 - **Numbers come from code, never from an LLM.** An LLM may later reword the prescription, but the verdict, ranges, ceiling and duration are computed deterministically and are testable.
@@ -50,7 +67,7 @@ MTB, road, trail running, running, walking/hiking, ski touring, alpine skiing. N
 | Terra / Junction aggregators | Paid, licensed | Multi-user production path |
 
 ## Product surface
-**Web first.** No native iOS or Android for now. Pages: Today (prescription), Yesterday (score), Recovery (trends), Profile (max HR, threshold, zones).
+**Web first.** No native iOS or Android for now. Pages: Today (prescription), Yesterday (score), Recovery (trends), Progress, Profile (max HR, thresholds, zones).
 
 ## Open questions
 - Validate retention: does the athlete still follow it after month two?

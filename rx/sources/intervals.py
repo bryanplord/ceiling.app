@@ -53,7 +53,8 @@ class IntervalsClient:
     def activities(self, oldest: str, newest: str) -> list[dict]:
         return self._get(f"/athlete/{self.athlete}/activities", oldest=oldest, newest=newest)
 
-    def streams(self, activity_id: str, types=("time", "heartrate", "cadence")) -> dict[str, list]:
+    def streams(self, activity_id: str,
+                types=("time", "heartrate", "cadence", "velocity_smooth")) -> dict[str, list]:
         data = self._get(f"/activity/{activity_id}/streams.json", types=",".join(types))
         return {s["type"]: s.get("data") or [] for s in data if isinstance(s, dict)}
 
@@ -110,7 +111,8 @@ def sync(client: IntervalsClient, store: Store, days: int = 365,
                 st = client.streams(str(raw["id"]))
                 if st.get("heartrate"):
                     t = st.get("time") or list(range(len(st["heartrate"])))
-                    store.upsert_stream(act.id, t, st["heartrate"], st.get("cadence"))
+                    store.upsert_stream(act.id, t, st["heartrate"], st.get("cadence"),
+                                        st.get("velocity_smooth"))
                     counts["streams"] += 1
         for raw in client.wellness(cur.isoformat(), end.isoformat()):
             store.upsert_wellness("intervals", wellness_from_icu(raw), raw)

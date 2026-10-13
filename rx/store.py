@@ -29,7 +29,8 @@ CREATE TABLE IF NOT EXISTS streams (
     activity_id TEXT PRIMARY KEY,
     time        TEXT NOT NULL,         -- JSON array, seconds from start
     hr          TEXT NOT NULL,         -- JSON array, bpm (null allowed)
-    cadence     TEXT                   -- JSON array or null
+    cadence     TEXT,                  -- JSON array or null
+    speed       TEXT                   -- JSON array, m/s, or null
 );
 
 CREATE TABLE IF NOT EXISTS wellness (
@@ -81,6 +82,9 @@ class Store:
         self.db = sqlite3.connect(self.path)
         self.db.row_factory = sqlite3.Row
         self.db.executescript(SCHEMA)
+        cols = {r[1] for r in self.db.execute("PRAGMA table_info(streams)")}
+        if "speed" not in cols:  # migrate databases created before speed was stored
+            self.db.execute("ALTER TABLE streams ADD COLUMN speed TEXT")
 
     def close(self) -> None:
         self.db.close()
@@ -99,11 +103,12 @@ class Store:
         self.db.commit()
 
     def upsert_stream(self, activity_id: str, time: list, hr: list,
-                      cadence: list | None = None) -> None:
+                      cadence: list | None = None, speed: list | None = None) -> None:
         self.db.execute(
-            "INSERT OR REPLACE INTO streams VALUES (?,?,?,?)",
+            "INSERT OR REPLACE INTO streams (activity_id, time, hr, cadence, speed) VALUES (?,?,?,?,?)",
             (activity_id, json.dumps(time), json.dumps(hr),
-             json.dumps(cadence) if cadence else None),
+             json.dumps(cadence) if cadence else None,
+             json.dumps(speed) if speed else None),
         )
         self.db.commit()
 
@@ -144,6 +149,10 @@ class Store:
             return None
         return (json.loads(r["time"]), json.loads(r["hr"]),
                 json.loads(r["cadence"]) if r["cadence"] else None)
+
+    def speed(self, activity_id: str) -> list | None:
+        r = self.db.execute("SELECT speed FROM streams WHERE activity_id=?", (activity_id,)).fetchone()
+        return json.loads(r["speed"]) if r and r["speed"] else None
 
     def wellness(self, since: str | None = None) -> list[Wellness]:
         """One merged row per day, by source priority."""

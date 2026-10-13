@@ -42,6 +42,11 @@ def profile(request: Request):
     return _page(request, "profile.html", p=prof.build(open_store()))
 
 
+@app.get("/progress", response_class=HTMLResponse)
+def progress(request: Request):
+    return _page(request, "progress.html", p=prof.build(open_store()))
+
+
 @app.get("/api/today")
 def api_today(d: str | None = None):
     """JSON for anything else that wants the prescription (a watch face, later)."""
@@ -50,5 +55,7 @@ def api_today(d: str | None = None):
         "date": rx.date, "verdict": rx.verdict, "headline": rx.headline, "why": rx.why,
         "do": rx.do, "dont": rx.dont, "tonight": rx.tonight, "sport": rx.sport,
         "hr_low": rx.hr_low, "hr_ceiling": rx.hr_ceiling, "max_minutes": rx.max_minutes,
-        "steps": rx.steps, "scenarios": rx.scenarios, "notes": rx.notes,
+        "steps": rx.steps, "compress": rx.compress, "stretch": rx.stretch,
+        "if_skip": rx.if_skip, "if_overdo": rx.if_overdo,
+        "scenarios": rx.scenarios, "notes": rx.notes,
     }

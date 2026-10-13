@@ -7,8 +7,13 @@
 <p class="big">{{ p.threshold.bpm or '—' }} bpm</p>
 <p class="muted">From {{ p.threshold.source }}. Rises as harder sustained efforts are recorded.</p>
 
+<h2>Aerobic threshold</h2>
+<p class="big">{{ p.aerobic.bpm or '—' }} bpm</p>
+<p class="muted">{{ p.aerobic.evidence }}</p>
+
 {% if p.zones %}
 <h2>Your zones</h2>
+<p class="muted">{{ p.zones.basis }}</p>
 {% for n, lo, hi in p.zones.bounds %}
 <div class="row num"><span>{{ n }}</span><span>{{ lo }}–{{ hi }}</span></div>
 {% endfor %}

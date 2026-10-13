@@ -37,23 +37,38 @@ def cmd_profile(_):
     for pk in m.rejected[:3]:
         print(f"   rejected   {pk.bpm:.0f}  {pk.date}  {pk.reason}")
     print(f"Threshold   {p.threshold.bpm or '—'}  from {p.threshold.source}")
+    print(f"Aerobic thr {p.aerobic.bpm or '—'}  {p.aerobic.evidence}")
     print(f"Resting HR  {p.rest_hr:.0f}")
     if p.zones:
+        print(f"  {p.zones.basis}")
         for n, lo, hi in p.zones.bounds:
             print(f"  {n:14} {lo:>3}–{hi}")
     if p.yesterday:
         y = p.yesterday
         print(f"Load        fitness {y.ctl:.0f}  fatigue {y.atl:.0f}  form {y.tsb:+.0f}")
+    r = p.response
+    print(f"Response    {r.pairs} day-pairs; fitted={r.fitted}; "
+          f"back to baseline after big days in {r.recovery_days} mornings ({r.big_days} big days)")
+    print(f"\n{p.progress.headline}")
+    for m in p.progress.measures:
+        print(f"  {m.name:28} {m.trend:16} {m.sentence}")
 
 
 def cmd_today(a):
     _, rx = today_rx(open_store(), a.date)
     print(f"\n{rx.headline}\n")
     print("Why:     " + " ".join(rx.why))
-    print("Do:      " + rx.do)
+    print("Ideal:   " + rx.do)
     for s in rx.steps:
         print("           · " + s)
     print("Don't:   " + rx.dont)
+    if rx.compress:
+        print("Compress: " + rx.compress)
+        print("Stretch:  " + rx.stretch)
+    if rx.if_skip:
+        print("If you skip it:   " + rx.if_skip)
+    if rx.if_overdo:
+        print("If you overdo it: " + rx.if_overdo)
     print("Tonight: " + rx.tonight)
     for s in rx.scenarios:
         print("  " + s)
