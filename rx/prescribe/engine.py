@@ -242,7 +242,7 @@ def build_rx(p: Profile, day: str | None = None) -> Rx:
     rx.diagnosis, rx.activity_why = diag, sport_reason
     rx.why_title, rx.why_tone, rx.why_says = why_lead(verdict, p, day, reading)
     rx.what, rx.how = what_how(rx, kind, mins, low, ceiling, steps)
-    rx.minimum = minimum_dose(p, day)
+    rx.minimum = minimum_dose(p, rx, kind)
     rx.scenarios = scenarios(p, rx)
     rx.if_skip, rx.if_overdo = consequences(p, rx)
     rx.compress, rx.stretch = flex(p, rx)
@@ -709,24 +709,27 @@ def diagnosis(verdict: str, p: Profile, day: str, reading, sb) -> str:
     return f"{need}. {because[:1].upper()}{because[1:]}."
 
 
-def minimum_dose(p: Profile, day: str) -> str:
-    """The least you can do this week and keep the fitness you have.
+def minimum_dose(p: Profile, rx: "Rx", kind: str | None = None) -> str:
+    """The least you can do TODAY and keep the fitness you have.
 
-    Evidence: aerobic fitness holds for weeks to months with frequency cut to ~2 sessions a week
-    and volume cut by up to two thirds, provided intensity is kept (Hickson 1981, 1985;
-    Spiering 2021). Stop entirely and VO2max falls ~4–14% within 2–4 weeks (Mujika & Padilla 2000)."""
+    Evidence: fitness holds with volume cut by up to two thirds as long as frequency and
+    intensity are kept (Hickson 1981, 1985; Spiering 2021). So the floor is a shorter version
+    of today's session, never a different one: on a hard day keep the hard minutes and drop the
+    filler; on an easy day 30 minutes in range keeps the habit and the aerobic signal."""
+    if rx.verdict == REST:
+        return "Nothing. A day off costs you no fitness; resting is how you keep it today."
+    if rx.verdict == LIGHT:
+        return "Nothing, or a 20-minute walk. One easy day costs you no fitness."
     if not p.zones:
         return ""
-    cut = (date.fromisoformat(day) - timedelta(days=28)).isoformat()
-    hours = sum((a.moving_s or 0) for a in p.activities if cut <= a.date < day and a.sport != WALK) / 3600 / 4
-    if hours < 1.5:
-        return ""
-    floor_h = max(1.0, hours / 3)
-    h, m = int(floor_h), int(round((floor_h - int(floor_h)) * 60 / 15) * 15)
-    if m == 60:
-        h, m = h + 1, 0
-    amount = f"{h}h {m:02d}m" if m else f"{h} hours"
     z = p.zones
-    return (f"Minimum to keep what you have: 2 sessions this week, about {amount} total "
-            f"(a third of your usual {hours:.0f}), one with 2 × 10 minutes at {z.bottom('Z4 Threshold')}–"
-            f"{z.top('Z4 Threshold')}. When time is short, intensity is what holds fitness.")
+    noun = NOUN.get(kind or "", None) or {BIKE: "ride", RUN: "run", SKI: "ski tour", WALK: "walk"}.get(rx.sport, "session")
+    if rx.verdict == HARD:
+        lo, hi = z.bottom("Z4 Threshold"), z.top("Z4 Threshold")
+        return (f"40 minutes: 10 easy, 2 × 10 minutes at {lo}–{hi} with 4 easy between, 6 easy to finish. "
+                f"Keep the hard part, cut the rest. That holds your fitness.")
+    floor = 30 if (rx.max_minutes or 0) >= 60 else 20
+    if not rx.max_minutes or rx.max_minutes <= floor or not rx.hr_low:
+        return ""
+    return (f"A {floor}-minute {noun} at {rx.hr_low}–{rx.hr_ceiling}. That holds your fitness. "
+            f"The full {rx.max_minutes} builds it.")
