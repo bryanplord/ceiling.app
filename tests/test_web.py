@@ -34,8 +34,8 @@ def test_password_login(tmp_path, monkeypatch):
     c = TestClient(app)
     form = {"content-type": "application/x-www-form-urlencoded"}
 
-    # home page is the sign-in page; everything else is locked
-    r = c.get("/")
+    # home page is the brochure, /login the sign-in page; everything else is locked
+    r = c.get("/login")
     assert r.status_code == 200 and 'name="password"' in r.text and "Ideal" not in r.text
     assert c.get("/profile", follow_redirects=False).headers["location"] == "/"
     assert c.get("/api/today").status_code == 401
@@ -61,7 +61,7 @@ def test_password_login(tmp_path, monkeypatch):
 
     # sign out
     c.get("/logout")
-    assert 'name="password"' in c.get("/").text
+    assert "This is how you train" in c.get("/").text
 
 
 def test_sync_button(tmp_path, monkeypatch):
@@ -136,8 +136,25 @@ def test_journal_changes_tomorrow(tmp_path, monkeypatch):
     demo.seed(Store(tmp_path / "rx.db"), days=90, end=date.today())
     from rx.web.app import app
     c = TestClient(app)
-    r = c.post("/journal", content="text=4+IPAs+and+pizza", headers={"Content-Type": "application/x-www-form-urlencoded"})
+    r = c.post("/journal", content="text=4+IPAs+and+pizza&feel=tired", headers={"Content-Type": "application/x-www-form-urlencoded"})
     assert r.status_code in (200, 303)
     page = c.get("/").text
     assert "4 drinks" in page and "Ate poorly" in page
     assert "Tomorrow" in page
+
+
+def test_brochure_is_public(tmp_path, monkeypatch):
+    monkeypatch.setenv("RX_DATA_DIR", str(tmp_path))
+    monkeypatch.delenv("RX_OPEN", raising=False)
+    monkeypatch.setenv("RX_SECRET", "q" * 40)
+    from rx.web import auth
+    monkeypatch.setenv("RX_USERS", "a@example.com=" + auth.hash_password("pw"))
+    from rx.web.app import app
+    c = TestClient(app)
+    assert "This is how you train" in c.get("/").text
+    for p in ("/how", "/science", "/join", "/login"):
+        assert c.get(p).status_code == 200, p
+    r = c.post("/join", content="email=x%40y.com&device=Garmin&hours=5+to+10",
+               headers={"Content-Type": "application/x-www-form-urlencoded"}, follow_redirects=False)
+    assert r.status_code == 303
+    assert c.get("/calendar", follow_redirects=False).status_code == 303   # app pages stay private

@@ -65,7 +65,8 @@ def label(tags: dict) -> list[str]:
     out = []
     d = tags.get("drinks")
     if d:
-        out.append("Drinks" if d < 0 else f"{d} drink{'s' if d != 1 else ''}")
+        out.append("Drinks" if d < 0 else "1 or 2 drinks" if d == 2 and tags.get("_tap_drinks") else
+                   f"{d} drink{'s' if d != 1 else ''}")
     if tags.get("sick"):
         out.append("Feeling sick")
     if tags.get("food") == "poor":
@@ -77,7 +78,7 @@ def label(tags: dict) -> list[str]:
     if tags.get("feel") == "tired":
         out.append("Tired")
     elif tags.get("feel") == "good":
-        out.append("Feeling good")
+        out.append("Energized")
     if tags.get("late"):
         out.append("Late night")
     return out
@@ -104,9 +105,33 @@ def effect(tags: dict) -> tuple[str | None, str]:
     return None, ""
 
 
-def save(store, day: str, text: str) -> dict:
-    tags = parse(text)
-    store.set_meta(f"journal:{day}", json.dumps({"text": text.strip()[:2000], "tags": tags}))
+def save(store, day: str, text: str, taps: dict | None = None) -> dict:
+    """Taps (the one-touch buttons) win over anything read from the note."""
+    tags = parse(text) if text else {}
+    taps = taps or {}
+    feel = taps.get("feel")
+    if feel == "sick":
+        tags["sick"] = True
+        tags.pop("feel", None)
+    elif feel in ("good", "tired"):
+        tags["feel"] = feel
+        tags.pop("sick", None) if "sick" not in parse(text or "") else None
+    elif feel == "normal":
+        tags.pop("feel", None)
+    if taps.get("drinks") in ("0", "2", "3"):
+        n = int(taps["drinks"])
+        if n:
+            tags["drinks"] = max(n, tags.get("drinks") or 0) if (tags.get("drinks") or 0) > 0 else n
+            tags["_tap_drinks"] = True
+        else:
+            tags.pop("drinks", None)
+    if taps.get("food") in ("good", "ok", "poor"):
+        if taps["food"] == "ok":
+            tags.pop("food", None)
+        else:
+            tags["food"] = taps["food"]
+    store.set_meta(f"journal:{day}", json.dumps({"text": (text or "").strip()[:2000], "tags": tags,
+                                                  "taps": {k: v for k, v in taps.items() if v}}))
     return tags
 
 

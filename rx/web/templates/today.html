@@ -53,6 +53,16 @@
   .dnext { font-size:19px; margin:10px 0 0; max-width:52ch; }
   .dwas { color:var(--lichen); }
   .jr { margin-top:36px; }
+  .jform { display:grid; gap:12px; }
+  .jrow { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+  .jk { width:72px; font-size:14px; font-weight:600; color:var(--lichen); }
+  .pill input { position:absolute; opacity:0; pointer-events:none; }
+  .pill span { display:inline-block; font-size:15px; padding:8px 14px; border:1px solid #d4d4d8; border-radius:999px; cursor:pointer; }
+  .pill input:checked + span { background:var(--ink); color:#fff; border-color:var(--ink); }
+  .pill input:focus-visible + span { outline:2px solid var(--ceiling); outline-offset:2px; }
+  .jnoteRow { display:flex; gap:10px; margin-top:4px; }
+  .jtext { flex:1; min-width:0; font:inherit; font-size:16px; padding:10px 14px; border:1px solid #d4d4d8; border-radius:8px; }
+  .jnoteRow button { margin-top:0 !important; }
   .jr textarea { width:100%; font:inherit; font-size:17px; padding:14px; border:1px solid #d4d4d8; border-radius:8px; resize:vertical; }
   .jr button { margin-top:10px; font:inherit; font-weight:600; font-size:15px; padding:10px 20px; border:0; border-radius:8px; background:var(--ink); color:#fff; cursor:pointer; }
   .jtags { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0 0; }
@@ -272,10 +282,20 @@
       {% if rx.sleep and rx.sleep.lights_out %}<div class="rxl"><span class="rxk">Tonight</span><p class="rxv">In bed by {{ rx.sleep.lights_out }} for {{ rx.sleep_if[0][0][9:] if rx.sleep_if else '' }} of sleep. Do that, and {{ rx.sleep_if[0][2] if rx.sleep_if }}.</p></div>{% endif %}
     </div>
     <section class="jr" id="journal">
-      <p class="dlab">How's today going?</p>
-      <form method="post" action="/journal">
-        <textarea name="text" rows="3" placeholder="How you feel, what you ate, what you drank. Anything. &quot;3 IPAs and pizza&quot;, &quot;scratchy throat&quot;, &quot;ate clean, legs feel good&quot;.">{{ entry.text if entry else '' }}</textarea>
-        <button type="submit">Save</button>
+      <p class="dlab">How are you today?</p>
+      {% set tp = entry.taps if entry and entry.taps else {} %}
+      <form method="post" action="/journal" class="jform">
+        <div class="jrow"><span class="jk">Feeling</span>
+          {% for v, l in [('good','Energized'),('normal','Normal'),('tired','Tired'),('sick','Sick')] %}
+          <label class="pill"><input type="radio" name="feel" value="{{ v }}" {{ 'checked' if tp.feel == v }} onchange="this.form.submit()"><span>{{ l }}</span></label>{% endfor %}</div>
+        <div class="jrow"><span class="jk">Drinks</span>
+          {% for v, l in [('0','None'),('2','1 or 2'),('3','3 or more')] %}
+          <label class="pill"><input type="radio" name="drinks" value="{{ v }}" {{ 'checked' if tp.drinks == v }} onchange="this.form.submit()"><span>{{ l }}</span></label>{% endfor %}</div>
+        <div class="jrow"><span class="jk">Food</span>
+          {% for v, l in [('good','Ate well'),('ok','OK'),('poor','Ate poorly')] %}
+          <label class="pill"><input type="radio" name="food" value="{{ v }}" {{ 'checked' if tp.food == v }} onchange="this.form.submit()"><span>{{ l }}</span></label>{% endfor %}</div>
+        <div class="jnoteRow"><input class="jtext" name="text" value="{{ entry.text if entry else '' }}" placeholder="Anything else? Pizza and a beer, long day at work…">
+          <button type="submit">Save</button></div>
       </form>
       {% if entry_tags %}<p class="jtags">{% for t in entry_tags %}<span>{{ t }}</span>{% endfor %}</p>{% endif %}
       {% if after and after.journal_note %}<p class="jnote">{{ after.journal_note }}</p>{% endif %}

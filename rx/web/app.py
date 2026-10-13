@@ -51,7 +51,7 @@ async def sign_in_gate(request: Request, call_next):
     path = request.url.path
     email = auth.verify("session", request.cookies.get(auth.COOKIE)) if auth.enabled() else None
     current_owner.set(owner_of(email))
-    if path in ("/healthz", "/login", "/logout", "/plan.ics") or path.startswith("/static/"):
+    if path in ("/healthz", "/login", "/logout", "/plan.ics", "/how", "/science", "/join") or path.startswith("/static/"):
         return await call_next(request)
     if _signed_in(request):
         # A new athlete has no data yet: every page sends them to Data to connect it.
@@ -87,8 +87,42 @@ async def login_submit(request: Request):
 
 
 @app.get("/login")
-def login_get():
-    return RedirectResponse("/", status_code=303)
+def login_get(request: Request):
+    if _signed_in(request):
+        return RedirectResponse("/", status_code=303)
+    return _login(request)
+
+
+def _site(request: Request, name: str, **ctx):
+    return templates.TemplateResponse(request, name, {"active": name[5:].split(".")[0], **ctx})
+
+
+@app.get("/how", response_class=HTMLResponse)
+def site_how(request: Request):
+    return _site(request, "site_how.html")
+
+
+@app.get("/science", response_class=HTMLResponse)
+def site_science(request: Request):
+    return _site(request, "site_science.html")
+
+
+@app.get("/join", response_class=HTMLResponse)
+def site_join(request: Request, done: int = 0):
+    return _site(request, "site_join.html", done=bool(done))
+
+
+@app.post("/join")
+async def site_join_post(request: Request):
+    """The waitlist: kept in the primary database's meta table, one row per email."""
+    import json as _json
+    form = parse_qs((await request.body()).decode())
+    email = (form.get("email", [""])[0] or "").strip().lower()[:200]
+    if "@" in email and "." in email.split("@")[-1]:
+        open_store("").set_meta(f"waitlist:{email}", _json.dumps({
+            "device": (form.get("device", [""])[0] or "")[:40], "hours": (form.get("hours", [""])[0] or "")[:40],
+            "at": int(time.time())}))
+    return RedirectResponse("/join?done=1", status_code=303)
 
 
 @app.get("/logout")
@@ -251,7 +285,7 @@ def _page(request: Request, name: str, **ctx):
 @app.get("/", response_class=HTMLResponse)
 def today(request: Request, d: str | None = None):
     if not _signed_in(request):
-        return _login(request)
+        return _site(request, "site_home.html")
     _refresh_in_background()
     store = open_store()
     p, rx = today_rx(store, d)
@@ -397,8 +431,9 @@ async def journal_save(request: Request):
     from .. import journal as jr
     form = parse_qs((await request.body()).decode())
     text = (form.get("text", [""])[0] or "").strip()
-    if text:
-        jr.save(open_store(), local_today().isoformat(), text)
+    taps = {k: (form.get(k, [""])[0] or "") for k in ("feel", "drinks", "food")}
+    if text or any(taps.values()):
+        jr.save(open_store(), local_today().isoformat(), text, taps)
     return RedirectResponse("/#journal", status_code=303)
 
 
