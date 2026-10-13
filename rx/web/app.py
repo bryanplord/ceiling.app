@@ -168,6 +168,18 @@ def sync_now():
     return RedirectResponse("/?syncing=1", status_code=303)
 
 
+def _resp_keys(store) -> str:
+    import json as _json
+    keys = set()
+    for r in store.wellness_raw((local_today() - timedelta(days=10)).isoformat()):
+        try:
+            d = _json.loads(r["raw"]) if r["raw"] else {}
+        except Exception:
+            continue
+        keys |= {k for k, v in d.items() if "resp" in k.lower() or "breath" in k.lower()}
+    return ", ".join(sorted(keys)) or "none"
+
+
 @app.get("/healthz", response_class=PlainTextResponse)
 def healthz():
     """Public, so it shows only plumbing: whether syncing works and how many records
@@ -186,7 +198,8 @@ def healthz():
                 f"activities: {n['activities']}  with heart-rate streams: {n['streams']}  "
                 f"days of sleep/HRV: {n['wellness']}\n"
                 f"nights with breathing rate (last 30): "
-                f"{sum(1 for w in s.wellness((local_today() - timedelta(days=30)).isoformat()) if w.breathing)}")
+                f"{sum(1 for w in s.wellness((local_today() - timedelta(days=30)).isoformat()) if w.breathing)}\n"
+                f"breathing fields offered by the source: {_resp_keys(s)}")
     except Exception as e:
         return f"ok\nstore unavailable: {type(e).__name__}"
 
