@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 
 from ..analysis import load as la
+from ..analysis import sleep as sleepbank
 from ..analysis.reading import Reading, cap_verdict, read
 from ..analysis.recovery import AMBER, GREEN, RED, Recovery, assess
 from ..profile import Profile
@@ -57,6 +58,8 @@ class Rx:
     reading: Reading | None = None
     skip_short: str = ""
     example: str = ""
+    sleep: object = None
+    sleep_if: list = field(default_factory=list)
     overdo_short: str = ""
 
 
@@ -144,8 +147,13 @@ def build_rx(p: Profile, day: str | None = None) -> Rx:
     verdict = cap_verdict(verdict, reading.cap)
     why = [reading.says] + [r for r in why if not r.startswith(
         ("HRV", "Resting HR", "Sleep", "Recovered", "Recovery looks", "No sleep"))]
+    sb = sleepbank.bank(p.wellness, p.daily_load, day)
+    before = verdict
+    verdict = cap_verdict(verdict, sb.cap)
+    if sb.state in ("owed", "debt", "deep_debt") or verdict != before or sb.no_technical:
+        why.insert(1, sb.says)
     sport = _pick_sport(verdict, p)
-    mins = _round5(_minutes(verdict, sport, p))
+    mins = _round5(_minutes(verdict, sport, p) * (sb.volume if verdict not in (REST, LIGHT) else 1.0))
 
     if not p.ready:
         return Rx(day, verdict, HEADLINE[verdict], why,
@@ -204,6 +212,20 @@ def build_rx(p: Profile, day: str | None = None) -> Rx:
         else "Normal bedtime. Aim for 8 hours in bed."
     rx = Rx(day, verdict, HEADLINE[verdict], why[:3], do, dont, tonight, sport,
             low, ceiling, mins, steps, recovery=rec, reading=reading)
+    sb = sleepbank.bank(p.wellness, p.daily_load, day, verdict)   # tonight's need depends on today's session
+    rx.sleep = sb
+    rx.tonight = (f"Lights out by {sb.lights_out}. You need {sleepbank._hm(sb.need_tonight)} tonight: "
+                  + ", ".join(sb.parts) + f". That's for a {sb.wake} wake-up.")
+    if sb.no_technical and sport in (BIKE, SKI):
+        rx.dont += " No technical descents today: under 5 hours of sleep, reaction time goes first."
+    need = round(sb.need_tonight * 4) / 4
+    for label, hrs in ((f"Get your {sleepbank._hm(need)}", need), ("Sleep 6 hours", 6.0), ("Sleep 5 hours", 5.0)):
+        cap = sleepbank.tomorrow_if(p.wellness, p.daily_load, day, hrs)
+        rx.sleep_if.append((label, cap, {HARD: "sleep won't hold you back tomorrow",
+                                         STEADY: "tomorrow caps at steady: no intervals",
+                                         EASY: "tomorrow is easy only",
+                                         LIGHT: "tomorrow is a stroll at most",
+                                         REST: "tomorrow is a day off"}[cap]))
     rx.example = example_ride(p, sport, verdict, mins, ceiling)
     rx.scenarios = scenarios(p, rx)
     rx.if_skip, rx.if_overdo = consequences(p, rx)

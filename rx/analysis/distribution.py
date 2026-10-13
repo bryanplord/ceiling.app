@@ -270,3 +270,30 @@ def trend_chart(d: Distribution, w: int = 960, h: int = 300) -> str:
     o.append(f'<line class="target" x1="{L}" x2="{w - R}" y1="{y:.1f}" y2="{y:.1f}"/>')
     o.append("</svg>")
     return "".join(o)
+
+
+def hr_histogram(store, p, days: int = 28) -> tuple[np.ndarray, float | None]:
+    """Seconds spent at each bpm (index = bpm) over the last `days`, and the median
+    average HR of those sessions: where your heart actually lives when you train."""
+    end = date.fromisoformat(p.as_of)
+    cut = (end - timedelta(days=days)).isoformat()
+    hist = np.zeros(231)
+    avgs = []
+    for a in p.activities:
+        if a.date < cut or a.date >= p.as_of or a.sport == "walk":
+            continue
+        key = ("hist", a.id)
+        if key not in _cache:
+            st = store.stream(a.id)
+            if not st:
+                _cache[key] = None
+            else:
+                h = clean(st[0], st[1])
+                h = h[~np.isnan(h)].astype(int)
+                _cache[key] = np.bincount(np.clip(h, 0, 230), minlength=231)
+        c = _cache[key]
+        if c is not None:
+            hist += c
+        if a.avg_hr:
+            avgs.append(a.avg_hr)
+    return hist, (float(np.median(avgs)) if avgs else None)

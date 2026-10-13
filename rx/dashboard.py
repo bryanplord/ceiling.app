@@ -354,49 +354,95 @@ ZONE_FEEL = {"Z1 Recovery": "barely working", "Z2 Aerobic": "all day, full sente
              "Z5 Max": "all out, no words"}
 
 
-def room(rx: Rx, p: Profile) -> str:
-    """Your heart today: your own zones in color, today's range lit, everything else
-    dimmed, and the ceiling drawn as the brand's orange line across the top."""
+def room(rx: Rx, p: Profile, hist=None, usual: float | None = None) -> str:
+    """Your heart today, on your whole range: resting HR at the floor, your max at the
+    top, your own zones in color, today's band lit, the ceiling in orange, and a strip
+    showing where your heart actually spends its training time."""
     if rx.hr_ceiling is None or not p.zones:
         return ""
     c = rx.hr_ceiling
     lo = rx.hr_low
-    top = int(p.max_bpm) + 3
-    floor = max(int(p.rest_hr) + 10, (lo if lo is not None else c - 30) - 24)
-    floor -= floor % 10
-    W, H, T, B = 460, 560, 30, 540
-    X0, X1 = 52, 330
-    Y = lambda v: B - (B - T) * (v - floor) / (top - floor)
+    rest = int(round(p.rest_hr))
+    mx = int(p.max_bpm)
+    top = mx + 4
+    floor = rest - 4
+    floor -= floor % 5
+    W, H, T, B = 580, 600, 30, 580
+    X0, X1 = 52, 280          # zone column
+    S0, S1 = X1 + 6, X1 + 96  # where-you-train strip
+    LX = S1 + 12              # labels
+    # Broken axis: resting HR up to the knee is squeezed into the bottom 14%, so the
+    # range you actually train in gets the room.
+    knee = max(floor + 10, min(band_lo_ := (lo if lo is not None else c - 30), p.zones.bottom("Z2 Aerobic")) - 22)
+    KY = B - (B - T) * 0.14
+
+    def Y(v):
+        if v <= knee:
+            return B - (B - KY) * (v - floor) / max(1, knee - floor)
+        return KY - (KY - T) * (v - knee) / (top - knee)
     o = [f'<svg class="room" viewBox="0 0 {W} {H}" role="img" '
-         f'aria-label="Your heart today: {lo if lo is not None else floor} to {c}. Never above {c}. Your max is {int(p.max_bpm)}.">']
+         f'aria-label="Your heart: resting {rest}, max {mx}. Today {lo if lo is not None else floor} to {c}, never above {c}.">']
     band_lo = lo if lo is not None else floor
     for i, (name, zlo, zhi) in enumerate(p.zones.bounds):
         a, b = max(zlo, floor), min(zhi + 1, top)
+        if i == 0:
+            a = floor
         if b <= a:
             continue
         o.append(f'<rect class="zf z{i + 1}" x="{X0}" y="{Y(b):.1f}" width="{X1 - X0}" height="{Y(a) - Y(b):.1f}"/>')
-        # today's slice of this zone, lit
         la_, lb = max(a, band_lo), min(b, c + 1)
-        if lb > la_:
-            o.append(f'<rect class="zon z{i + 1}" x="{X0}" y="{Y(lb):.1f}" width="{X1 - X0}" height="{Y(la_) - Y(lb):.1f}"/>')
         on = lb > la_
+        if on:
+            o.append(f'<rect class="zon z{i + 1}" x="{X0}" y="{Y(lb):.1f}" width="{X1 - X0}" height="{Y(la_) - Y(lb):.1f}"/>')
         ym = (Y(a) + Y(b)) / 2
         if Y(a) - Y(b) >= 34:
             o.append(f'<text class="zn{" on" if on else ""}" x="{X0 + 14}" y="{ym - 2:.1f}">{ZONE_SHORT.get(name, name)}</text>')
             o.append(f'<text class="zd{" on" if on else ""}" x="{X0 + 14}" y="{ym + 17:.1f}">{ZONE_FEEL.get(name, "")}</text>')
         elif Y(a) - Y(b) >= 16:
             o.append(f'<text class="zn{" on" if on else ""}" x="{X0 + 14}" y="{ym + 6:.1f}">{ZONE_SHORT.get(name, name)}</text>')
-    for v in range(floor, top + 1, 10):
+    for v in range((knee // 10 + 1) * 10, top + 1, 10):
         o.append(f'<text class="tick" x="{X0 - 10}" y="{Y(v) + 5:.1f}" text-anchor="end">{v}</text>')
-    mx = int(p.max_bpm)
-    o.append(f'<line class="maxl" x1="{X0}" x2="{W}" y1="{Y(mx):.1f}" y2="{Y(mx):.1f}"/>')
-    o.append(f'<text class="side" x="{W}" y="{Y(mx) - 8:.1f}" text-anchor="end">your max {mx}</text>')
+    # the break in the axis
+    o.append(f'<path class="brk" d="M{X0 - 8},{KY + 4:.1f} l6,-6 l6,6 l6,-6 l6,6"/>')
+
+    # where your heart actually spends training time (last 4 weeks)
+    if hist is not None and hist.sum() > 0:
+        bins = []
+        for v in range(max(floor, knee), top, 2):
+            bins.append((v, float(hist[max(0, v):min(231, v + 2)].sum())))
+        peak = max(x for _, x in bins) or 1
+        for v, x in bins:
+            if x <= 0:
+                continue
+            o.append(f'<rect class="hbin" x="{S0}" y="{Y(v + 2):.1f}" width="{(S1 - S0) * x / peak:.1f}" '
+                     f'height="{max(0.8, Y(v) - Y(v + 2) - 0.6):.1f}"/>')
+        o.append(f'<text class="strip" x="{(S0 + S1) / 2:.0f}" y="{B + 16}" text-anchor="middle">where you train</text>')
+
+    # markers and labels, nudged apart so they never collide
+    labels = []
+    o.append(f'<line class="maxl" x1="{X0}" x2="{S1}" y1="{Y(mx):.1f}" y2="{Y(mx):.1f}"/>')
+    labels.append([Y(mx), f"your max {mx}", "side"])
+    o.append(f'<line class="restl" x1="{X0}" x2="{S1}" y1="{Y(rest):.1f}" y2="{Y(rest):.1f}"/>')
+    labels.append([Y(rest), f"resting {rest}", "side rest"])
+    if usual:
+        u = round(usual)
+        o.append(f'<line class="usual" x1="{S0 - 4}" x2="{S1 + 6}" y1="{Y(u):.1f}" y2="{Y(u):.1f}"/>')
+        labels.append([Y(u), f"you usually average {u}", "side usualt"])
     if lo is not None:
         avg = round((lo + c) / 2)
-        o.append(f'<line class="avgl" x1="{X1 - 70}" x2="{X1 + 8}" y1="{Y(avg):.1f}" y2="{Y(avg):.1f}"/>')
-        o.append(f'<text class="side strong" x="{X1 + 14}" y="{Y(avg) + 6:.1f}">aim {avg}</text>')
-        o.append(f'<text class="side" x="{X1 + 14}" y="{Y(lo) + 6:.1f}">{lo}</text>')
-        o.append(f'<line class="lol" x1="{X1}" x2="{X1 + 8}" y1="{Y(lo):.1f}" y2="{Y(lo):.1f}"/>')
+        o.append(f'<line class="avgl" x1="{X1 - 70}" x2="{X1}" y1="{Y(avg):.1f}" y2="{Y(avg):.1f}"/>')
+        labels.append([Y(avg), f"today aim {avg}", "side strong"])
+        labels.append([Y(lo), f"{lo}", "side"])
+    yc = Y(c)
+    for l in labels:          # keep clear of the ceiling line and its number
+        if yc - 12 <= l[0] <= yc + 16:
+            l[0] = yc + 22
+    labels.sort(key=lambda l: l[0])
+    for i in range(1, len(labels)):
+        if labels[i][0] - labels[i - 1][0] < 20:
+            labels[i][0] = labels[i - 1][0] + 20
+    for y, text, cls in labels:
+        o.append(f'<text class="{cls}" x="{LX}" y="{y + 5:.1f}">{text}</text>')
     o.append(f'<rect class="ceil" x="{X0 - 6}" y="{Y(c) - 4:.1f}" width="{W - X0 + 6}" height="8" rx="4"/>')
     o.append(f'<text class="cnum" x="{W}" y="{Y(c) - 16:.1f}" text-anchor="end">{c}</text>')
     o.append("</svg>")

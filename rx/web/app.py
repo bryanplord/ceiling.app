@@ -15,6 +15,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .. import dashboard, story as storymod
+from ..analysis import sleep as sleepmod
+from ..analysis import distribution as dist
 from .. import profile as prof
 from ..service import cached, open_store, profile_for, recovery_history, scored_day, today_rx
 from ..clock import local_today
@@ -25,6 +27,13 @@ templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 app.mount("/static", StaticFiles(directory=str(Path(__file__).parent / "static")), name="static")
 
 REFRESH_EVERY_S = 60 * 60
+MORNING_EVERY_S = 10 * 60
+
+
+def _have_last_night(store) -> bool:
+    today = local_today().isoformat()
+    w = next((w for w in store.wellness() if w.date == today), None)
+    return bool(w and (w.hrv or w.sleep_secs or w.sleep_score))
 _sync_lock = threading.Lock()
 
 
@@ -92,7 +101,10 @@ def _refresh_in_background() -> None:
             # Backfill a year until a backfill has actually brought data in; an empty
             # pull (source not ready yet) must not mark history as done or wait an hour.
             backfilled = store.get_meta("backfilled") == "1"
-            if backfilled and time.time() - last < REFRESH_EVERY_S:
+            # Mornings: until last night's sleep/HRV has landed, check every 10 minutes.
+            # Garmin only uploads it once the watch syncs to the phone.
+            every = REFRESH_EVERY_S if _have_last_night(store) else MORNING_EVERY_S
+            if backfilled and time.time() - last < every:
                 return
             days = 3 if backfilled else 365
             store.set_meta("sync_state", f"running since {int(time.time())}")
@@ -145,7 +157,10 @@ def _startup() -> None:
 @app.get("/healthz", response_class=PlainTextResponse)
 def healthz():
     """Public, so it shows only plumbing: whether syncing works and how many records
-    exist. No dates, names, heart rates or anything else about the athlete."""
+    exist. No dates, names, heart rates or anything else about the athlete.
+    The keep-awake ping hits this every 10 minutes, so it also drives the refresh:
+    the morning's data is pulled before you open the page."""
+    _refresh_in_background()
     try:
         s = open_store()
         n = s.counts()
@@ -185,9 +200,13 @@ def today(request: Request, d: str | None = None):
         recent.append({"when": label, "what": a.name or a.sport.capitalize(), "stats": dur + hr})
         if len(recent) == 5:
             break
-    return _page(request, "today.html", rx=rx, d=dash, p=p, recent=recent,
-                 spark=dashboard.spark, room=dashboard.room(rx, p),
+    last = store.get_meta("last_sync")
+    mins_ago = int((time.time() - float(last)) / 60) if last and float(last) > 0 else None
+    return _page(request, "today.html", rx=rx, waiting=not _have_last_night(store), updated=mins_ago, d=dash, p=p, recent=recent,
+                 spark=dashboard.spark, room=dashboard.room(rx, p, *cached(store, "hrhist", rx.date, lambda: dist.hr_histogram(store, p))),
                  st=st, hist=storymod.history_chart(st),
+                 sleep_chart=sleepmod.chart(rx.sleep) if rx.sleep else "",
+                 base_need=sleepmod._hm(rx.sleep.base) if rx.sleep else "",
                  day_label=when.strftime("%A, %B %-d"))
 
 

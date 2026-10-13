@@ -134,7 +134,7 @@ def read(wellness, daily_load: dict[str, float], load_days, day: str) -> Reading
         week = [by[iso(n)].sleep_secs / 3600 for n in range(7) if iso(n) in by and by[iso(n)].sleep_secs]
         deficit = sum(max(0.0, usual - h) for h in week)
         short_night = sleep_h < 6.0 or sleep_h < usual - 1.5
-        debt = deficit >= 5.0
+        debt = False   # running sleep debt is handled by the sleep bank (analysis/sleep.py)
         gap = sleep_h - usual
         line = f"{_hm(sleep_h)} last night; your usual is {_hm(usual)}"
         line += "." if abs(gap) < 0.25 else f" ({'+' if gap > 0 else '−'}{_hm(abs(gap))})."

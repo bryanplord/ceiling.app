@@ -15,6 +15,9 @@
   .flex h3, .trade h3 { margin:0 0 6px; font-size:15px; font-weight:650; }
   .flex p, .trade p { margin:0; color:var(--lichen); font-size:16px; line-height:1.45; }
 
+  .waiting { background:var(--frost); border-left:4px solid var(--warn); border-radius:8px; padding:14px 18px;
+             font-size:17px; margin:8px 0 0; max-width:72ch; }
+  .upd { margin-left:10px; }
   .pad { margin-top:36px; border-top:2px solid var(--ink); }
   .rxl { display:grid; grid-template-columns:110px 1fr; gap:20px; padding:16px 0; border-bottom:1px solid var(--rule); }
   .rxk { font-weight:700; font-size:15px; color:var(--lichen); padding-top:4px; }
@@ -23,7 +26,7 @@
   .rxv b.good { color:var(--good); } .rxv b.ok { color:var(--warn); } .rxv b.bad { color:var(--bad); }
   .rxl.over .rxk { color:var(--ceiling); }
   .rxl .steps { margin:0; font-size:18px; }
-  .room { width:100%; max-width:420px; display:block; margin-left:auto; overflow:visible; font-family:var(--face); }
+  .room { width:100%; max-width:520px; display:block; margin-left:auto; overflow:visible; font-family:var(--face); }
   .room .zf { opacity:.16; } .room .zon { opacity:.95; }
   .room .z1 { fill:var(--z1); } .room .z2 { fill:var(--z2); } .room .z3 { fill:var(--z3); }
   .room .z4 { fill:var(--z4); } .room .z5 { fill:var(--z5); }
@@ -31,6 +34,13 @@
   .room .zd { fill:var(--lichen); font-size:13px; }
   .room .zn.on, .room .zd.on { fill:#0d1114; }
   .room .avgl { stroke:#0d1114; stroke-width:2; stroke-dasharray:6 4; }
+  .room .hbin { fill:var(--lichen); opacity:.8; }
+  .room .brk { fill:none; stroke:var(--lichen); stroke-width:1.5; }
+  .room .strip { fill:var(--lichen); font-size:13px; }
+  .room .restl { stroke:var(--z1); stroke-width:2; stroke-dasharray:2 4; }
+  .room .side.rest { fill:var(--z1); font-weight:650; }
+  .room .usual { stroke:var(--ink); stroke-width:2.5; }
+  .room .side.usualt { fill:var(--ink); }
   .room .tick { fill:var(--lichen); font-size:14px; font-variant-numeric:tabular-nums; }
   .room .side { fill:var(--lichen); font-size:16px; font-variant-numeric:tabular-nums; }
   .room .side.strong { fill:var(--ink); font-weight:650; }
@@ -55,6 +65,13 @@
   .evidence li.bad { border-left-color:var(--bad); }
   .ask { font-size:18px; font-weight:600; background:var(--frost); border-radius:10px; padding:16px 18px; max-width:62ch; margin:16px 0; }
   .conf { color:var(--lichen); font-size:15px; margin:12px 0 0; }
+  .sbwrap { max-width:760px; margin:8px 0 6px; }
+  .sbank { display:block; width:100%; height:auto; font-family:var(--face); overflow:visible; }
+  .sbank .plus { fill:var(--good); } .sbank .minus { fill:var(--bad); }
+  .sbank .need { stroke:var(--ink); stroke-width:1.5; stroke-dasharray:4 4; }
+  .sbank .miss { fill:var(--lichen); } .sbank .tk { fill:var(--lichen); font-size:13px; }
+  .k.plusk { background:var(--good); } .k.minusk { background:var(--bad); }
+  .tonight { font-size:18px; line-height:1.5; max-width:52ch; margin:0; }
   .twocol { display:grid; grid-template-columns:1fr 1fr; gap:48px; margin-top:28px; }
   .twocol h3 { font-size:17px; margin:0 0 12px; }
   .getback { font-size:17px; line-height:1.5; padding-left:22px; margin:0; } .getback li { margin:0 0 10px; }
@@ -130,6 +147,7 @@
     .split, .trade, .next, .twocol { grid-template-columns:1fr; gap:36px; }
     .hist .lbl, .hist .tick { font-size:30px; } .hist .lbl.strong { font-size:34px; }
     .hist .hline { stroke-width:4; }
+    .sbank .tk { font-size:22px; }
     .flex { grid-template-columns:1fr; gap:18px; }
     .rxl { grid-template-columns:1fr; gap:4px; padding:14px 0; }
     section.band { padding:40px 0; }
@@ -146,9 +164,12 @@
 </div>
 {% endmacro %}
 {% block body %}
+{% if waiting %}
+<p class="waiting">Waiting on last night's sleep and HRV. Open Garmin Connect on your phone so your watch syncs; Ceiling checks every 10 minutes. Until it lands, today is built from yesterday's data.</p>
+{% endif %}
 <section class="hero">
   <div>
-    <p class="date">{{ day_label }}</p>
+    <p class="date">{{ day_label }}{% if updated is not none %}<span class="upd"> Updated {{ 'just now' if updated < 2 else (updated ~ ' min ago' if updated < 120 else (updated // 60) ~ ' hours ago') }}.</span>{% endif %}</p>
     <h1 class="verdict">{{ rx.headline }}</h1>
     <div class="pad">
       <div class="rxl"><span class="rxk">Do</span>
@@ -159,13 +180,14 @@
       {% if rx.reading %}<div class="rxl"><span class="rxk">Because</span>
         <p class="rxv"><b class="{{ rx.reading.tone }}">{{ rx.reading.title }}.</b> {{ rx.reading.says.split('. ')[0] }}.</p></div>{% endif %}
       {% if rx.skip_short %}<div class="rxl"><span class="rxk">Skip it</span><p class="rxv">{{ rx.skip_short }}</p></div>{% endif %}
+      {% if rx.sleep and rx.sleep.lights_out %}<div class="rxl"><span class="rxk">Tonight</span><p class="rxv">Lights out by <b>{{ rx.sleep.lights_out }}</b>. {{ rx.sleep_if[0][0] if rx.sleep_if }} and {{ rx.sleep_if[0][2] if rx.sleep_if }}.</p></div>{% endif %}
       {% if rx.overdo_short %}<div class="rxl over"><span class="rxk">Overdo it</span><p class="rxv">{{ rx.overdo_short }}</p></div>{% endif %}
     </div>
   </div>
   {% if room %}
   <div>
     <p class="roomh">Your heart today</p>
-    <p class="roomsub">Your own zones, from your rides and runs. Today is the lit band.</p>
+    <p class="roomsub">Resting to max, in your own zones. Today is the lit band; the grey strip is where you actually train.</p>
     {{ room | safe }}
     <p class="roomcap">Stay in the lit band. <b>Never above {{ rx.hr_ceiling }}.</b>{% if rx.max_minutes %} {{ rx.max_minutes }} minutes max.{% endif %}</p>
   </div>
@@ -189,6 +211,22 @@
   </ul>
   {% if rx.reading.ask %}<p class="ask">{{ rx.reading.ask }}</p>{% endif %}
   <p class="conf">{{ rx.reading.confidence }} Today: {{ rx.reading.action | lower }}</p>
+</section>
+{% endif %}
+
+{% if rx.sleep and rx.sleep.nights %}
+<section class="band sleepb">
+  <h2>Sleep bank</h2>
+  <p class="rtitle {{ rx.sleep.tone }}">{{ rx.sleep.title }}</p>
+  <p class="rsays">{{ rx.sleep.says }}</p>
+  <div class="sbwrap">{{ sleep_chart | safe }}</div>
+  <p class="legend"><span><i class="k plusk"></i>Slept more than you needed</span><span><i class="k minusk"></i>Short of what you needed</span><span>Need is {{ base_need }} a night, plus extra after big days. Poor sleep scores count for less.</span></p>
+  <div class="twocol">
+    <div><h3>Tonight</h3><p class="tonight">{{ rx.tonight }}</p></div>
+    <div><h3>What tonight decides</h3>
+      <ul class="evidence">{% for label, cap, words in rx.sleep_if %}<li class="{{ 'good' if cap == 'hard' else 'ok' if cap == 'steady' else 'bad' }}"><b>{{ label }}</b>{{ words[:1] | upper }}{{ words[1:] }}.</li>{% endfor %}</ul>
+    </div>
+  </div>
 </section>
 {% endif %}
 
