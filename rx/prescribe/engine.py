@@ -59,6 +59,7 @@ class Rx:
     skip_short: str = ""
     example: str = ""
     minimum: str = ""
+    maximum: str = ""
     options: list = field(default_factory=list)     # other ways to do today: (title, note, tone)
     options_short: str = ""
     tomorrow_short: str = ""
@@ -257,6 +258,10 @@ def build_rx(p: Profile, day: str | None = None) -> Rx:
     rx.what, rx.how = what_how(rx, kind, mins, low, ceiling, steps)
     rx.minimum = minimum_dose(p, rx, kind)
     rx.options = alternatives(p, rx, kind)
+    try:
+        rx.maximum = maximum(p, rx)
+    except Exception:
+        rx.maximum = ""
     if rx.options:
         names = [o[3] for o in rx.options[:3]]
         rx.options_short = "Or " + (names[0] if len(names) == 1 else ", ".join(names[:-1]) + " or " + names[-1]) + \
@@ -338,6 +343,62 @@ def _personal_cost(p: Profile, load: float) -> str:
         return "Your personal recovery cost is learned after about 3 weeks of sleep and HRV data."
     s = "; ".join(parts) + "."
     return s[0].upper() + s[1:]
+
+
+TOMORROW_SHORT = {REST: "a day off", LIGHT: "a walk-only day", EASY: "an easy day",
+                  STEADY: "a steady day", HARD: "a hard day"}
+
+
+def maximum(p: Profile, rx: Rx) -> str:
+    """The most you can do today without making tomorrow worse, and what happens past it."""
+    if not p.ready or not p.yesterday or rx.hr_ceiling is None:
+        return ""
+    ceil = rx.hr_ceiling
+    if rx.verdict in (REST, LIGHT):
+        over = _next_verdict(p, rx, _est_load(p, 75, p.zones.bottom("Z3 Tempo")))
+        base = _next_verdict(p, rx, _rx_load(p, rx))
+        if ORDER.index(over) < ORDER.index(base):
+            return (f"A 60-minute walk, heart rate under {ceil}. Turn it into a workout and tomorrow drops "
+                    f"from {TOMORROW_SHORT[base]} to {TOMORROW_SHORT[over]}.")
+        return (f"A 60-minute walk, heart rate under {ceil}. Turn it into a workout and the fatigue you're "
+                f"clearing stays: tomorrow only holds at {TOMORROW_SHORT[base]} if you sleep well.")
+    ideal = _next_verdict(p, rx, _rx_load(p, rx))
+    if rx.verdict == HARD:
+        z = p.zones
+        z4 = (z.bottom("Z4 Threshold") + z.top("Z4 Threshold")) / 2
+        five = _est_load(p, 40, z4) + _est_load(p, 50, z.top("Z1 Recovery"))
+        v5 = _next_verdict(p, rx, five)
+        if ORDER.index(v5) >= ORDER.index(ideal):
+            six = _next_verdict(p, rx, _est_load(p, 48, z4) + _est_load(p, 55, z.top("Z1 Recovery")))
+            tail = (f"A sixth turns tomorrow from {TOMORROW_SHORT[ideal]} into {TOMORROW_SHORT[six]}."
+                    if ORDER.index(six) < ORDER.index(ideal) else
+                    "A sixth is done tired, so it adds fatigue and very little fitness.")
+            return f"5 efforts instead of 4, same {z.bottom('Z4 Threshold')}–{z.top('Z4 Threshold')}. {tail}"
+        return (f"The 4 efforts as written. A fifth turns tomorrow from {TOMORROW_SHORT[ideal]} into "
+                f"{TOMORROW_SHORT[v5]}.")
+    mid = ((rx.hr_low or ceil - 15) + ceil) / 2
+    most = rx.max_minutes
+    nxt = ideal
+    for m in range(rx.max_minutes + 15, rx.max_minutes * 3 + 1, 15):
+        v = _next_verdict(p, rx, _est_load(p, m, mid))
+        if ORDER.index(v) < ORDER.index(ideal):
+            nxt = v
+            break
+        most = m
+    else:
+        nxt = None
+    cap_note = ""
+    if rx.sport == RUN:
+        cut30 = (date.fromisoformat(rx.date) - timedelta(days=30)).isoformat()
+        if sum(1 for a in p.activities if a.sport == RUN and cut30 <= a.date < rx.date) < 6:
+            cap_note = (f" On a run, keep it to {rx.max_minutes}: your legs aren't used to more. "
+                        f"The extra time is fine on the bike.")
+    if most > rx.max_minutes:
+        tail = (f" Past that, tomorrow drops from {TOMORROW_SHORT[ideal]} to {TOMORROW_SHORT[nxt]}." if nxt
+                else " Even longer wouldn't change tomorrow, but it adds nothing today needs.")
+        return f"{most} minutes, still never over {ceil}.{tail}{cap_note}"
+    return (f"{rx.max_minutes} minutes. Even 15 more turns tomorrow from {TOMORROW_SHORT[ideal]} into "
+            f"{TOMORROW_SHORT[nxt]}." if nxt else f"{rx.max_minutes} minutes.") + cap_note
 
 
 def flex(p: Profile, rx: Rx) -> tuple[str | None, str | None]:

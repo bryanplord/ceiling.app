@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block head %}
+<style>
+  .plan-h { font-size:clamp(40px, 6vw, 72px); margin:12px 0 0; }
+  .tabs { display:flex; gap:24px; margin-top:24px; font-size:17px; }
+  .tabs a { text-decoration:none; color:var(--lichen); padding-bottom:4px; }
+  .tabs a.on { color:var(--ink); box-shadow:inset 0 -2px 0 var(--ink); }
+  .mhead { display:flex; align-items:baseline; gap:20px; margin-top:40px; }
+  .mhead h2 { color:var(--ink); font-size:28px; margin:0; font-weight:600; }
+  .mhead a { color:var(--lichen); text-decoration:none; font-size:15px; }
+  .mhead a:hover { color:var(--ink); }
+  .stats { display:flex; flex-wrap:wrap; gap:32px; margin:20px 0 0; }
+  .stat b { display:block; font-size:34px; font-weight:600; font-stretch:125%; line-height:1.1; }
+  .stat span { color:var(--lichen); font-size:14px; }
+  .note { color:var(--lichen); font-size:15px; max-width:70ch; margin:16px 0 0; }
+  .cal { display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); margin-top:24px; border-top:2px solid var(--ink); }
+  .dow { font-size:13px; font-weight:600; color:var(--lichen); padding:10px 8px; border-bottom:1px solid var(--rule); }
+  .c { min-height:128px; padding:8px; border-bottom:1px solid var(--rule); border-right:1px solid var(--rule); display:flex; flex-direction:column; gap:4px; }
+  .c:nth-child(7n) { border-right:0; }
+  .c.out { background:#fafafa; }
+  .c.fut { color:var(--rule); }
+  .c.tod { box-shadow:inset 0 0 0 2px var(--ink); }
+  .c .n { font-size:15px; font-weight:600; display:flex; justify-content:space-between; align-items:center; }
+  .c .vb { height:4px; }
+  .c .k { font-size:12px; color:var(--lichen); }
+  .c .did { font-size:13px; line-height:1.3; }
+  .c .st { margin-top:auto; font-size:12px; font-weight:700; }
+  .st.t-good { color:#1d6b45; } .st.t-bad { color:#a8321f; } .st.t-ok { color:#8a5a10; } .st.t-muted { color:var(--lichen); }
+  .rdot { width:9px; height:9px; border-radius:50%; display:inline-block; }
+  .rdot.good { background:#2fae6b; } .rdot.ok { background:#e6c13d; } .rdot.bad { background:#d9433b; }
+  .c.both { background:#f2faf5; }
+  .v-rest { background:#c9c9cd; } .v-light { background:#b3a6dc; } .v-easy { background:#7fa7d9; }
+  .v-steady { background:#46b07f; } .v-hard { background:#ec9550; }
+  .key { display:flex; flex-wrap:wrap; gap:6px 18px; font-size:13px; color:var(--lichen); margin-top:16px; }
+  .key i { display:inline-block; width:14px; height:4px; margin-right:6px; vertical-align:middle; }
+  @media (max-width:760px) {
+    .c { min-height:76px; padding:5px; }
+    .c .k, .c .did { display:none; }
+    .c .st { font-size:10px; }
+    .dow { padding:8px 4px; font-size:11px; }
+  }
+</style>
+{% endblock %}
+{% block body %}
+<h1 class="plan-h">Calendar</h1>
+<nav class="tabs"><a href="/calendar">Upcoming</a><a class="on" href="/calendar/history">History</a></nav>
+
+<div class="mhead">
+  <h2>{{ mon.title }}</h2>
+  <a href="/calendar/history?m={{ mon.prev }}">← {{ 'Previous' }}</a>
+  {% if mon.next %}<a href="/calendar/history?m={{ mon.next }}">Next →</a>{% endif %}
+</div>
+{% if mon.days %}
+<div class="stats">
+  <div class="stat"><b>{{ mon.nailed }}/{{ mon.days }}</b><span>days you did what the morning called for</span></div>
+  <div class="stat"><b>{{ mon.recovered }}/{{ mon.rec_days }}</b><span>mornings you woke up recovered</span></div>
+  <div class="stat"><b>{{ mon.both }}</b><span>days you nailed both</span></div>
+</div>
+{% endif %}
+{% if mon.replayed %}<p class="note">Days before Ceiling saved its prescriptions are replayed: what Ceiling would have told you that morning, from your sleep, HRV and training up to the day before.</p>{% endif %}
+
+<div class="cal">
+  {% for d in ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}<div class="dow">{{ d }}</div>{% endfor %}
+  {% for wk in mon.grid %}{% for c in wk %}
+    {% if not c %}<div class="c out"></div>
+    {% elif c.future %}<div class="c fut"><span class="n">{{ c.day }}</span></div>
+    {% elif c.today %}<div class="c tod"><span class="n">{{ c.day }}</span><span class="k">Today</span></div>
+    {% else %}
+    <div class="c{{ ' both' if c.both }}" title="{{ c.kind }}: {{ c.status }}">
+      <span class="n">{{ c.day }}{% if c.rec %}<span class="rdot {{ c.rec }}" title="Next morning: {{ {'good':'recovered','ok':'mostly recovered','bad':'not recovered'}[c.rec] }}"></span>{% endif %}</span>
+      <span class="vb v-{{ c.verdict }}"></span>
+      <span class="k">{{ c.kind }}</span>
+      <span class="did">{{ c.did|join(', ') if c.did else '' }}</span>
+      <span class="st t-{{ c.tone }}">{{ c.status }}</span>
+    </div>
+    {% endif %}
+  {% endfor %}{% endfor %}
+</div>
+<div class="key">
+  <span><i class="v-easy"></i>Easy</span><span><i class="v-steady"></i>Steady</span><span><i class="v-hard"></i>Hard</span>
+  <span><i class="v-light"></i>Walk</span><span><i class="v-rest"></i>Day off</span>
+  <span><span class="rdot good"></span> recovered next morning</span><span><span class="rdot ok"></span> mostly</span><span><span class="rdot bad"></span> not recovered</span>
+  <span>Green day: nailed the workout and the recovery</span>
+</div>
+{% endblock %}

@@ -35,7 +35,11 @@ _build_lock = threading.RLock()
 def data_version(store: Store) -> tuple:
     """Changes whenever a sync brings anything in; cheap to read."""
     c = store.counts()
-    return (c["activities"], c["streams"], c["wellness"], store.get_meta("last_sync") or "")
+    # Fingerprint of what the pages are built from, NOT the time of the last sync: the morning
+    # pull runs every 10 minutes and must not throw away every cached page when nothing changed.
+    since = (local_today() - timedelta(days=3)).isoformat()
+    recent = tuple((w.date, w.hrv, w.rhr, w.sleep_score, w.sleep_secs) for w in store.wellness(since))
+    return (c["activities"], c["streams"], c["wellness"], hash(recent))
 
 
 def today_rx(store: Store, day: str | None = None):
@@ -48,9 +52,16 @@ def today_rx(store: Store, day: str | None = None):
         if hit is None:
             p = prof.build(store, day)
             hit = (p, build_rx(p, day))
-            if len(_built) > 8:
-                _built.clear()
+            while len(_built) > 120:                 # drop the oldest, never everything at once
+                _built.pop(next(iter(_built)))
             _built[key] = hit
+            if day == local_today().isoformat():     # keep what today actually prescribed, for History
+                try:
+                    import json as _json
+                    rx_ = hit[1]
+                    store.set_meta(f"rx:{day}", _json.dumps([rx_.verdict, rx_.hr_low, rx_.hr_ceiling]))
+                except Exception:
+                    pass
     return hit
 
 
@@ -137,7 +148,7 @@ def plan_history(store: Store, days: int = 7):
             py, rxy = today_rx(store, y)
             prev = planmod.build(py, rxy)
             planned = next((x for x in prev.days if x.date == d), None)
-            if planned and not planned.reason.startswith("You rarely") and planned.verdict != rx.verdict:
+            if planned and not planned.reason.startswith("You almost never") and planned.verdict != rx.verdict:
                 up = 1 if ORDER.index(rx.verdict) > ORDER.index(planned.verdict) else -1
                 row.update(changed=True, was=planned.verdict, was_title=planned.title, why=planmod.explain(up, planmod.causes(p, rx, prev), rx))
         except Exception:

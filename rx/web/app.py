@@ -227,6 +227,26 @@ def today(request: Request, d: str | None = None):
                  day_label=when.strftime("%A, %B %-d"))
 
 
+@app.get("/calendar/history", response_class=HTMLResponse)
+def history_page(request: Request, m: str | None = None):
+    from .. import history as histmod
+    store = open_store()
+    p, rx = today_rx(store)
+    ym = m if (m and len(m) == 7) else rx.date[:7]
+    def live():
+        import json as _json
+        out = {}
+        y_, m_ = map(int, ym.split("-"))
+        for dd in range(1, 32):
+            k = f"{ym}-{dd:02d}"
+            v = store.get_meta(f"rx:{k}")
+            if v:
+                out[k] = tuple(_json.loads(v))
+        return out
+    mon = cached(store, f"month:{ym}", rx.date, lambda: histmod.month(p, ym, rx.date, live()))
+    return _page(request, "history.html", mon=mon, active="calendar")
+
+
 @app.get("/calendar", response_class=HTMLResponse)
 def plan_page(request: Request):
     from ..prescribe import plan as planmod

@@ -5,11 +5,15 @@
   .plan-note { color:var(--lichen); font-size:18px; line-height:1.5; max-width:62ch; margin:20px 0 0; text-wrap:pretty; }
   .week { display:grid; margin-top:18px !important; grid-template-columns:repeat({{ plan.days|length or 1 }}, minmax(0, 1fr)); gap:0;
           margin-top:44px; border-top:2px solid var(--ink); }
-  .day { padding:18px 16px 22px; border-right:1px solid var(--rule); min-height:300px; display:flex; flex-direction:column; }
+  .week { grid-template-rows:auto auto auto auto; }
+  .day { padding:18px 16px 22px; border-right:1px solid var(--rule); display:grid; grid-row:span 4;
+         grid-template-rows:subgrid; row-gap:0; align-content:start; }
+  .day .dw { align-self:start; }
+  .day > .conf { align-self:end; }
   .day:last-child { border-right:0; }
   .day .wd { font-size:14px; font-weight:600; color:var(--lichen); }
   .day .dn { font-size:34px; font-weight:600; font-stretch:125%; line-height:1.1; margin-top:2px; font-variant-numeric:tabular-nums; }
-  .day .dh, .day .db { display:flex; flex-direction:column; } .day .db { flex:1; }
+  .day .dh, .day .db, .day .dw { display:flex; flex-direction:column; }
   .day .vbar { display:block; height:6px; margin:14px 0 12px; }
   .day .kind { font-size:14px; font-weight:700; }
   .day .ttl { font-size:16px; line-height:1.4; margin:4px 0 0; }
@@ -32,6 +36,9 @@
   .was-card .ttl { color:var(--lichen); font-size:14px; }
   .was-card .why { color:var(--lichen); }
   .opts { font-size:13px; color:var(--lichen); margin:6px 0 0; }
+  .tabs { display:flex; gap:24px; margin-top:24px; font-size:17px; }
+  .tabs a { text-decoration:none; color:var(--lichen); padding-bottom:4px; }
+  .tabs a.on { color:var(--ink); box-shadow:inset 0 -2px 0 var(--ink); }
   .rowh { color:var(--ink); font-size:20px; margin:56px 0 4px; }
   .rowsub { color:var(--lichen); margin:0; }
   .week.past .day { min-height:0; }
@@ -59,9 +66,11 @@
   .sub a.btn:hover { background:var(--ink); color:#fff; }
   .sub input { width:100%; font:inherit; font-size:13px; padding:10px 12px; border:1px solid var(--rule); border-radius:8px; margin-top:14px; color:var(--lichen); }
   @media (max-width: 900px) {
-    .week { grid-template-columns:1fr; }
-    .day { min-height:0; border-right:0; border-bottom:1px solid var(--rule); flex-direction:row; gap:18px; padding:16px 0; }
-    .day .dh { width:56px; flex:none; }
+    .week, .week.past { grid-template-columns:1fr !important; grid-template-rows:none; }
+    .day { grid-row:auto; grid-template-rows:none; grid-template-columns:56px 1fr; column-gap:18px;
+           border-right:0; border-bottom:1px solid var(--rule); padding:16px 0; }
+    .day .dh { grid-row:1 / span 3; }
+    .day .db, .day .dw, .day > .conf { grid-column:2; }
     .day .vbar { width:40px; margin:8px 0 0; }
     .day .conf { padding-top:8px; }
   }
@@ -69,32 +78,9 @@
 {% endblock %}
 {% block body %}
 <h1 class="plan-h">Calendar</h1>
+<nav class="tabs"><a class="on" href="/calendar">Upcoming</a><a href="/calendar/history">History</a></nav>
 
 {% set K = {'rest':'Day off','light':'Walk','easy':'Easy','steady':'Steady','hard':'Hard'} %}
-<h2 class="rowh">The last 7 days</h2>
-<p class="rowsub">What each morning prescribed, what you did, and whether you recovered from it.</p>
-{% if hist %}
-<div class="week past" style="grid-template-columns:repeat({{ hist|length }}, minmax(0, 1fr))">
-{% for h in hist %}{% set hd = date.fromisoformat(h.date) %}
-  <div class="day">
-    <div class="dh"><span class="wd">{{ hd.strftime('%a') }}</span><span class="dn">{{ hd.day }}</span>
-      <span class="vbar v-{{ h.now }}"></span></div>
-    <div class="db">
-      <span class="kind">{{ K[h.now] }}</span>
-      <p class="ttl">{{ h.what }}</p>
-      <p class="did">{% if h.did %}{% for x in h.did %}{{ x }}<br>{% endfor %}{% else %}Nothing recorded{% endif %}</p>
-      <span class="chip t-{{ h.work_tone }}">{{ h.work }}</span>
-      {% if h.rec %}<p class="rec t-{{ h.rec_tone }}">{{ h.rec }}</p>{% endif %}
-      {% if h.head %}<p class="head">{{ h.head }}</p>{% endif %}
-      {% if h.changed %}<div class="was-card"><span class="wl">Planned the day before</span>
-        <span class="vbar v-{{ h.was }}"></span><span class="kind">{{ K[h.was] }}</span>
-        {% if h.was_title %}<p class="ttl">{{ h.was_title }}</p>{% endif %}<p class="why">{{ h.why }}</p></div>{% endif %}
-    </div>
-  </div>
-{% endfor %}
-</div>
-{% else %}<p class="rowsub">Working it out from the last week. Refresh in a minute.</p>{% endif %}
-
 <h2 class="rowh">The next {{ plan.horizon }} days</h2>
 <p class="rowsub">{{ plan.note }}</p>
 <div class="week">
@@ -108,12 +94,14 @@
       {% if d.options %}<p class="opts">{{ d.options }}</p>{% endif %}
       {% if d.reason and not d.because and d.confidence != 'Today' %}<p class="why">{{ d.reason }}</p>{% endif %}
       {% if d.verdict != 'rest' %}<details><summary>Details</summary><p>{{ d.detail }}</p></details>{% endif %}
-      {% if d.was %}<div class="was-card"><span class="wl">Yesterday's plan</span>
+    </div>
+    <div class="dw">{% if d.was %}<div class="was-card"><span class="wl">Yesterday's plan</span>
         <span class="vbar v-{{ d.was }}"></span>
         <span class="kind">{{ {'rest':'Day off','light':'Walk','easy':'Easy','steady':'Steady','hard':'Hard'}[d.was] }}</span>
         {% if d.was_title and d.was_title != {'rest':'Day off','light':'Walk','easy':'Easy','steady':'Steady','hard':'Hard'}[d.was] %}<p class="ttl">{{ d.was_title }}</p>{% endif %}
         <p class="why">{{ d.because }}</p></div>{% endif %}
-      <span class="conf">{{ d.confidence }}</span></div>
+    </div>
+    <span class="conf">{{ d.confidence }}</span>
   </div>
 {% endfor %}
 </div>

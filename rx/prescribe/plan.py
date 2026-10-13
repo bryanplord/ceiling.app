@@ -51,7 +51,7 @@ def _rest_days(p: Profile, day: str) -> set[int]:
     out = set()
     for wd in range(7):
         days = [d0 - timedelta(days=n) for n in range(1, 85) if (d0 - timedelta(days=n)).weekday() == wd]
-        if days and sum(x.isoformat() in trained for x in days) / len(days) < 0.25:
+        if days and sum(x.isoformat() in trained for x in days) / len(days) < 0.1:
             out.add(wd)
     return out
 
@@ -130,7 +130,7 @@ def build(p: Profile, rx: Rx) -> Plan:
         if v == HARD and len(recent_hard) >= 2:
             v, reason = STEADY, "Two hard days already this week."
         if (d0 + timedelta(days=k)).weekday() in rest_wd and v != REST:
-            v, reason = REST, f"You rarely train on {(d0 + timedelta(days=k)).strftime('%A')}s."
+            v, reason = REST, f"You almost never train on {(d0 + timedelta(days=k)).strftime('%A')}s."
         ban = set()
         if new_runner and (v in (STEADY, HARD) or (last_run and (date.fromisoformat(d) - date.fromisoformat(last_run)).days < 2)):
             ban = set(RUNS)
@@ -235,7 +235,7 @@ def explain(direction: int, why: list[tuple[str, int]], rx: Rx | None = None) ->
 def adjust(p: Profile, rx: Rx, plan: Plan, prev: Plan) -> list[PlanDay]:
     """Mark every day whose plan changed since yesterday, and say why."""
     from .engine import ORDER
-    was = {d.date: d.verdict for d in prev.days if not d.reason.startswith("You rarely")}
+    was = {d.date: d.verdict for d in prev.days if not d.reason.startswith("You almost never")}
     was_t = {d.date: d.title for d in prev.days}
     why = causes(p, rx, prev)
     changed, first = [], True

@@ -228,6 +228,8 @@
           {% if rx.sleep and rx.sleep.state not in ('even', 'unknown', 'surplus') %}{% set sd = rx.sleep.says.split('. ')[0].rstrip('.') %}<li><b>Sleep debt</b> {{ sd[:1] | upper }}{{ sd[1:] }}.</li>{% endif %}</ul></div></details>{% endif %}
       {% if rx.minimum %}{% set ms = rx.minimum.split('. ') %}<details class="rowd"><summary><span class="rxk">Minimum</span><p class="rxv">{{ ms[0].rstrip('.') }}.</p><i class="chev" aria-hidden="true"></i></summary>
         <div class="rowb"><p class="actwhy">{{ ms[1:]|join('. ') }}</p></div></details>{% endif %}
+      {% if rx.maximum %}{% set mx = rx.maximum.split('. ') %}<details class="rowd"><summary><span class="rxk">Maximum</span><p class="rxv">{{ mx[0].rstrip('.') }}.</p><i class="chev" aria-hidden="true"></i></summary>
+        <div class="rowb"><p class="actwhy">{{ mx[1:]|join('. ') }}</p></div></details>{% endif %}
       {% if rx.tomorrow %}<details class="rowd"><summary><span class="rxk">Tomorrow</span><p class="rxv">{{ rx.tomorrow_short }}</p><i class="chev" aria-hidden="true"></i></summary>
         <div class="rowb"><dl class="tmr">{% for label, tone, text in rx.tomorrow %}<div class="t-{{ tone }}"><dt>{{ label }}</dt><dd>{{ text }}</dd></div>{% endfor %}</dl>
         <p class="actwhy">Assumes a normal night. Re-read tomorrow morning with your sleep and HRV.</p></div></details>{% endif %}
