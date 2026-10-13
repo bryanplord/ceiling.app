@@ -60,6 +60,8 @@ class Rx:
     example: str = ""
     minimum: str = ""
     tomorrow_short: str = ""
+    why_need: str = ""
+    why_story: str = ""
     how_short: str = ""
     how_more: list = field(default_factory=list)
     tomorrow: list = field(default_factory=list)   # (label, tone, text): as written / overdo / skip
@@ -245,6 +247,7 @@ def build_rx(p: Profile, day: str | None = None) -> Rx:
     rx.example = example_ride(p, sport, verdict, mins, ceiling, kind)
     rx.diagnosis, rx.activity_why = diag, sport_reason
     rx.why_title, rx.why_tone, rx.why_says = why_lead(verdict, p, day, reading)
+    rx.why_need, rx.why_story = why_story(verdict, p, day, sb, reading)
     rx.what, rx.how = what_how(rx, kind, mins, low, ceiling, steps)
     rx.minimum = minimum_dose(p, rx, kind)
     key = next((i for i, h in enumerate(rx.how) if "×" in h), 0) if verdict == HARD else 0
@@ -785,6 +788,72 @@ def choose_activity(verdict: str, p: Profile, day: str) -> tuple[str, str | None
 def _hm_short(h: float) -> str:
     hh, mm = int(h), int(round((h - int(h)) * 60))
     return f"{hh}h {mm:02d}m" if hh else f"{mm} minutes"
+
+
+def _hm_words(h: float) -> str:
+    hh, mm = int(h), round((h - int(h)) * 60)
+    return f"{hh}h {mm:02d}m" if hh else f"{mm} minutes"
+
+
+def why_story(verdict: str, p: Profile, day: str, sb, reading) -> tuple[str, str]:
+    """The Why as a coach says it: what you need, which signals point there, and what they mean
+    together. One reading of all of it, not a list of numbers (the numbers sit under More)."""
+    need = {REST: "You need a day off.", LIGHT: "Move today, but don't train.",
+            EASY: "Train today, but take it easy.", STEADY: "Train today: steady, not hard.",
+            HARD: "You're ready to go hard."}[verdict]
+    w = sorted((x for x in p.wellness if x.date <= day), key=lambda x: x.date)
+
+    def avg(vals):
+        vals = [v for v in vals if v is not None]
+        return sum(vals) / len(vals) if vals else None
+
+    hrv7, hrv60 = avg(x.hrv for x in w[-7:]), avg(x.hrv for x in w[-67:-7])
+    rhr7, rhr60 = avg(x.rhr for x in w[-7:]), avg(x.rhr for x in w[-67:-7])
+    hrv_dir = None if not (hrv7 and hrv60) else ("down" if hrv7 < hrv60 * 0.95 else "up" if hrv7 > hrv60 * 1.05 else "flat")
+    rhr_dir = None if not (rhr7 and rhr60) else ("up" if rhr7 >= rhr60 + 1.5 else "down" if rhr7 <= rhr60 - 1.5 else "flat")
+    debt = sb.balance if sb else 0.0
+    rising = bool(sb and len(sb.nights) >= 4 and sb.nights[-1].debt > sb.nights[-4].debt + 0.25)
+    y = p.yesterday
+    load_up = bool(y and y.ctl > 5 and y.atl / y.ctl > 1.15)
+
+    bad, good = [], []
+    if debt >= 1.0:
+        bad.append(f"sleep debt is stacking up ({_hm_words(debt)} owed)" if rising
+                   else f"you're carrying {_hm_words(debt)} of sleep debt")
+    if hrv_dir == "down":
+        bad.append(f"HRV is trending down ({hrv7:.0f} this week against your usual {hrv60:.0f})")
+    if rhr_dir == "up":
+        bad.append(f"resting HR is creeping up ({rhr7:.0f} against your usual {rhr60:.0f})")
+    if load_up:
+        bad.append(f"your last week is {(y.atl / y.ctl - 1) * 100:.0f}% above your normal training")
+    if hrv_dir == "flat" and rhr_dir == "flat":
+        good.append("HRV and resting HR are both holding")
+    else:
+        if hrv_dir in ("up", "flat"):
+            good.append("HRV is holding" if hrv_dir == "flat" else "HRV is trending up")
+        if rhr_dir in ("flat", "down"):
+            good.append("resting HR is holding" if rhr_dir == "flat" else "resting HR is coming down")
+
+    def join(xs):
+        return xs[0] if len(xs) == 1 else ", ".join(xs[:-1]) + " and " + xs[-1]
+
+    parts = []
+    if bad:
+        parts.append(join(bad)[0].upper() + join(bad)[1:] + ".")
+    if hrv_dir == "down" and (rhr_dir == "up" or debt >= 2.0):
+        parts.append("Together that means you're fatigued and not fully recovered. Easy work keeps the "
+                     "fitness; anything harder digs the hole deeper.")
+    elif hrv_dir == "down":
+        parts.append("Resting HR is holding, so it's early. Back off now and it turns around in a few days, "
+                     "not a few weeks.")
+    elif bad:
+        tail = {HARD: "Go hard, then make tonight's sleep count.",
+                STEADY: "Steady work is fine; intensity is what would tip it over."}.get(verdict, "Today is about not tipping it over.")
+        parts.append(f"But {join(good)}, so your body is coping. {tail}" if good
+                     else "That's fatigue building. Today is about letting it clear.")
+    elif good:
+        parts.append(join(good)[0].upper() + join(good)[1:] + ": you're absorbing what you're doing.")
+    return need, " ".join(parts)
 
 
 def why_lead(verdict: str, p: Profile, day: str, reading) -> tuple[str, str, str]:
