@@ -16,8 +16,9 @@ from datetime import date, timedelta
 import fitparse
 import numpy as np
 
-from .raw import (blocks, climb_from_blocks, climb_rates, far_out, fastest, hr_bands, mark_jumps,
-                  ok, r0, rolling_hr, segments, structure)
+from .checks import check_record, credible_peak, hr_coverage
+from .raw import (blocks, climb_from_blocks, far_out, fastest, hr_bands, mark_jumps,
+                  ok, person_caps, r0, rolling_hr, segments, structure)
 
 def _fit_file_type(path):
     """The file_id type the device wrote into the file (activity, monitoring and so on).
@@ -40,6 +41,14 @@ CHECKED = {"climb_vert_mh": "hi", "bike_climb_vert_mh": "hi", "foot_flat_speed_m
            "fastest_bike_10mi_s": "lo"}
 
 
+def _sustained(b, grade):
+    """True when the two minutes around a block are steep too. A single steep
+    30-second block among flat ones is usually an altitude reading stepping,
+    not a climb, and counting only such blocks would make climbing look fast."""
+    wd, wa = b.get("win_dist") or 0.0, b.get("win_dalt")
+    return ok(wa) and wd > 20 and wa / wd >= grade
+
+
 def session_card(act, tz, bl):
     rec = act["rec"]
     family = act["family"]
@@ -59,8 +68,9 @@ def session_card(act, tz, bl):
     mhr = np.array([b["hr"] for b in moving]) if moving else np.array([b["hr"] for b in live])
     w = np.array([b["dur"] for b in (moving or live)])
     f = np.isfinite(mhr)
-    peak60, low60 = rolling_hr(rec, 60)
+    _, low60 = rolling_hr(rec, 60)
     _, low300 = rolling_hr(rec, 300)
+    peak60, peak_notes = credible_peak(rec, 60)
     card = {
         "id": loc.strftime("%Y-%m-%d-%H-%M-%S"),
         "recorded_as": act["sport"] if act["sub_sport"] in ("generic", "None") else f"{act['sport']} ({act['sub_sport']})",
@@ -91,7 +101,7 @@ def session_card(act, tz, bl):
             card["foot_flat_speed_ms"] = round(sum(b["dist"] for b in flat) / sum(b["dur"] for b in flat), 3)
             fh = [b["hr"] for b in flat if ok(b["hr"])]
             card["foot_flat_hr"] = r0(float(np.mean(fh))) if fh else None
-        steep = [b for b in foot if ok(b["grade"]) and b["grade"] >= 0.08]
+        steep = [b for b in foot if ok(b["grade"]) and b["grade"] >= 0.08 and _sustained(b, 0.08)]
         if len(steep) >= 4:
             card["climb_vert_mh"] = round(sum(b["dalt"] for b in steep) / sum(b["dur"] for b in steep) * 3600)
             sh = [b["hr"] for b in steep if ok(b["hr"])]
@@ -108,7 +118,7 @@ def session_card(act, tz, bl):
             card["bike_flat_speed_ms"] = round(sum(b["dist"] for b in flat) / sum(b["dur"] for b in flat), 3)
             fh = [b["hr"] for b in flat if ok(b["hr"])]
             card["bike_flat_hr"] = r0(float(np.mean(fh))) if fh else None
-        steep = [b for b in bike if ok(b["grade"]) and b["grade"] >= 0.05]
+        steep = [b for b in bike if ok(b["grade"]) and b["grade"] >= 0.05 and _sustained(b, 0.05)]
         if len(steep) >= 4:
             card["bike_climb_vert_mh"] = round(sum(b["dalt"] for b in steep) / sum(b["dur"] for b in steep) * 3600)
             sh = [b["hr"] for b in steep if ok(b["hr"])]
@@ -143,10 +153,22 @@ def session_card(act, tz, bl):
             if v:
                 card[f"fastest_{mode}_{label}_s"] = round(v)
 
-    notes = []
+    notes = list(act.get("check_notes") or []) + peak_notes
+    mov_min, miss_min = hr_coverage(bl)
+    if mov_min >= 5 and miss_min / mov_min > 0.2 and miss_min < mov_min:
+        notes.append(f"no heart rate for {round(miss_min)} of {round(mov_min)} moving minutes")
     jumps = sum(1 for b in live if b.get("alt_jump"))
     if jumps:
-        notes.append(f"{jumps} blocks with a climb rate far outside this person's own range left out of climb")
+        notes.append(f"{jumps} blocks whose altitude change the rest of the data contradicts (steeper than the "
+                     f"ground covered, or a climb rate far outside this person's own) left out "
+                     f"of climbing")
+    doubt = [b for b in live if b.get("alt_doubt")]
+    if doubt:
+        notes.append(f"{round(sum(b['dur'] for b in doubt) / 60)} min of climbing faster than this person usually "
+                     f"climbs on foot at that heart rate were kept but are doubtful")
+    vehicle = sum(1 for b in live if b["mode"] == "fast") if family == "bike" else 0
+    if vehicle:
+        notes.append(f"{vehicle} blocks far faster than this person ever rides were read as a vehicle, not riding")
     fast = card["minutes"].get("fast", 0)
     moving_min = sum(v for k, v in card["minutes"].items() if k != "still")
     if family == "foot" and moving_min and fast / moving_min > 0.3:
@@ -252,7 +274,7 @@ def hr_envelope(cards):
 
 # ------------------------------------------------------------------ building
 
-BLOCK_KEYS = ("pause", "start", "end", "dur", "mode", "hr", "grade", "dist", "dalt", "alt_jump")
+BLOCK_KEYS = ("pause", "start", "end", "dur", "mode", "hr", "grade", "dist", "dalt", "alt_jump", "alt_doubt")
 
 
 def slim_blocks(bl):
@@ -274,14 +296,16 @@ def _unslim(bl):
 
 
 def session_rows(acts, tz, caps=None, source="export"):
-    """Cards, segments and slimmed blocks for a list of sessions. Without caps,
-    this person's altitude-jump caps are computed from these sessions first."""
+    """Cards, segments and slimmed blocks for a list of sessions. Heart-rate
+    readings that fail the consistency checks are left out first (checks.py).
+    Without caps, this person's own limits are computed from these sessions."""
     all_bl = []
     for a in acts:
         a["family"] = FAMILY.get(a["sport"], "foot")
+        a["check_notes"] = check_record(a["rec"], a["family"])
         all_bl.append(blocks(a["rec"], a["family"]))
     if caps is None:
-        caps = {k: far_out(v) for k, v in climb_rates(all_bl).items()}
+        caps = person_caps(all_bl)
     rows = []
     for a, bl in zip(acts, all_bl):
         mark_jumps(bl, caps)

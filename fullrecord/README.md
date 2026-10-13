@@ -17,6 +17,18 @@ formula. Values far outside the athlete's own range are removed and named,
 judged only against their own data. The one label used is the sport chosen on
 the watch, to tell rides and swims from movement on foot.
 
+Before anything is computed, readings that the rest of the data contradicts
+are left out and named on their session (`checks.py`, and the altitude checks
+in `raw.py`): heart rate that jumps from the seconds around it, stops changing
+while moving, or follows the step rate (an optical sensor counting arm swing);
+one-minute peaks with no rise into them; climbing steeper than the ground
+covered or, on a bike, faster than the person ever climbs at that heart rate;
+and bike stretches far faster than the person ever rides on level ground.
+Climbing on foot faster than the person usually climbs is kept but marked
+doubtful. Every limit comes from the person's own data or the session's own
+other streams. After updating this code, run the ingest again so the stored
+history is rebuilt with the checks.
+
 History comes once from a Garmin account export. Every day after the export
 comes from Ceiling's own intervals.icu pull, which has no altitude, so those
 days show no climbing. Garmin's own nightly figures for those days are left out
@@ -41,6 +53,7 @@ and `ANTHROPIC_API_KEY`.
 ## Files
 
 - `ingest.py`: export to the `fr_sessions` and `fr_nights` tables.
+- `checks.py`: the consistency checks on heart rate and peaks.
 - `fit.py`, `raw.py`, `catalogue.py`, `nights.py`, `render.py`: the record.
 - `store_source.py`: days after the export, from Ceiling's store.
 - `record.py`: the whole record as text, rebuilt when the data changes.

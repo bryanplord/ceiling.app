@@ -206,14 +206,17 @@ def blocks(rec, family="foot"):
             hi += 1
         win = [x for x in out[lo:hi + 1] if ok(x["dalt"])]
         wd = sum(x["dur"] for x in win)
+        b["win_dist"] = sum(x["dist"] for x in win)
+        b["win_dalt"] = sum(x["dalt"] for x in win)
         if ok(b["dalt"]) and wd > 0:
-            b["win_rate"] = sum(x["dalt"] for x in win) / wd * 3600
+            b["win_rate"] = b["win_dalt"] / wd * 3600
     return out
 
 
 def far_out(values, side="hi", k=FENCE_K):
     """The fence beyond which a value is far outside the person's own curve:
-    Tukey's far-out fence on a log scale, from their values only."""
+    Tukey's far-out fence on a log scale, from their values only. Used for
+    card values; the altitude and speed checks use far_out_linear."""
     v = sorted(math.log(x) for x in values if ok(x) and x > 0)
     if len(v) < 8:
         return None
@@ -222,37 +225,123 @@ def far_out(values, side="hi", k=FENCE_K):
     return math.exp(q3 + k * iqr) if side == "hi" else math.exp(q1 - k * iqr)
 
 
+def _band(hr):
+    return int(hr // 10 * 10) if ok(hr) else None
+
+
+def far_out_linear(values, k=FENCE_K):
+    """Tukey's far-out fence (Q3 + 3 IQR) on the plain scale, from the person's
+    own values. Tighter than the log-scale fence on right-skewed values such as
+    climb rates, where a log scale lets readings several times too high pass."""
+    v = [x for x in values if ok(x)]
+    if len(v) < 8:
+        return None
+    q1, q3 = float(np.percentile(v, 25)), float(np.percentile(v, 75))
+    return q3 + k * (q3 - q1)
+
+
 def climb_rates(all_blocks):
-    """Two-minute climbing and descending rates by mode, for setting a person's caps."""
-    out = {"foot_up": [], "foot_down": [], "bike_up": []}
+    """The person's own spreads that the checks are set from: two-minute
+    climbing and descending rates by mode, the same by 10-bpm heart-rate band
+    (key "bike_up@120" means climbing on a bike at a heart rate of 120 to 129),
+    and block speeds on a bike."""
+    out = {"foot_up": [], "foot_down": [], "bike_up": [], "bike_speed": []}
     for bl in all_blocks:
         for b in bl:
-            r = b.get("win_rate", math.nan)
-            if b["pause"] or not ok(r) or b["mode"] in ("fast", "swim"):
+            if b["pause"] or b["mode"] in ("fast", "swim", "still"):
                 continue
+            dalt = b.get("dalt", math.nan)
+            if b["mode"] == "bike" and b["speed"] > 0 and not (ok(dalt) and b["dist"] > 20
+                                                               and dalt / b["dist"] < -0.02):
+                out["bike_speed"].append(b["speed"])
+            r = b.get("win_rate", math.nan)
+            if not ok(r):
+                continue
+            key = None
             if b["mode"] == "bike":
                 if r >= CLIMB_FLOOR_MH:
-                    out["bike_up"].append(r)
+                    key, v = "bike_up", r
             elif r >= CLIMB_FLOOR_MH:
-                out["foot_up"].append(r)
+                key, v = "foot_up", r
             elif r <= -CLIMB_FLOOR_MH:
                 out["foot_down"].append(-r)
+            if key:
+                out[key].append(v)
+                band = _band(b["hr"])
+                if band is not None:
+                    out.setdefault(f"{key}@{band}", []).append(v)
     return out
 
 
+def person_caps(all_blocks):
+    """Limits computed from this person's own blocks.
+
+    On a bike, climbing beyond the person's own far-out fence (plain scale),
+    overall or at that heart rate, is left out. On foot the removal limit is
+    the looser log-scale fence, because steep ground on foot really does give
+    rare, very fast climbing; climbing between the two fences is kept but
+    marked as doubtful ('~usual' limits). A limit for a heart-rate band is never
+    higher than the limit for the bands above it: at a lower heart rate the
+    same person does not climb faster than they ever do at a higher one."""
+    rates = climb_rates(all_blocks)
+    caps = {}
+    for k, v in rates.items():
+        mode = k.split("@")[0]
+        if mode in ("foot_up", "foot_down"):
+            if "@" not in k:
+                caps[k] = far_out(v)
+            caps[k.replace(mode, mode + "~usual")] = far_out_linear(v)
+        else:
+            caps[k] = far_out_linear(v)
+    for mode in ("foot_up~usual", "bike_up"):
+        bands = sorted(int(k.split("@")[1]) for k in caps if k.startswith(mode + "@") and caps[k])
+        ceiling = None
+        for band in reversed(bands):
+            key = f"{mode}@{band}"
+            ceiling = caps[key] if ceiling is None else min(caps[key], ceiling)
+            caps[key] = ceiling
+    return caps
+
+
 def mark_jumps(bl, caps):
-    """Mark blocks whose two-minute climb rate is far outside the person's own
-    curve as altitude jumps, and leave them (and fast blocks) out of climbing."""
+    """Leave out of climbing the blocks whose altitude change the rest of the
+    data contradicts, mark as doubtful the climbing faster than this person
+    usually climbs, and reclassify bike blocks far faster than this person ever
+    rides on level or rising ground as 'fast' (a vehicle). A block is an
+    altitude jump when it rises or falls more than the ground it covers, when
+    its two-minute climb rate is far outside the person's own rates (on a bike,
+    overall or at that heart rate), or when over two minutes it rises or falls
+    more than the ground covered."""
     for b in bl:
         if b["pause"]:
             continue
+        b["alt_doubt"] = False
+        dalt = b.get("dalt", math.nan)
+        downhill = ok(dalt) and b["dist"] > 20 and dalt / b["dist"] < -0.02
+        if b["mode"] == "bike" and caps.get("bike_speed") and b["speed"] > caps["bike_speed"] and not downhill:
+            b["mode"] = "fast"
+        if ok(dalt) and abs(dalt) >= 5 and abs(dalt) > b["dist"] and b["mode"] in ("bike", "foot"):
+            b["alt_jump"] = True
         r = b.get("win_rate", math.nan)
-        if ok(r) and b["mode"] != "fast":
-            up = caps.get("bike_up") if b["mode"] == "bike" else caps.get("foot_up")
-            down = None if b["mode"] == "bike" else caps.get("foot_down")
-            if (up and r > up) or (down and r < -down):
+        if ok(r) and b["mode"] not in ("fast", "still"):
+            band = _band(b["hr"])
+            if b["mode"] == "bike":
+                up = caps.get("bike_up")
+                band_up = caps.get(f"bike_up@{band}") if band is not None else None
+                if (up and r > up) or (band_up and r > band_up):
+                    b["alt_jump"] = True
+            else:
+                up, down = caps.get("foot_up"), caps.get("foot_down")
+                if (up and r > up) or (down and r < -down):
+                    b["alt_jump"] = True
+                usual = caps.get(f"foot_up~usual@{band}") if band is not None else None
+                usual = usual or caps.get("foot_up~usual")
+                if not b.get("alt_jump") and usual and r > usual:
+                    b["alt_doubt"] = True
+            wd, wa = b.get("win_dist", 0.0), b.get("win_dalt", math.nan)
+            if ok(wa) and abs(wa) >= 10 and abs(wa) > wd:
                 b["alt_jump"] = True
-        if b["mode"] == "fast" or b["alt_jump"]:
+        if b["mode"] == "fast" or b.get("alt_jump"):
             b["dalt"] = math.nan
         b["grade"] = b["dalt"] / b["dist"] if ok(b["dalt"]) and b["dist"] > 20 else math.nan
     return bl

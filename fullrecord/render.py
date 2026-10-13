@@ -87,18 +87,26 @@ def render(meta, env, rel, weekly, cards, seg_rows, today, night_rows=()):
              "faster than 13 mph in a session not recorded as cycling: a vehicle, lift or ski run), "
              "'still' (under 33 feet per block), 'paused' (no records). Climb and descent count "
              "altitude changes of 10 feet or more within unbroken recording. Units are US: miles, "
-             "feet, minutes per mile, miles per hour, feet climbed per hour. Plausibility is judged only "
-             "against this person's own data: a value far outside their own spread (beyond the "
-             "quartile plus three interquartile ranges, on a log scale) is removed and named in a "
-             "NOTE, and blocks whose two-minute climb rate is far outside their own spread are left "
-             "out of climbing. 'HR min by band' "
+             "feet, minutes per mile, miles per hour, feet climbed per hour. Readings are checked before "
+             "anything is computed, against the other streams of the same session and against this "
+             "person's own data, never against anyone else: heart-rate readings that jump from the "
+             "seconds around them, stop changing while moving, or follow the step rate (an optical "
+             "sensor counting arm swing) are left out; a one-minute heart-rate peak with no rise into "
+             "it is not counted as a peak; altitude changes steeper than the ground covered, or (on a "
+             "bike) faster than this person ever climbs at that heart rate, are left out of climbing, and "
+             "climbing on foot faster than this person usually climbs is kept but marked doubtful; "
+             "bike stretches far faster than this person ever rides are read as a vehicle; and a card "
+             "value far outside their own spread (beyond the quartile plus three interquartile ranges, "
+             "on a log scale) is removed. Every one of these is named in the session's NOTE. The checks "
+             "catch only what the data contradicts, so a reading can still be wrong without a NOTE. "
+             "'HR min by band' "
              "is minutes in each 10-bpm band (110 means 110-119). Watch temperature reads high "
              "because the watch sits on the wrist.")
     lim = meta.get("limits")
     if lim:
         caps = lim.get("altitude_jump_caps_m_per_h", {})
         L.append("This person's own limits: altitude jumps above " + ", ".join(
-            f"{k.replace('_', ' ')} {ft(v)} ft/h" for k, v in caps.items() if v) + "; card values beyond " + ", ".join(
+            f"{k.replace('_', ' ')} {ft(v)} ft/h" for k, v in caps.items() if v and "@" not in k and "~" not in k and k != "bike_speed") + "; card values beyond " + ", ".join(
             f"{k} {v['fence']}" for k, v in lim.items() if isinstance(v, dict) and v.get("fence")) + ".")
     L.append("")
 
