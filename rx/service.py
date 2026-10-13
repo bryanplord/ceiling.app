@@ -84,7 +84,8 @@ def _data_version(store: Store) -> tuple:
     # pull runs every 10 minutes and must not throw away every cached page when nothing changed.
     since = (local_today() - timedelta(days=3)).isoformat()
     recent = tuple((w.date, w.hrv, w.rhr, w.sleep_score, w.sleep_secs) for w in store.wellness(since))
-    return (store.owner, c["activities"], c["streams"], c["wellness"], hash(recent), store.get_meta("goal") or "")
+    return (store.owner, c["activities"], c["streams"], c["wellness"], hash(recent), store.get_meta("goal") or "",
+            store.get_meta("plans") or "")
 
 
 def today_rx(store: Store, day: str | None = None):
@@ -99,8 +100,11 @@ def today_rx(store: Store, day: str | None = None):
             try:
                 from . import goals as _gl
                 from datetime import date as _date
-                g = _gl.load(store)
-                p.program = _gl.build(p, g, _date.fromisoformat(day)) if g else None
+                d_ = _date.fromisoformat(day)
+                # Every committed plan live on this day. p.program is the lead one, so older callers
+                # keep working; anything that needs all of them uses goals.daily_all(p.programs, day).
+                p.programs = [_gl.build(p, g, d_) for g in _gl.active(store, d_)]
+                p.program = _gl.primary(p.programs, d_)
             except Exception as e:
                 print(f"goal failed: {e}")
             hit = (p, build_rx(p, day))

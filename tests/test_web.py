@@ -169,11 +169,10 @@ def test_goal_builder(tmp_path, monkeypatch):
     c = TestClient(app)
     form = {"Content-Type": "application/x-www-form-urlencoded"}
     assert "What are you training for?" in c.get("/plan").text
-    c.post("/plan", content="text=run+a+marathon+in+May", headers=form)
-    page = c.get("/plan").text
-    assert "Marathon on May" in page and "Base" in page and "days to go" in page
+    page = c.post("/plan", content="text=run+a+marathon+in+May", headers=form).text   # lands on the draft
+    assert "Marathon on May" in page and "Base" in page and "days to go" in page and "Draft" in page
     assert c.get("/calendar").status_code == 200 and c.get("/").status_code == 200
-    c.post("/plan/clear", headers=form)
-    c.post("/plan", content="canned=weight&w_now=181&w_target=170&date=" + (date.today().replace(year=date.today().year + 1)).isoformat(), headers=form)
-    page = c.get("/plan").text
+    page = c.post("/plan", content="canned=weight&w_now=181&w_target=170&date=" + (date.today().replace(year=date.today().year + 1)).isoformat(), headers=form).text
     assert "181 lb to 170 lb" in page and "Protein" in page
+    page = c.get("/plan").text
+    assert "Drafts" in page and "181 lb to 170 lb" in page and "Marathon on May" in page

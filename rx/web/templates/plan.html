@@ -1,65 +1,162 @@
 {% extends "base.html" %}
 {% block head %}
 <style>
-  .ph { font-size:clamp(40px, 6vw, 72px); margin:12px 0 0; }
-  .lede2 { font-size:19px; line-height:1.5; max-width:62ch; margin:18px 0 0; color:#2a2a2d; }
-  .cards { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:12px; margin-top:28px; }
+  .pg { max-width:880px; }
+  .ph { font-size:clamp(44px, 7.4vw, 88px); font-weight:700; font-stretch:100%; text-transform:none; letter-spacing:-0.035em;
+        line-height:1.02; margin:28px 0 0; text-wrap:balance; }
+  .lede2 { font-size:19px; line-height:1.5; max-width:58ch; margin:20px 0 0; color:#2a2a2d; text-wrap:pretty; }
+  .sec { font-size:22px; font-weight:700; letter-spacing:-0.01em; margin:72px 0 4px; color:var(--ink); }
+  .sec small { font-weight:400; font-size:15px; color:var(--lichen); margin-left:8px; }
+  .back { display:inline-block; margin-top:8px; font-size:15px; color:var(--lichen); text-decoration:none; }
+  .back:hover { color:var(--ink); }
+
+  /* buttons */
+  .btn { font:inherit; font-weight:600; font-size:16px; padding:14px 24px; border:0; border-radius:999px; background:var(--ink);
+         color:#fff; cursor:pointer; text-decoration:none; display:inline-block; line-height:1.2; }
+  .btn:hover { background:#333; }
+  .btn.go { background:var(--good); } .btn.go:hover { background:#1b623f; }
+  .btn.ghost { background:transparent; color:var(--ink); box-shadow:inset 0 0 0 1px #cfcfd4; font-weight:500; }
+  .btn.ghost:hover { box-shadow:inset 0 0 0 1px var(--ink); }
+  .btn.danger { background:var(--bad); } .btn.danger:hover { background:#9e2615; }
+  .btn.sm { font-size:15px; padding:10px 18px; }
+  .acts { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+
+  /* status */
+  .pill { display:inline-flex; align-items:center; gap:7px; font-size:14px; font-weight:600; padding:5px 12px 5px 10px;
+          border-radius:999px; background:var(--frost); color:var(--lichen); white-space:nowrap; }
+  .pill::before { content:""; width:8px; height:8px; border-radius:50%; background:currentColor; }
+  .pill.active { background:#e5f3ec; color:var(--good); }
+  .pill.draft { background:#fbf1de; color:var(--warn); }
+  .bar2 { height:6px; border-radius:3px; background:var(--frost2); overflow:hidden; margin-top:14px; }
+  .bar2 i { display:block; height:100%; background:var(--good); border-radius:3px; }
+
+  /* list */
+  .plans { margin-top:20px; display:grid; gap:14px; }
+  .pc { border:1px solid var(--rule); border-radius:18px; padding:26px 28px; }
+  .pc.on { border-color:#bfe0cf; }
+  .pc .top { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; }
+  .pc h3 { font-size:clamp(22px, 3vw, 28px); font-weight:700; letter-spacing:-0.02em; line-height:1.15; margin:0; text-wrap:balance; }
+  .pc h3 a { text-decoration:none; }
+  .pc h3 a:hover { text-decoration:underline; text-underline-offset:4px; }
+  .pc .meta { color:var(--lichen); font-size:16px; margin:8px 0 0; text-wrap:pretty; }
+  .pc .acts { margin-top:20px; }
+  .empty { color:var(--lichen); font-size:16px; margin:10px 0 0; }
+  .together { margin-top:14px; font-size:15px; color:var(--lichen); max-width:70ch; text-wrap:pretty; }
+
+  /* inline confirm */
+  details.cf { display:inline-block; }
+  details.cf > summary { list-style:none; }
+  details.cf > summary::-webkit-details-marker { display:none; }
+  details.cf[open] { display:block; width:100%; }
+  details.cf[open] > summary { display:none; }
+  .cfbox { margin-top:4px; padding:18px 20px; border-radius:14px; background:#fbeeec; }
+  .cfbox p { margin:0 0 14px; font-size:16px; max-width:60ch; text-wrap:pretty; }
+
+  /* picker */
+  .cards { display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); gap:12px; margin-top:40px; }
   .gc input { position:absolute; opacity:0; pointer-events:none; }
-  .gc span { display:block; padding:20px; border:1.5px solid var(--rule); border-radius:12px; font-size:18px; font-weight:600; cursor:pointer; min-height:84px; }
+  .gc span { display:block; padding:22px; border:1.5px solid var(--rule); border-radius:16px; font-size:18px; font-weight:600; cursor:pointer; min-height:96px; }
   .gc span small { display:block; font-weight:400; font-size:14px; color:var(--lichen); margin-top:6px; }
   .gc input:checked + span { border-color:var(--ink); box-shadow:inset 0 0 0 1px var(--ink); }
   .gc input:focus-visible + span { outline:2px solid var(--ceiling); outline-offset:2px; }
-  .gform { margin-top:24px; display:grid; gap:16px; max-width:640px; }
-  .gform label { display:grid; gap:6px; font-size:14px; font-weight:600; }
-  .gform input[type=text], .gform input[type=date], .gform input[type=number] { font:inherit; font-size:17px; padding:12px 14px; border:1px solid #d4d4d8; border-radius:8px; }
-  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-  .gform button { font:inherit; font-weight:600; font-size:16px; padding:15px 22px; border:0; border-radius:999px; background:var(--ink); color:#fff; cursor:pointer; justify-self:start; }
-  .gform button:hover { background:var(--ceiling); }
-  .or { color:var(--lichen); font-size:15px; margin:28px 0 0; }
+  .gform { margin-top:24px; display:grid; gap:18px; max-width:640px; }
+  .gform label, .fl { display:grid; gap:6px; font-size:15px; font-weight:600; }
+  .gform label small, .fl small { font-weight:400; color:var(--lichen); font-size:14px; }
+  .gform input[type=text], .gform input[type=date], .gform input[type=number], .gform select {
+    font:inherit; font-size:17px; padding:12px 14px; border:1px solid #d4d4d8; border-radius:10px; background:#fff; width:100%; min-width:0; height:50px; -webkit-appearance:none; appearance:none; }
+  .gform select { background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%236b6b6f' stroke-width='1.6'/%3E%3C/svg%3E") no-repeat right 14px center; padding-right:36px; }
+  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .or { color:var(--lichen); font-size:16px; margin:36px 0 0; }
   .wfields { display:none; } .wfields.on { display:grid; }
-  .count { display:flex; flex-wrap:wrap; gap:48px; margin-top:28px; }
-  .count b { display:block; font-size:clamp(40px, 6vw, 64px); font-weight:600; font-stretch:125%; line-height:1; }
-  .count span { color:var(--lichen); font-size:14px; }
-  .warn { margin-top:24px; padding:14px 16px; border-left:3px solid var(--warn); background:#fbf6ec; max-width:70ch; font-size:16px; }
+  .days { display:flex; flex-wrap:wrap; gap:8px; }
+  .days label { display:block; }
+  .days input { position:absolute; opacity:0; pointer-events:none; }
+  .days span { display:block; padding:9px 14px; border:1px solid #d4d4d8; border-radius:999px; font-weight:500; font-size:15px; cursor:pointer; }
+  .days input:checked + span { background:var(--ink); color:#fff; border-color:var(--ink); }
+  .days input:focus-visible + span { outline:2px solid var(--ceiling); outline-offset:2px; }
+
+  /* detail */
+  .state { margin-top:36px; display:flex; flex-wrap:wrap; align-items:center; gap:12px 16px; }
+  .state b { font-size:20px; font-weight:700; letter-spacing:-0.01em; }
+  .state span.m { color:var(--lichen); font-size:16px; }
+  .commitbox { margin-top:28px; padding:28px; border-radius:20px; background:var(--frost); }
+  .commitbox.on { background:#eef7f2; }
+  .commitbox h2 { font-size:28px; font-weight:700; color:var(--ink); letter-spacing:-0.02em; margin:0; text-wrap:balance; }
+  .commitbox p { margin:8px 0 0; font-size:17px; color:#2a2a2d; max-width:60ch; text-wrap:pretty; }
+  .commitbox .bar2 { max-width:520px; background:#d5e9de; }
+  .flash { margin-top:20px; font-size:16px; color:var(--good); font-weight:600; }
+  .count { display:flex; flex-wrap:wrap; gap:28px 56px; margin-top:48px; }
+  .count b { display:block; font-size:clamp(36px, 5vw, 56px); font-weight:700; letter-spacing:-0.02em; line-height:1; font-variant-numeric:tabular-nums; }
+  .count span { color:var(--lichen); font-size:15px; }
+  .warn { margin-top:24px; padding:16px 18px; border-radius:12px; background:#fbf3e4; max-width:70ch; font-size:16px; }
+  .adj { margin-top:8px; }
+  details.adjd > summary { cursor:pointer; list-style:none; display:inline-block; }
+  details.adjd > summary::-webkit-details-marker { display:none; }
   .tl { display:flex; gap:2px; margin-top:36px; }
-  .tl div { flex:1; height:30px; position:relative; }
-  .tl div.cur::after { content:""; position:absolute; left:50%; top:-10px; width:2px; height:50px; background:var(--ink); }
+  .tl div { flex:1; height:28px; position:relative; }
+  .tl div:first-child { border-radius:6px 0 0 6px; } .tl div:last-child { border-radius:0 6px 6px 0; }
+  .tl div.cur::after { content:""; position:absolute; left:50%; top:-8px; width:2px; height:44px; background:var(--ink); }
   .ph-Base { background:#7fa7d9; } .ph-Build { background:#46b07f; } .ph-Peak { background:#ec9550; }
   .ph-Taper { background:#e3bd52; } .ph-Recover { background:#c9d8ea; } .ph-Race { background:#de5f55; }
-  .tlk { display:flex; flex-wrap:wrap; gap:6px 16px; font-size:13px; color:var(--lichen); margin-top:10px; }
-  .tlk i { display:inline-block; width:12px; height:12px; margin-right:6px; vertical-align:-1px; }
-  table.wk { width:100%; border-collapse:collapse; margin-top:32px; font-size:15px; font-variant-numeric:tabular-nums; }
-  table.wk th { text-align:left; color:var(--lichen); font-weight:600; padding:8px 10px 8px 0; border-bottom:2px solid var(--ink); }
-  table.wk td { padding:10px 10px 10px 0; border-bottom:1px solid var(--rule); vertical-align:top; }
-  table.wk tr.cur td { font-weight:600; }
+  .tlk { display:flex; flex-wrap:wrap; gap:6px 16px; font-size:13px; color:var(--lichen); margin-top:12px; }
+  .tlk i { display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:6px; vertical-align:-1px; }
+  table.wk { width:100%; border-collapse:collapse; margin-top:28px; font-size:15px; font-variant-numeric:tabular-nums; }
+  table.wk th { text-align:left; color:var(--lichen); font-weight:600; padding:8px 12px 8px 0; border-bottom:1px solid var(--ink); }
+  table.wk td { padding:11px 12px 11px 0; border-bottom:1px solid var(--rule); vertical-align:top; }
+  table.wk tr.cur td { font-weight:700; }
   .nut { margin-top:28px; } .nut li { font-size:17px; margin:6px 0; }
-  .change { margin-top:36px; display:flex; gap:12px; }
-  .change button { font:inherit; font-size:15px; padding:10px 16px; border:1px solid var(--rule); background:#fff; border-radius:999px; cursor:pointer; }
-  @media (max-width:700px) { .row2 { grid-template-columns:1fr; } table.wk td.note, table.wk th.note { display:none; } }
+  .fine { text-wrap:pretty; font-size:15px; color:var(--lichen); max-width:62ch; margin-top:48px; }
+  .end { margin-top:40px; padding-top:28px; border-top:1px solid var(--rule); }
+  @media (max-width:700px) {
+    .ph { margin-top:16px; }
+    .row2 { grid-template-columns:1fr; }
+    table.wk td.note, table.wk th.note { display:none; }
+    .pc { padding:22px 20px; border-radius:16px; }
+    .pc .top { flex-direction:column-reverse; gap:10px; }
+    .commitbox { padding:22px 20px; }
+    .count { gap:24px 36px; }
+    .sec { margin-top:56px; }
+  }
 </style>
 {% endblock %}
 {% block body %}
-{% if not prog %}
+<div class="pg">
+
+{% macro confirm(label, action, body, go, cls='ghost') %}
+<details class="cf"><summary class="btn sm {{ cls }}">{{ label }}</summary>
+  <div class="cfbox"><p>{{ body }}</p>
+    <form method="post" action="{{ action }}" class="acts">
+      <button class="btn sm danger" type="submit">{{ go }}</button>
+      <button class="btn sm ghost" type="button" onclick="this.closest('details').open=false">Keep it</button>
+    </form></div></details>
+{% endmacro %}
+
+{% if mode == 'new' %}
+{# ---------- pick a goal ---------- #}
+{% if has_plans %}<a class="back" href="/plan">&larr; Your plans</a>{% endif %}
 <h1 class="ph">What are you training for?</h1>
-<p class="lede2">Pick a goal, or type it in your own words. Ceiling builds the programme and the calendar from it, and every morning's prescription follows it.</p>
+<p class="lede2">Pick a goal or say it your way. You'll see the plan before you commit to it.</p>
 <form method="post" action="/plan" class="gform" style="max-width:none">
   <div class="cards">
     {% for c in canned %}
     <label class="gc"><input type="radio" name="canned" value="{{ c.id }}" {{ 'checked' if loop.first }} data-kind="{{ c.kind }}">
-      <span>{{ c.title }}<small>{{ {'best_shape':'Peak fitness by a date, or ongoing','event':'Base, build, peak, taper to race day','weight':'A safe weekly rate, fuelled training','longevity':'Mostly easy, some hard, strength twice a week'}[c.kind] }}</small></span></label>
+      <span>{{ c.title }}<small>{{ {'best_shape':'Peak fitness by a date','event':'Base, build, peak, taper','weight':'A safe weekly rate','longevity':'Mostly easy, strength twice a week'}[c.kind] }}</small></span></label>
     {% endfor %}
   </div>
-  <p class="or">Or say it your way:</p>
-  <label>Your goal<input type="text" name="text" placeholder="Run a marathon in May. Lose 15 lb by Christmas. Best shape by March 1."></label>
-  <div class="row2">
-    <label>By when<input type="date" name="date"></label>
-    <label>Target (optional)<input type="text" name="target" placeholder="Sub 4 hours, finish strong…"></label>
+  <p class="or">Or say it your way</p>
+  <div style="display:grid; gap:18px; max-width:640px">
+    <label>Your goal<input type="text" name="text" placeholder="A 4:20 marathon in May"></label>
+    <div class="row2">
+      <label>By when<input type="date" name="date"></label>
+      <label><span>Target <small>Optional</small></span><input type="text" name="target" placeholder="4:20, or finish strong"></label>
+    </div>
+    <div class="row2 wfields" id="wf">
+      <label>Weight now (lb)<input type="number" step="0.1" name="w_now" placeholder="181"></label>
+      <label>Target weight (lb)<input type="number" step="0.1" name="w_target" placeholder="170"></label>
+    </div>
+    <div class="acts" style="margin-top:8px"><button class="btn" type="submit">See the plan</button>
+      {% if has_plans %}<a class="btn ghost" href="/plan">Cancel</a>{% endif %}</div>
   </div>
-  <div class="row2 wfields" id="wf">
-    <label>Weight now (lb)<input type="number" step="0.1" name="w_now" placeholder="181"></label>
-    <label>Target weight (lb)<input type="number" step="0.1" name="w_target" placeholder="170"></label>
-  </div>
-  <button type="submit">Build my plan</button>
 </form>
 <script>
 (() => { const wf = document.getElementById('wf');
@@ -68,30 +165,153 @@
     wf.classList.toggle('on', (c && c.dataset.kind === 'weight') || /lose|weight|lb|pound/.test(t)); };
   document.querySelectorAll('input[name=canned], input[name=text]').forEach(e => e.addEventListener('input', sync)); sync(); })();
 </script>
+
+{% elif mode == 'list' %}
+{# ---------- every plan ---------- #}
+<h1 class="ph">Your plans</h1>
+<p class="lede2">Plans you commit to set Today and your calendar. Drafts don't until you commit.</p>
+<div class="acts" style="margin-top:32px"><a class="btn" href="/plan/new">New plan</a></div>
+
+{% for name, rows in groups %}{% if rows or name == 'Active' %}
+<h2 class="sec">{{ name }}{% if rows %}<small>{{ rows|length }}</small>{% endif %}</h2>
+{% if name == 'Active' and not rows %}<p class="empty">Nothing committed. Today and the calendar follow your recovery alone.</p>{% endif %}
+{% if name == 'Active' and rows|length > 1 %}<p class="together">Running together. The nearest event leads, and the stricter plan sets each day's cap.</p>{% endif %}
+<div class="plans">
+{% for r in rows %}{% set g = r.g %}
+  <article class="pc {{ 'on' if name == 'Active' }}">
+    <div class="top">
+      <h3><a href="/plan/{{ g.id }}">{{ r.prog.title }}</a></h3>
+      {% if name == 'Active' %}<span class="pill active">Committed</span>
+      {% elif name == 'Drafts' %}<span class="pill draft">Draft</span>
+      {% else %}<span class="pill">Stopped</span>{% endif %}
+    </div>
+    {% if name == 'Active' %}
+      <p class="meta">Since {{ date.fromisoformat(g.committed).strftime('%b %-d') }}. Week {{ r.week }}{% if r.of %} of {{ r.of }}{% endif %}.{% if r.prog.days_left is not none %} {{ r.prog.days_left }} days to go.{% endif %}{% if lead == g.id and rows|length > 1 %} This one leads.{% endif %}</p>
+      {% if r.of %}<div class="bar2" role="img" aria-label="Week {{ r.week }} of {{ r.of }}"><i style="width:{{ (100 * r.week / r.of)|round(1) }}%"></i></div>{% endif %}
+      <div class="acts"><a class="btn sm ghost" href="/plan/{{ g.id }}">Edit</a>
+        {{ confirm('Stop', '/plan/' ~ g.id ~ '/stop', 'Stop this plan from today? Its workouts come off your calendar from today on. Everything you have already done stays in your history.', 'Stop plan') }}</div>
+    {% elif name == 'Drafts' %}
+      <p class="meta">Not committed yet. Nothing on your calendar.</p>
+      <div class="acts"><a class="btn sm ghost" href="/plan/{{ g.id }}">Review</a>
+        <form method="post" action="/plan/{{ g.id }}/commit"><button class="btn sm go" type="submit">Commit</button></form>
+        {{ confirm('Delete', '/plan/' ~ g.id ~ '/delete', 'Delete this draft? It never touched your calendar.', 'Delete draft') }}</div>
+    {% else %}
+      <p class="meta">Stopped {{ date.fromisoformat(g.stopped_on).strftime('%b %-d, %Y') if g.stopped_on }}{% if g.committed %}, after {{ r.week }} week{{ 's' if r.week != 1 }}{% endif %}. Your workouts from it stay in your history.</p>
+      <div class="acts">
+        <a class="btn sm ghost" href="/plan/{{ g.id }}">View</a>
+        {{ confirm('Delete', '/plan/' ~ g.id ~ '/delete', 'Delete this plan from the list? Your history comes from what you actually did, so nothing there changes.', 'Delete plan') }}</div>
+    {% endif %}
+  </article>
+{% endfor %}
+</div>
+{% endif %}{% endfor %}
+
 {% else %}
+{# ---------- one plan ---------- #}
+<a class="back" href="/plan">&larr; Your plans</a>
 <h1 class="ph">{{ prog.title }}</h1>
-{% if prog.goal.target %}<p class="lede2" style="color:var(--lichen)">“{{ prog.goal.target }}”</p>{% endif %}
+{% if just == 'committed' %}<p class="flash">Committed. Today and your calendar now follow this plan.</p>
+{% elif just == 'saved' %}<p class="flash">Saved.</p>{% endif %}
+
+{% if g.status == 'draft' %}
+<div class="commitbox">
+  <span class="pill draft">Draft</span>
+  <h2 style="margin-top:14px">This is a preview. Nothing changes until you commit.</h2>
+  <p>Adjust anything below, then commit. From then on, every morning's prescription and your calendar follow it.</p>
+</div>
+{% elif live %}
+<div class="commitbox on">
+  <span class="pill active">Committed</span>
+  <h2 style="margin-top:14px">You're committed.</h2>
+  <p>Since {{ date.fromisoformat(g.committed).strftime('%B %-d') }}. Week {{ r.week }}{% if r.of %} of {{ r.of }}{% endif %}.{% if others %} Running alongside {{ others|length }} other plan{{ 's' if others|length > 1 }}.{% endif %}</p>
+  {% if r.of %}<div class="bar2" role="img" aria-label="Week {{ r.week }} of {{ r.of }}"><i style="width:{{ (100 * r.week / r.of)|round(1) }}%"></i></div>{% endif %}
+</div>
+{% else %}
+<div class="commitbox">
+  <span class="pill">Stopped</span>
+  <h2 style="margin-top:14px">Stopped {{ date.fromisoformat(g.stopped_on).strftime('%B %-d') if g.stopped_on }}.</h2>
+  <p>It sets nothing from that day on. What you did while on it stays in your history.</p>
+</div>
+{% endif %}
+
 <div class="count">
   {% if prog.days_left is not none %}<div><b>{{ prog.days_left }}</b><span>days to go</span></div>{% endif %}
-  {% if prog.phase %}<div><b>{{ prog.phase }}</b><span>this week's phase</span></div>{% endif %}
+  {% if prog.pace %}<div><b>{{ prog.pace }}</b><span>goal pace a mile</span></div>{% endif %}
+  {% if prog.phase %}<div><b>{{ prog.phase }}</b><span>this week</span></div>{% endif %}
   {% if prog.this_week %}<div><b>{{ prog.this_week.hours }} h</b><span>this week's target</span></div>
-  <div><b>{{ done_h }} h</b><span>done so far this week</span></div>{% endif %}
+  {% if live %}<div><b>{{ done_h }} h</b><span>done this week</span></div>{% endif %}{% endif %}
 </div>
 <p class="lede2">{{ prog.summary }}</p>
 {% for w in prog.warnings %}<p class="warn">{{ w }}</p>{% endfor %}
-{% if prog.nutrition %}<ul class="nut">{% for n in prog.nutrition %}<li>{{ n }}</li>{% endfor %}</ul>{% endif %}
+
+{% if g.status != 'stopped' %}
+{% set fields %}
+  <input type="hidden" name="edit" value="1">
+  <div class="row2">
+    <label><span>{{ 'Race day' if g.kind == 'event' else 'By when' }}{% if g.kind != 'event' %} <small>Empty for ongoing</small>{% endif %}</span><input type="date" name="date" value="{{ g.target_date or '' }}"></label>
+    <label><span>Target{% if g.kind == 'event' and g.event in ('marathon', 'half marathon', '10k') %} <small>A finish time sets your pace</small>{% else %} <small>Optional</small>{% endif %}</span>
+      <input type="text" name="target" value="{{ g.target }}" placeholder="{{ '4:20' if g.event in ('marathon', 'half marathon') else 'Finish strong' }}"></label>
+  </div>
+  <div class="row2">
+    <label><span>Most hours a week <small>Optional</small></span><input type="number" step="0.5" min="1" max="40" name="max_hours" value="{{ g.max_hours if g.max_hours else '' }}" placeholder="No cap"></label>
+    <label>Main sport<select name="sport">
+      <option value="" {{ 'selected' if not g.sport }}>Any</option>
+      {% for v, l in [('run','Running'),('bike','Riding'),('ski','Skiing')] %}<option value="{{ v }}" {{ 'selected' if g.sport == v }}>{{ l }}</option>{% endfor %}
+    </select></label>
+  </div>
+  <div class="fl">Days you can't train
+    <div class="days">{% for d in days %}<label><input type="checkbox" name="no" value="{{ loop.index0 }}" {{ 'checked' if loop.index0 in g.no_days }}><span>{{ d[:3] }}</span></label>{% endfor %}</div>
+  </div>
+  {% if g.kind == 'weight' %}
+  <div class="row2">
+    <label>Weight now (lb)<input type="number" step="0.1" name="w_now" value="{{ g.start_weight or '' }}"></label>
+    <label>Target weight (lb)<input type="number" step="0.1" name="w_target" value="{{ g.target_weight or '' }}"></label>
+  </div>
+  {% endif %}
+{% endset %}
+{% if g.status == 'draft' %}
+<h2 class="sec">Adjust the plan</h2>
+<form method="post" action="/plan/{{ g.id }}/commit" class="gform">
+  {{ fields }}
+  <div class="acts" style="margin-top:10px">
+    <button class="btn go" type="submit">Commit to this plan</button>
+    <button class="btn ghost" type="submit" formaction="/plan/{{ g.id }}/edit">Update preview</button>
+  </div>
+</form>
+{% else %}
+<details class="adjd" style="margin-top:40px"><summary class="btn ghost">Edit plan</summary>
+<form method="post" action="/plan/{{ g.id }}/edit" class="gform">
+  {{ fields }}
+  <div class="acts" style="margin-top:10px"><button class="btn" type="submit">Save changes</button>
+    <button class="btn ghost" type="button" onclick="this.closest('details').open=false">Cancel</button></div>
+</form></details>
+{% endif %}
+{% endif %}
+
+{% if prog.nutrition %}<h2 class="sec">Eating for it</h2><ul class="nut">{% for n in prog.nutrition %}<li>{{ n }}</li>{% endfor %}</ul>{% endif %}
 {% if prog.weeks %}
+<h2 class="sec">Week by week</h2>
 <div class="tl" aria-label="Programme phases">{% for w in prog.weeks %}<div class="ph-{{ w.phase }}{{ ' cur' if w.current }}" title="{{ w.start }}: {{ w.phase }}"></div>{% endfor %}</div>
 <div class="tlk">{% for ph in ['Base','Build','Recover','Peak','Taper','Race'] %}{% if prog.weeks|selectattr('phase','equalto',ph)|list %}<span><i class="ph-{{ ph }}"></i>{{ ph }}</span>{% endif %}{% endfor %}<span>Line: this week</span></div>
 <table class="wk">
-  <tr><th>Week of</th><th>Phase</th><th>Hours</th><th>Hard days</th><th>Long session</th><th class="note">Focus</th></tr>
+  <tr><th>Week of</th><th>Phase</th><th>Hours</th><th>Hard</th><th>Long</th><th class="note">Focus</th></tr>
   {% for w in prog.weeks %}{% set wd = date.fromisoformat(w.start) %}
   <tr class="{{ 'cur' if w.current }}"><td>{{ wd.strftime('%b %-d') }}</td><td>{{ w.phase }}</td><td>{{ w.hours }}</td>
     <td>{{ w.hard_days }}</td><td>{{ (w.long_minutes ~ ' min') if w.long_minutes else '–' }}</td><td class="note">{{ w.note }}</td></tr>
   {% endfor %}
 </table>
 {% endif %}
-<p class="lede2">The calendar and every morning's prescription follow this. Bad sleep, low HRV or a hard day you didn't plan still win on the day: the programme bends, and it catches up over the next week.</p>
-<form method="post" action="/plan/clear" class="change"><button type="submit">Change goal</button></form>
+<p class="fine">Bad sleep, low HRV or a hard day you didn't plan still win on the day. The plan bends, then catches up over the next week.</p>
+
+<div class="end acts">
+{% if g.status == 'draft' %}
+  {{ confirm('Delete draft', '/plan/' ~ g.id ~ '/delete', 'Delete this draft? It never touched your calendar.', 'Delete draft') }}
+{% elif live %}
+  {{ confirm('Stop this plan', '/plan/' ~ g.id ~ '/stop', 'Stop this plan from today? Its workouts come off your calendar from today on. Everything you have already done stays in your history.', 'Stop plan') }}
+{% else %}
+  {{ confirm('Delete plan', '/plan/' ~ g.id ~ '/delete', 'Delete this plan from the list? Your history comes from what you actually did, so nothing there changes.', 'Delete plan') }}
 {% endif %}
+</div>
+{% endif %}
+</div>
 {% endblock %}

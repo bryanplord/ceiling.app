@@ -187,7 +187,7 @@ def build_rx(p: Profile, day: str | None = None) -> Rx:
     ban = {"run", "trail run"} if runs30 < 6 and (verdict in (STEADY, HARD) or ran_yday) else None
     # The programme (your goal): phase, hard days allowed this week, the long session, the goal sport.
     from .. import goals as gl
-    gday = gl.daily(getattr(p, "program", None), date.fromisoformat(day))
+    gday = gl.daily_all(getattr(p, "programs", None) or getattr(p, "program", None), date.fromisoformat(day))
     goal_note = ""
     if gday:
         z_ = p.zones

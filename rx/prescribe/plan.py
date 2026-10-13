@@ -315,3 +315,238 @@ def ics(plan: Plan, url: str = "https://www.ceiling.app/calendar") -> str:
             b = b" " + b[cut:]
         lines.append(b.decode())
     return "\r\n".join(lines) + "\r\n"
+
+
+# ---------------------------------------------------------------------------------------------
+# The whole plan: everything from today to the end of the programme. The honest horizon (above)
+# is firm; the days past it are pencilled in from the programme's week and how you usually train,
+# and firm up as they come into view.
+
+LONG, RACE = "long", "race"
+LABEL = {REST: "Rest", LIGHT: "Walk", EASY: "Easy", STEADY: "Steady", HARD: "Hard", LONG: "Long", RACE: "Race"}
+WEIGHT = {HARD: 1.0, STEADY: 1.2, EASY: 0.8}
+NO_PLAN_DAYS = 42
+
+
+def _weekday_share(p: Profile, day: str) -> list[float]:
+    """How often you train on each weekday (Mon=0), over the last 12 weeks."""
+    d0 = date.fromisoformat(day)
+    trained = {a.date for a in p.activities if a.sport != WALK}
+    out = []
+    for wd in range(7):
+        days = [d0 - timedelta(days=n) for n in range(1, 85) if (d0 - timedelta(days=n)).weekday() == wd]
+        out.append(sum(x.isoformat() in trained for x in days) / len(days) if days else 0.0)
+    return out
+
+
+def _programs(p: Profile) -> list:
+    progs = getattr(p, "programs", None)
+    if progs:
+        return list(progs)
+    one = getattr(p, "program", None)
+    return [one] if one else []
+
+
+def _gday(p: Profile, day: date) -> dict:
+    from .. import goals as gl
+    progs = getattr(p, "programs", None)
+    both = getattr(gl, "daily_all", None)
+    try:
+        if progs and both:
+            return both(progs, day) or {}
+        return gl.daily(getattr(p, "program", None), day) or {}
+    except Exception:
+        return {}
+
+
+def _week_hours(g: dict) -> float | None:
+    if g.get("hours") is not None:
+        return float(g["hours"])
+    w = g.get("week")
+    return float(w.hours) if w is not None and getattr(w, "hours", None) is not None else None
+
+
+def plan_end(p: Profile, start: date) -> date:
+    """The last day of the active plan(s), or about six weeks out when there's no plan."""
+    ends = []
+    for pr in _programs(p):
+        g = getattr(pr, "goal", None)
+        if g is not None and getattr(g, "kind", "") == "event" and getattr(g, "target_date", None):
+            ends.append(date.fromisoformat(g.target_date))
+        elif getattr(pr, "weeks", None):
+            ends.append(date.fromisoformat(pr.weeks[-1].start) + timedelta(days=6))
+    end = max(ends) if ends else start + timedelta(days=NO_PLAN_DAYS - 1)
+    return min(max(end, start), start + timedelta(days=365))
+
+
+def _minutes_in(title: str) -> int | None:
+    import re
+    m = re.search(r"(?<![×x] )\b(\d+)\s*min", title or "")
+    return int(m.group(1)) if m else None
+
+
+def _firm(p: Profile, rx: Rx, plan: Plan) -> dict[str, dict]:
+    out = {}
+    for d in plan.days:
+        kind = d.verdict
+        if d.title.startswith("Race day"):
+            kind = RACE
+        elif d.title.startswith("Long "):
+            kind = LONG
+        mins = (rx.max_minutes if d.confidence == "Today" else None) or _minutes_in(d.title)
+        if mins is None and kind in WEIGHT:
+            mins = {HARD: 75, STEADY: 90, EASY: 60}[kind]
+        if kind in (REST, RACE):
+            mins = None
+        out[d.date] = dict(date=d.date, kind=kind, label=LABEL[kind], minutes=mins, phase=d.phase,
+                           firm=True, title=d.title)
+    return out
+
+
+def outlook(p: Profile, rx: Rx, start: date | None = None, end: date | None = None,
+            plan: Plan | None = None) -> list[dict]:
+    """Every day from start to end: firm inside the honest horizon, pencilled in past it.
+
+    A pencilled-in day comes from the programme's week (phase, hours, hard days, the long session
+    on the long day) and your habits: rest only on weekdays you train less than 10% of the time,
+    hard days on the days you usually train, never back to back. With no plan, your recent
+    weekly hours as an easy and steady pattern."""
+    start = start or date.fromisoformat(rx.date)
+    end = end or plan_end(p, start)
+    if plan is None:
+        plan = build(p, rx)
+    firm = _firm(p, rx, plan) if plan.days else {}
+    share = _weekday_share(p, rx.date)
+    rest_wd = {wd for wd in range(7) if share[wd] < 0.1}
+    from .. import goals as gl
+    base_h = max(3.0, gl._recent_hours(p, date.fromisoformat(rx.date)))
+    has_plan = bool(_programs(p))
+
+    out: list[dict] = []
+    kinds: dict[date, str] = {}            # kept across weeks so Sunday's hard day is seen by Monday
+    mins: dict[date, int | None] = {}
+    mon = start - timedelta(days=start.weekday())
+    while mon <= end:
+        week = [mon + timedelta(days=i) for i in range(7)]
+        gds = {d: _gday(p, d) for d in week}
+        gw = next((g for g in gds.values() if g), {})
+        phase = gw.get("phase", "")
+        hours = _week_hours(gw) if gw else None
+        hours = hours if hours is not None else (None if has_plan and gw else round(base_h, 1))
+        hard_n = gw.get("hard_days", 0) if gw else 0
+        for d in week:
+            f = firm.get(d.isoformat())
+            if f:
+                kinds[d], mins[d] = f["kind"], f["minutes"]
+        open_ = [d for d in week if d >= start and d not in kinds]   # whole weeks, so the hours split evenly
+        for d in open_:
+            g = gds[d]
+            if g.get("race_day"):
+                kinds[d], mins[d] = RACE, None
+            elif g.get("rest"):                          # a day the plan rules out
+                kinds[d], mins[d] = REST, None
+            elif g.get("long_minutes"):
+                kinds[d], mins[d] = LONG, int(round(g["long_minutes"] / 5) * 5)
+        for d in open_:
+            if d not in kinds and d.weekday() in rest_wd:
+                kinds[d], mins[d] = REST, None
+        # the day before a race is easy and short
+        for d in open_:
+            if d not in kinds and kinds.get(d + timedelta(days=1)) == RACE:
+                kinds[d], mins[d] = EASY, 30
+        busy = (HARD, LONG, RACE)
+        need = max(0, hard_n - sum(1 for d in week if kinds.get(d) == HARD))
+        for d in sorted((d for d in open_ if d not in kinds), key=lambda d: (-share[d.weekday()], d)):
+            if need <= 0:
+                break
+            near = [kinds.get(d + timedelta(days=k)) or (firm.get((d + timedelta(days=k)).isoformat()) or {}).get("kind")
+                    for k in (-1, 1)]
+            if any(n in busy for n in near):
+                continue
+            kinds[d] = HARD
+            need -= 1
+        quiet = phase in ("Taper", "Recover", "Race")
+        steady_n = 0
+        for d in week:
+            if d not in open_ or d in kinds:
+                continue
+            prev = kinds.get(d - timedelta(days=1)) or (firm.get((d - timedelta(days=1)).isoformat()) or {}).get("kind")
+            if prev in busy or prev == STEADY or quiet or steady_n >= 2:
+                kinds[d] = EASY
+            else:
+                kinds[d] = STEADY
+                steady_n += 1
+        # share the week's hours across the sessions still to place
+        if hours is not None:
+            used = sum(v for d, v in mins.items() if v and d in week)
+            past = {d.isoformat() for d in week if d < start}       # what you already did this week counts
+            used += sum((a.moving_s or 0) / 60 for a in p.activities if a.date in past and a.sport != WALK)
+            todo = [d for d in open_ if kinds[d] in WEIGHT and d not in mins]
+            left = hours * 60 - used
+            wsum = sum(WEIGHT[kinds[d]] for d in todo) or 1.0
+            for d in todo:
+                m = left * WEIGHT[kinds[d]] / wsum
+                mins[d] = int(min(120, max(20, round(m / 5) * 5)))
+        else:
+            for d in open_:
+                if kinds[d] in WEIGHT and d not in mins:
+                    mins[d] = {HARD: 60, STEADY: 75, EASY: 45}[kinds[d]]
+        for d in week:
+            if not (start <= d <= end):
+                continue
+            f = firm.get(d.isoformat())
+            if f:
+                row = dict(f)
+                row["phase"] = row["phase"] or phase
+            else:
+                k = kinds[d]
+                row = dict(date=d.isoformat(), kind=k, label=LABEL[k], minutes=mins.get(d), phase=phase,
+                           firm=False, title="")
+            row.update(week_hours=hours, week_phase=phase, today=d.isoformat() == rx.date)
+            out.append(row)
+        mon += timedelta(days=7)
+    return out
+
+
+def duration(m: int | None) -> str:
+    if not m:
+        return ""
+    if m < 60:
+        return f"{m} min"
+    h, r = divmod(m, 60)
+    return f"{h} h" if not r else f"{h} h {r:02d}"
+
+
+def months(days: list[dict]) -> list[dict]:
+    """The outlook as month grids (Monday first), one week row at a time, each with its phase and hours."""
+    if not days:
+        return []
+    by = {d["date"]: d for d in days}
+    first, last = date.fromisoformat(days[0]["date"]), date.fromisoformat(days[-1]["date"])
+    out = []
+    y, m = first.year, first.month
+    while (y, m) <= (last.year, last.month):
+        d1 = date(y, m, 1)
+        nxt = date(y + (m == 12), m % 12 + 1, 1)
+        mon = d1 - timedelta(days=d1.weekday())
+        weeks = []
+        while mon < nxt:
+            cells, info = [], None
+            for i in range(7):
+                d = mon + timedelta(days=i)
+                row = by.get(d.isoformat()) if d.month == m else None
+                if row is not None:
+                    info = info or row
+                    row = dict(row, day=d.day, dur=duration(row.get("minutes")))
+                cells.append(row if row is not None else ({"day": d.day, "past": True} if d.month == m else None))
+            any_day = next((by.get((mon + timedelta(days=i)).isoformat()) for i in range(7)
+                            if by.get((mon + timedelta(days=i)).isoformat())), None)
+            weeks.append(dict(cells=cells, phase=(any_day or {}).get("week_phase", ""),
+                              hours=(any_day or {}).get("week_hours"), shown=any(c and not c.get("past") for c in cells)))
+            mon += timedelta(days=7)
+        out.append(dict(ym=f"{y}-{m:02d}", title=d1.strftime("%B %Y"), weeks=weeks,
+                        race=any(c and c.get("kind") == RACE for w in weeks for c in w["cells"])))
+        y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+    for x in out:
+        x["end"], x["ends_in_race"] = days[-1]["date"], days[-1]["kind"] == RACE
+    return out

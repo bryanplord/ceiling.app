@@ -367,52 +367,159 @@ def me_page(request: Request):
     return _page(request, "me.html")
 
 
+def _plan_num(x):
+    try:
+        v = float(x)
+        return v if v > 0 else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _plan_form(form: dict) -> dict:
+    return {k: (v[0] if v else "").strip() for k, v in form.items()}
+
+
+def _plan_apply(g, form: dict, f: dict) -> None:
+    """The adjustable fields: date, target, weekly hours cap, sport, days you can't train, weights."""
+    if "date" in f:
+        g.target_date = f["date"] or (g.target_date if g.kind == "event" else None)
+    if "target" in f:
+        g.target = f["target"][:120]
+    if "max_hours" in f:
+        g.max_hours = _plan_num(f["max_hours"])
+    if "sport" in f and f["sport"] in ("", "run", "bike", "ski"):
+        from .. import goals as gl
+        g.sport = f["sport"] or (gl.EVENT_SPORT.get((g.event or "").lower(), "") if g.kind == "event" else "")
+    if f.get("edit"):
+        g.no_days = sorted({int(x) for x in form.get("no", []) if x.isdigit() and 0 <= int(x) <= 6})
+    if g.kind == "weight":
+        g.start_weight = _plan_num(f.get("w_now")) or g.start_weight
+        g.target_weight = _plan_num(f.get("w_target")) or g.target_weight
+
+
+def _plan_row(gl, p, g, today):
+    prog = gl.build(p, g, today)
+    x, y = gl.progress(g, today)
+    return {"g": g, "prog": prog, "week": x, "of": y}
+
+
 @app.get("/plan", response_class=HTMLResponse)
-def plan_goal(request: Request):
+def plan_list(request: Request):
     from .. import goals as gl
     store = open_store()
+    plans = gl.all_plans(store)
+    if not plans:
+        return _page(request, "plan.html", mode="new", canned=gl.CANNED, has_plans=False)
     p, rx = today_rx(store)
-    prog = getattr(p, "program", None)
-    mon = (local_today() - timedelta(days=local_today().weekday())).isoformat()
-    done = sum((a.moving_s or 0) for a in p.activities if a.date >= mon and a.sport != "walk") / 3600
-    return _page(request, "plan.html", prog=prog, canned=gl.CANNED, date=date, done_h=round(done, 1))
+    today = local_today()
+    rows = [_plan_row(gl, p, g, today) for g in plans]
+    groups = [("Active", [r for r in rows if gl.is_live(r["g"], today)]),
+              ("Drafts", [r for r in rows if r["g"].status == "draft"]),
+              ("Stopped", [r for r in rows if r["g"].status == "stopped" and not gl.is_live(r["g"], today)])]
+    lead = getattr(p, "program", None)
+    return _page(request, "plan.html", mode="list", groups=groups, date=date, today=today,
+                 lead=lead.goal.id if lead else None)
+
+
+@app.get("/plan/new", response_class=HTMLResponse)
+def plan_new(request: Request):
+    from .. import goals as gl
+    return _page(request, "plan.html", mode="new", canned=gl.CANNED, has_plans=bool(gl.all_plans(open_store())))
 
 
 @app.post("/plan")
-async def plan_goal_save(request: Request):
+async def plan_create(request: Request):
+    """A goal from the picker becomes a draft plan to adjust and commit."""
     from .. import goals as gl
     form = parse_qs((await request.body()).decode())
-    f = {k: (v[0] if v else "").strip() for k, v in form.items()}
+    f = _plan_form(form)
     today = local_today()
-    def num(x):
-        try:
-            return float(x)
-        except (TypeError, ValueError):
-            return None
     if f.get("text"):
-        g = gl.parse_text(f["text"], today, num(f.get("w_now")))
+        g = gl.parse_text(f["text"], today, _plan_num(f.get("w_now")))
     else:
         c = next((c for c in gl.CANNED if c["id"] == f.get("canned")), gl.CANNED[0])
         g = gl.Goal(c["kind"], event=c.get("event", ""), sport=gl.EVENT_SPORT.get(c.get("event", ""), ""),
-                    target=f.get("target", ""), created=today.isoformat(),
+                    created=today.isoformat(),
                     target_date=(today + timedelta(weeks=c["weeks"])).isoformat() if c.get("weeks") else None)
+        if g.kind == "event" and g.target_date:              # events are on weekends: the Sunday of that week
+            td = date.fromisoformat(g.target_date)
+            g.target_date = (td + timedelta(days=6 - td.weekday())).isoformat()
     if f.get("date"):
         g.target_date = f["date"]
     if f.get("target"):
-        g.target = f["target"]
+        g.target = f["target"][:120]
     if g.kind == "weight":
-        g.start_weight = num(f.get("w_now")) or g.start_weight
-        g.target_weight = num(f.get("w_target")) or g.target_weight
-    gl.save(open_store(), g)
-    bust(open_store())
+        g.start_weight = _plan_num(f.get("w_now")) or g.start_weight
+        g.target_weight = _plan_num(f.get("w_target")) or g.target_weight
+    g.status = "draft"
+    store = open_store()
+    g = gl.save_plan(store, g)
+    bust(store)
+    return RedirectResponse(f"/plan/{g.id}", status_code=303)
+
+
+@app.get("/plan/{pid}", response_class=HTMLResponse)
+def plan_detail(request: Request, pid: str):
+    from .. import goals as gl
+    store = open_store()
+    g = gl.get(store, pid)
+    if not g:
+        return RedirectResponse("/plan", status_code=303)
+    p, rx = today_rx(store)
+    today = local_today()
+    row = _plan_row(gl, p, g, today)
+    mon = (today - timedelta(days=today.weekday())).isoformat()
+    done = sum((a.moving_s or 0) for a in p.activities if a.date >= mon and a.sport != "walk") / 3600
+    others = [x for x in gl.active(store, today) if x.id != g.id]
+    return _page(request, "plan.html", mode="detail", r=row, prog=row["prog"], g=g, date=date, today=today,
+                 done_h=round(done, 1), live=gl.is_live(g, today), others=others, days=gl.DAY_NAMES,
+                 just=request.query_params.get("ok", ""))
+
+
+async def _plan_edit(request: Request, pid: str):
+    from .. import goals as gl
+    store = open_store()
+    g = gl.get(store, pid)
+    if not g:
+        return None, store
+    form = parse_qs((await request.body()).decode(), keep_blank_values=True)
+    _plan_apply(g, form, _plan_form(form))
+    gl.save_plan(store, g)
+    return g, store
+
+
+@app.post("/plan/{pid}/edit")
+async def plan_edit(request: Request, pid: str):
+    g, store = await _plan_edit(request, pid)
+    bust(store)
+    return RedirectResponse(f"/plan/{pid}?ok=saved" if g else "/plan", status_code=303)
+
+
+@app.post("/plan/{pid}/commit")
+async def plan_commit(request: Request, pid: str):
+    from .. import goals as gl
+    g, store = await _plan_edit(request, pid)
+    if g:
+        gl.commit(store, pid, local_today())
+    bust(store)
+    return RedirectResponse(f"/plan/{pid}?ok=committed" if g else "/plan", status_code=303)
+
+
+@app.post("/plan/{pid}/stop")
+def plan_stop(pid: str):
+    from .. import goals as gl
+    store = open_store()
+    gl.stop(store, pid, local_today())
+    bust(store)
     return RedirectResponse("/plan", status_code=303)
 
 
-@app.post("/plan/clear")
-def plan_goal_clear():
+@app.post("/plan/{pid}/delete")
+def plan_delete(pid: str):
     from .. import goals as gl
-    gl.clear(open_store())
-    bust(open_store())
+    store = open_store()
+    gl.delete(store, pid)
+    bust(store)
     return RedirectResponse("/plan", status_code=303)
 
 
@@ -458,11 +565,18 @@ def history_page(request: Request, m: str | None = None):
 
 
 @app.get("/calendar", response_class=HTMLResponse)
-def plan_page(request: Request):
+def plan_page(request: Request, m: str | None = None):
     from ..prescribe import plan as planmod
     store = open_store()
     p, rx = today_rx(store)
     pl, changed = cached(store, "planx", rx.date, lambda: plan_with_changes(store))
+    try:                                              # the whole plan: firm days, then pencilled in
+        cal = cached(store, "outlook", rx.date, lambda: planmod.months(planmod.outlook(p, rx, plan=pl)))
+    except Exception as e:
+        print(f"outlook failed: {e}")
+        cal = []
+    yms = [x["ym"] for x in cal]
+    mi = yms.index(m) if m in yms else 0
     hist = None
     try:                                              # what today's synced workouts actually were
         after = cached(store, "cal_after", rx.date, lambda: today_after(store, p, rx))
@@ -482,7 +596,10 @@ def plan_page(request: Request):
     if email:
         tok = auth.sign("cal", email, 10 * 365 * 24 * 3600)
         feed = f"{request.url.netloc}/plan.ics?k={tok}"
-    return _page(request, "calendar.html", plan=pl, changed=changed, hist=hist, feed=feed, date=date, done=done)
+    return _page(request, "calendar.html", plan=pl, changed=changed, hist=hist, feed=feed, date=date, done=done,
+                 cal=cal[mi] if cal else None, cal_prev=yms[mi - 1] if mi > 0 else None,
+                 cal_next=yms[mi + 1] if mi + 1 < len(yms) else None, cal_end=date.fromisoformat(cal[-1]["end"]).strftime("%B %-d, %Y") if cal else "",
+                 has_plan=bool(getattr(p, "programs", None) or getattr(p, "program", None)))
 
 
 @app.get("/plan.ics")

@@ -18,6 +18,8 @@ Periodisation follows the standard model (Bompa; Issurin's block periodisation):
 from __future__ import annotations
 
 import json
+import re
+import secrets
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
@@ -45,6 +47,13 @@ class Goal:
     start_weight: float | None = None
     target_weight: float | None = None
     created: str = ""
+    # A plan is a goal you can draft, commit to and stop. Only committed plans drive Today and the calendar.
+    id: str = ""
+    status: str = "draft"           # draft | active | stopped
+    committed: str | None = None    # the day you committed
+    stopped_on: str | None = None   # from this day on the plan contributes nothing; what you did stays
+    max_hours: float | None = None  # weekly hours cap
+    no_days: list = field(default_factory=list)   # weekdays you can't train, 0 = Monday
 
 
 @dataclass
@@ -69,24 +78,106 @@ class Program:
     phase: str = ""
     this_week: Week | None = None
     nutrition: list[str] = field(default_factory=list)
+    pace: str = ""                  # goal pace a mile, when the target is a finish time
+    long_day: int = 6               # weekday of the long session (Sunday unless you can't train then)
 
 
-def load(store) -> Goal | None:
-    v = store.get_meta("goal")
-    if not v:
-        return None
+def _from(d: dict) -> Goal | None:
     try:
-        return Goal(**json.loads(v))
+        known = {k: v for k, v in d.items() if k in Goal.__dataclass_fields__}
+        g = Goal(**known)
+        g.no_days = [int(x) for x in (g.no_days or []) if str(x).isdigit() and 0 <= int(x) <= 6]
+        return g
     except Exception:
         return None
 
 
-def save(store, g: Goal) -> None:
-    store.set_meta("goal", json.dumps(g.__dict__))
+def _write(store, plans: list[Goal]) -> None:
+    store.set_meta("plans", json.dumps([g.__dict__ for g in plans]))
 
 
-def clear(store) -> None:
-    store.set_meta("goal", "")
+def all_plans(store) -> list[Goal]:
+    """Every plan: drafts, active and stopped. The old single "goal" becomes one active plan."""
+    raw = store.get_meta("plans")
+    if raw is None:
+        plans: list[Goal] = []
+        old = store.get_meta("goal")
+        if old:
+            try:
+                g = _from(json.loads(old))
+            except Exception:
+                g = None
+            if g:
+                g.id = g.id or secrets.token_hex(4)
+                g.status, g.committed = "active", g.committed or g.created or date.today().isoformat()
+                plans.append(g)
+        _write(store, plans)
+        if old:
+            store.set_meta("goal", "")
+        return plans
+    try:
+        return [g for g in (_from(d) for d in json.loads(raw or "[]")) if g]
+    except Exception:
+        return []
+
+
+def get(store, pid: str) -> Goal | None:
+    return next((g for g in all_plans(store) if g.id == pid), None)
+
+
+def is_live(g: Goal, day: date) -> bool:
+    """Committed on or before the day, and not stopped on or before it."""
+    d = day.isoformat()
+    if g.status not in ("active", "stopped") or not g.committed or g.committed > d:
+        return False
+    return not (g.status == "stopped" and g.stopped_on and g.stopped_on <= d)
+
+
+def active(store, day: date) -> list[Goal]:
+    return [g for g in all_plans(store) if is_live(g, day)]
+
+
+def save_plan(store, g: Goal) -> Goal:
+    """Add or replace by id. A new plan starts as a draft."""
+    plans = all_plans(store)
+    if not g.id:
+        g.id = secrets.token_hex(4)
+    g.created = g.created or date.today().isoformat()
+    for i, x in enumerate(plans):
+        if x.id == g.id:
+            plans[i] = g
+            break
+    else:
+        plans.append(g)
+    _write(store, plans)
+    return g
+
+
+def commit(store, pid: str, day: date) -> Goal | None:
+    g = get(store, pid)
+    if g:
+        g.status, g.committed, g.stopped_on = "active", day.isoformat(), None
+        save_plan(store, g)
+    return g
+
+
+def stop(store, pid: str, day: date) -> Goal | None:
+    """Stop from this day on. The record stays; past days keep what you actually did."""
+    g = get(store, pid)
+    if g and g.status == "active":
+        g.status, g.stopped_on = "stopped", day.isoformat()
+        save_plan(store, g)
+    return g
+
+
+def delete(store, pid: str) -> None:
+    _write(store, [g for g in all_plans(store) if g.id != pid])
+
+
+def load(store) -> Goal | None:
+    """The first active plan (kept for older callers)."""
+    act = active(store, date.today())
+    return act[0] if act else None
 
 
 def _monday(d: date) -> date:
@@ -106,15 +197,95 @@ def _longest(p, day: date, sport: str, weeks: int = 6) -> int:
     return max(m) if m else 0
 
 
+DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+DIST_MI = {"marathon": 26.219, "half marathon": 13.109, "10k": 6.214}
+_SANE = {"marathon": (7200, 25200), "half marathon": (3600, 14400), "10k": (1500, 7200)}
+
+
+def target_seconds(g: Goal) -> int | None:
+    """A finish time in the target: '4:20' or 'sub 4:20' or '4 hours' for a marathon, '45:00' for a 10k."""
+    ev = (g.event or "").lower()
+    if g.kind != "event" or ev not in DIST_MI or not g.target:
+        return None
+    t = g.target.lower()
+    m = re.search(r"\b(\d{1,2}):(\d{2})(?::(\d{2}))?\b", t)
+    secs = None
+    if m:
+        a, b, c = int(m.group(1)), int(m.group(2)), m.group(3)
+        if c is not None:
+            secs = a * 3600 + b * 60 + int(c)
+        elif ev == "10k" and a >= 20:
+            secs = a * 60 + b
+        else:
+            secs = a * 3600 + b * 60
+    else:
+        m = re.search(r"(\d(?:\.\d+)?)\s*(?:h\b|hr\b|hrs\b|hours?\b)", t)
+        if m:
+            secs = round(float(m.group(1)) * 3600)
+    lo, hi = _SANE[ev]
+    return secs if secs and lo <= secs <= hi else None
+
+
+def fmt_time(secs: int) -> str:
+    h, r = divmod(int(secs), 3600)
+    return f"{h}:{r // 60:02d}" if h else f"{r // 60}:{r % 60:02d}"
+
+
+def pace_per_mile(g: Goal) -> str:
+    secs = target_seconds(g)
+    if not secs:
+        return ""
+    p_ = round(secs / DIST_MI[(g.event or "").lower()])
+    return f"{p_ // 60}:{p_ % 60:02d}"
+
+
+def long_weekday(g: Goal) -> int:
+    for wd in (6, 5, 4, 3, 2, 1, 0):
+        if wd not in (g.no_days or []):
+            return wd
+    return 6
+
+
+def _days_text(days: list[int]) -> str:
+    names = [DAY_NAMES[d] + "s" for d in sorted(days)]
+    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
+
+
 def build(p, g: Goal, today: date) -> Program:
     base_h = max(3.0, _recent_hours(p, today))
     if g.kind == "event":
-        return _event(p, g, today, base_h)
-    if g.kind == "weight":
-        return _weight(p, g, today, base_h)
-    if g.kind == "longevity":
-        return _longevity(p, g, today, base_h)
-    return _best_shape(p, g, today, base_h)
+        prog = _event(p, g, today, base_h)
+    elif g.kind == "weight":
+        prog = _weight(p, g, today, base_h)
+    elif g.kind == "longevity":
+        prog = _longevity(p, g, today, base_h)
+    else:
+        prog = _best_shape(p, g, today, base_h)
+    if g.max_hours:
+        cut = False
+        for w in prog.weeks:
+            if w.hours > g.max_hours:
+                w.hours, cut = round(float(g.max_hours), 1), True
+        if cut:
+            prog.summary += f" Capped at {g.max_hours:g} hours a week."
+    prog.long_day = long_weekday(g)
+    if g.no_days:
+        prog.summary += f" No training on {_days_text(g.no_days)}."
+        if prog.long_day != 6 and any(w.long_minutes for w in prog.weeks):
+            prog.summary += f" The long session moves to {DAY_NAMES[prog.long_day]}."
+    return prog
+
+
+def progress(g: Goal, day: date) -> tuple[int, int | None]:
+    """Week x of y, counted from the week you committed (or today, for a draft)."""
+    start = _monday(date.fromisoformat(g.committed)) if g.committed else _monday(day)
+    if g.stopped_on:
+        day = min(day, date.fromisoformat(g.stopped_on))
+    x = max(1, (_monday(day) - start).days // 7 + 1)
+    y = None
+    if g.target_date:
+        y = max(x, (_monday(date.fromisoformat(g.target_date)) - start).days // 7 + 1)
+    return x, y
 
 
 def _cycle(start: date, n: int, base_h: float, hard: int = 2, ramp: float = 0.05) -> list[Week]:
@@ -166,6 +337,7 @@ def _event(p, g: Goal, today: date, base_h: float) -> Program:
     if weeks_to < need:
         warnings.append(f"{weeks_to} weeks is short for a {ev} from where you are: a safe build needs about "
                         f"{need}. The programme compresses base, so expect to finish rather than race it.")
+    pace = pace_per_mile(g)
     long_now = max(20, _longest(p, today, sport))
     long_goal = {"marathon": 180, "half marathon": 105, "ultra": 240, "10k": 60, "trail race": 120,
                  "gran fondo": 300, "century ride": 330, "mtb race": 180, "ski tour": 300}.get(ev, 150)
@@ -203,17 +375,25 @@ def _event(p, g: Goal, today: date, base_h: float) -> Program:
             long_m = min(long_goal, long_m + max(5, min(15, round(max(step, long_m * 0.05)))))
             wk_h, wk_long = round(h, 1), long_m
             note = {"Base": f"Mostly easy, the {sport} share growing.",
-                    "Build": "Add race-specific efforts: steady tempo in the long session.",
-                    "Peak": "The longest sessions, at race effort in places."}[phase]
+                    "Build": (f"Last 20 minutes of the long run at {pace} a mile." if pace
+                              else "Add race-specific efforts: steady tempo in the long session."),
+                    "Peak": (f"The longest runs, with 30 to 45 minutes at {pace} a mile." if pace
+                             else "The longest sessions, at race effort in places.")}[phase]
         weeks.append(Week(ws.isoformat(), phase, wk_h, hard, wk_long, note))
     days_left = (race - today).days
-    title = f"{g.event.title() if g.event else 'Event'} on {race.strftime('%B %-d, %Y')}"
+    name = g.event[:1].upper() + g.event[1:] if g.event else "Event"
+    tsec = target_seconds(g)
+    title = f"{name} in {fmt_time(tsec)}" if tsec else name
+    title += f" on {race.strftime('%B %-d, %Y')}"
     summary = (f"{weeks_to} weeks: {base_w} base, {build_w} build, {peak} peak, {taper} taper. "
                f"Your {sport} volume is {sport_now:.1f} hours a week now; the long {sport} grows from "
                f"{long_now} minutes toward {long_goal}, about 10 minutes a week.")
-    if g.target:
+    if pace:
+        summary += f" Goal pace is {pace} a mile; the long runs practise it in the build and peak weeks."
+    elif g.target:
         summary += f" Target: {g.target}."
-    return _mark(Program(g, title, summary, weeks, warnings, days_left), today)
+    prog = Program(g, title, summary, weeks, warnings, days_left, pace=pace)
+    return _mark(prog, today)
 
 
 def _weight(p, g: Goal, today: date, base_h: float) -> Program:
@@ -266,11 +446,52 @@ def daily(prog: Program | None, day: date) -> dict:
     if not w:
         return {}
     g = prog.goal
-    sport = g.sport or EVENT_SPORT.get((g.event or "").lower(), "") if g.kind == "event" else ""
-    long_day = w.long_minutes and day.weekday() == 6        # the long session goes on Sunday
+    sport = g.sport or (EVENT_SPORT.get((g.event or "").lower(), "") if g.kind == "event" else "")
+    rest = day.weekday() in (g.no_days or [])
+    long_day = w.long_minutes and day.weekday() == getattr(prog, "long_day", 6) and not rest
     return {"phase": w.phase, "hard_days": w.hard_days, "sport": sport,
             "long_minutes": w.long_minutes if long_day else None, "week": w,
-            "race_day": g.kind == "event" and g.target_date == day.isoformat()}
+            "race_day": g.kind == "event" and g.target_date == day.isoformat(),
+            "rest": rest, "pace": getattr(prog, "pace", ""), "plan": g.id, "title": prog.title}
+
+
+def primary(programs: list[Program] | None, day: date) -> Program | None:
+    """The plan that leads when several run at once: the nearest dated event, else the nearest
+    dated goal, else the first."""
+    programs = [x for x in (programs or []) if x]
+    if not programs:
+        return None
+    d = day.isoformat()
+    for pick in (lambda x: x.goal.kind == "event", lambda x: True):
+        dated = [x for x in programs if pick(x) and x.goal.target_date and x.goal.target_date >= d]
+        if dated:
+            return min(dated, key=lambda x: x.goal.target_date)
+    return programs[0]
+
+
+def daily_all(programs: list[Program] | Program | None, day: date) -> dict:
+    """daily() across every active plan. The lead plan (see primary) sets the phase, sport, long
+    session and pace; the stricter cap wins on hard days; a day any plan rules out is a rest day."""
+    if isinstance(programs, Program):
+        programs = [programs]
+    parts = [(x, daily(x, day)) for x in (programs or []) if x]
+    parts = [(x, dd) for x, dd in parts if dd]
+    if not parts:
+        return {}
+    lead = primary([x for x, _ in parts], day)
+    out = dict(next(dd for x, dd in parts if x is lead))
+    out["hard_days"] = min(dd["hard_days"] for _, dd in parts)
+    out["rest"] = any(dd.get("rest") for _, dd in parts)
+    out["race_day"] = any(dd.get("race_day") for _, dd in parts)
+    if out["rest"]:
+        out["long_minutes"] = None
+    for _, dd in parts:
+        if not out.get("sport") and dd.get("sport"):
+            out["sport"] = dd["sport"]
+        if not out["rest"] and not out.get("long_minutes") and dd.get("long_minutes"):
+            out["long_minutes"] = dd["long_minutes"]
+    out["plans"] = [dd["plan"] for _, dd in parts]
+    return out
 
 
 CANNED = [
