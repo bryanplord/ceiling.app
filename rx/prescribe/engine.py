@@ -59,6 +59,8 @@ class Rx:
     skip_short: str = ""
     example: str = ""
     minimum: str = ""
+    options: list = field(default_factory=list)     # other ways to do today: (title, note, tone)
+    options_short: str = ""
     tomorrow_short: str = ""
     why_need: str = ""
     why_story: str = ""
@@ -249,6 +251,11 @@ def build_rx(p: Profile, day: str | None = None) -> Rx:
     rx.why_need, rx.why_story = why_story(verdict, p, day, sb, reading)
     rx.what, rx.how = what_how(rx, kind, mins, low, ceiling, steps)
     rx.minimum = minimum_dose(p, rx, kind)
+    rx.options = alternatives(p, rx, kind)
+    if rx.options:
+        names = [o[3] for o in rx.options[:3]]
+        rx.options_short = "Or " + (names[0] if len(names) == 1 else ", ".join(names[:-1]) + " or " + names[-1]) + \
+            ", same heart rate."
     key = next((i for i, h in enumerate(rx.how) if "×" in h), 0) if verdict == HARD else 0
     rx.how_short = rx.how[key] if rx.how else rx.do
     rx.how_more = [h for i, h in enumerate(rx.how) if i != key]
@@ -570,7 +577,9 @@ SUBTYPE = {"MountainBikeRide": "mountain bike", "EMountainBikeRide": "mountain b
            "Ride": "road ride", "road_biking": "road ride", "GravelRide": "gravel ride", "gravel_cycling": "gravel ride",
            "VirtualRide": "trainer ride", "Run": "run", "TrailRun": "trail run", "trail_running": "trail run",
            "BackcountrySki": "ski tour", "backcountry_skiing": "ski tour", "NordicSki": "nordic ski",
-           "Hike": "hike", "hiking": "hike", "Walk": "walk", "walking": "walk"}
+           "Hike": "hike", "hiking": "hike", "Walk": "walk", "walking": "walk",
+           "AlpineSki": "resort skiing", "resort_skiing_snowboarding_ws": "resort skiing",
+           "resort_skiing": "resort skiing", "Snowboard": "resort skiing"}
 
 
 def usual_kind(p: Profile, sport: str) -> str | None:
@@ -628,7 +637,7 @@ def example_ride(p: Profile, sport: str, verdict: str, mins: int, ceiling: int |
 
 NOUN = {"mountain bike": "mountain bike ride", "road ride": "road ride", "gravel ride": "gravel ride",
         "trainer ride": "trainer ride", "trail run": "trail run", "run": "run", "ski tour": "ski tour",
-        "nordic ski": "nordic ski", "hike": "hike", "walk": "walk"}
+        "nordic ski": "nordic ski", "hike": "hike", "walk": "walk", "resort skiing": "day of resort skiing"}
 
 
 def what_how(rx: Rx, kind: str | None, mins: int, low, ceiling, steps) -> tuple[str, list[str]]:
@@ -708,7 +717,8 @@ def kind_stats(p: Profile, day: str, days: int = 150) -> dict[str, dict]:
 
 
 SPORT_OF = {"mountain bike": BIKE, "road ride": BIKE, "gravel ride": BIKE, "trainer ride": BIKE,
-            "run": RUN, "trail run": RUN, "ski tour": SKI, "nordic ski": SKI, "hike": WALK, "walk": WALK}
+            "run": RUN, "trail run": RUN, "ski tour": SKI, "nordic ski": SKI, "hike": WALK, "walk": WALK,
+            "resort skiing": SKI}
 CONTROLLED = {"road ride", "gravel ride", "trainer ride", "run", "hike"}   # easy to hold a steady HR
 
 
@@ -787,6 +797,87 @@ def choose_activity(verdict: str, p: Profile, day: str, planned: dict | None = N
             cap = 40
             parts.append("Keep it to 40 minutes: your legs aren't used to much running right now.")
     return sport, best, " ".join(parts), cap
+
+
+SNOW = {"ski tour", "nordic ski", "resort skiing"}
+BIKES = {"mountain bike", "road ride", "gravel ride", "trainer ride"}
+
+
+def alternatives(p: Profile, rx: Rx, chosen: str | None) -> list[tuple[str, str, str, str]]:
+    """Other ways to do today's session, from the things you actually do, each judged by what it
+    does to YOUR heart (your own sessions of that kind over the last year) and by the season.
+    Returns (title, note, tone, short name), best first. Same heart rate whatever you pick."""
+    if rx.verdict in (REST,) or not p.zones or rx.hr_ceiling is None:
+        return []
+    lo = rx.hr_low if rx.hr_low is not None else rx.hr_ceiling - 15
+    hi = rx.hr_ceiling
+    aim = round((lo + hi) / 2)
+    month = date.fromisoformat(rx.date).month
+    winter, deep = month in (11, 12, 1, 2, 3, 4), month in (12, 1, 2, 3)
+    stats = kind_stats(p, rx.date, 400)
+    runs30 = sum(1 for a in p.activities if a.sport == RUN and
+                 (date.fromisoformat(rx.date) - timedelta(days=30)).isoformat() <= a.date < rx.date)
+    out = []
+    for k, st in stats.items():
+        if k == chosen or k == "walk" or st["n"] < 3:
+            continue
+        if k in SNOW and not winter:
+            continue
+        if rx.verdict == HARD and k in ("hike", "resort skiing", "nordic ski"):
+            continue
+        if rx.verdict == STEADY and k == "resort skiing":
+            continue
+        noun = NOUN.get(k, k)
+        hr, hr_hi = st["hr"], st["hr_hi"]
+        if rx.verdict == HARD:
+            mins = rx.max_minutes or 75
+            title = f"{noun[:1].upper() + noun[1:]}: 4 × 8 minutes at {lo}–{hi - 3}, {mins} minutes total"
+        elif k == "resort skiing":
+            title = "A few easy hours of resort laps"
+        else:
+            base = rx.max_minutes or 60
+            mins = base
+            if k in BIKES and rx.verdict == EASY:
+                mins = max(base, 60)                    # low impact: you can ride longer than you run
+            if k in ("run", "trail run") and runs30 < 3:
+                mins = min(mins, 40)
+            if k == "ski tour":
+                mins = max(base, 75)
+            title = f"{noun[:1].upper() + noun[1:]}, {mins} minutes at {aim} ({lo}–{hi})"
+        # how it fits your heart
+        if rx.verdict == HARD:
+            note, tone = ({"run": "On a flat road, a track or a treadmill, where nothing interrupts the efforts.",
+                           "trail run": "On a steady uphill trail, walking back down between efforts.",
+                           "ski tour": "On the skin track, up a steady slope: one effort per climb."}
+                          .get(k, "On a steady climb or a flat road where you control the effort."), "good")
+        elif k == "resort skiing":
+            note, tone = (f"Your ski days average {hr:.0f}: the lifts give you rest between runs, "
+                          f"so it counts as an easy day as long as you cruise."), "good"
+        elif lo - 3 <= hr <= hi + 3:
+            note, tone = f"Your {noun}s average {hr:.0f}, right in range.", "good"
+        elif hr > hi + 3:
+            note, tone = (f"Your {noun}s average {hr:.0f}, over today's {hi}. Pick a flat route and keep "
+                          f"it gentle, or it won't stay {'easy' if rx.verdict in (EASY, LIGHT) else 'in range'}."), "ok"
+        elif hr_hi >= lo:
+            note, tone = f"Your {noun}s usually average {hr:.0f}. Push the climbs a little to stay above {lo}.", "ok"
+        else:
+            if rx.verdict in (STEADY, HARD):
+                continue                                 # can't reach the range: not an option
+            note, tone = f"Your {noun}s average {hr:.0f}, under today's range: fine for an easy day.", "ok"
+        if k == "mountain bike" and rx.verdict in (EASY, LIGHT):
+            note += " Climbs spike it: spin, or walk the steep pitches."
+        if k == "mountain bike" and deep:
+            note += " Only if the trails are clear of snow."
+        if k in ("road ride", "gravel ride") and deep:
+            note += " If the roads are wet or icy, do it on the trainer."
+        if k in ("run", "trail run") and deep:
+            note += " If the trails are snowed in, a treadmill gives you the same session."
+        if k in ("run", "trail run") and runs30 < 3:
+            note += " Your legs aren't used to running right now: keep it short."
+        short = {"resort skiing": "a day of resort skiing"}.get(k, ("an " if noun[0] in "aeiou" else "a ") + noun)
+        out.append((title, note, tone, short))
+    out.sort(key=lambda o: 0 if o[2] == "good" else 1)
+    return out[:4]
 
 
 def _hm_short(h: float) -> str:

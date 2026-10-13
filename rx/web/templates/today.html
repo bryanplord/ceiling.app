@@ -218,6 +218,8 @@
     <div class="pad">
       <details class="rowd"><summary><span class="rxk">What</span><p class="rxv">{{ rx.what or rx.do }}</p><i class="chev" aria-hidden="true"></i></summary>
         <div class="rowb">{% if rx.activity_why %}<p class="actwhy">{{ rx.activity_why }}</p>{% endif %}</div></details>
+      {% if rx.options %}<details class="rowd"><summary><span class="rxk">Or</span><p class="rxv">{{ rx.options_short }}</p><i class="chev" aria-hidden="true"></i></summary>
+        <div class="rowb"><dl class="tmr">{% for title, note, tone, short in rx.options %}<div class="t-{{ 'good' if tone == 'good' else 'muted' }}"><dt>{{ title }}</dt><dd>{{ note }}</dd></div>{% endfor %}</dl></div></details>{% endif %}
       <details class="rowd"><summary><span class="rxk">How</span><p class="rxv">{{ rx.how_short }}</p><i class="chev" aria-hidden="true"></i></summary>
         <div class="rowb"><ul class="rxlist">{% for h in rx.how_more %}<li>{{ h }}</li>{% endfor %}</ul></div></details>
       {% if rx.reading %}<details class="rowd"><summary><span class="rxk">Why</span><p class="rxv">{{ rx.why_need }} {{ rx.why_story }}</p><i class="chev" aria-hidden="true"></i></summary>
