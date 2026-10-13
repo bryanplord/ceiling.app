@@ -89,7 +89,7 @@ def build(store, days: int = 14) -> list[dict]:
                 row.update(zones=[(n, c, round(mm), mm / tot * 100) for (n, c, _, _), mm in zip(bands(p), mins)])
                 if rv:
                     row.update(score=rv.score, word=rv.word, tone=rv.tone, head=rv.headline, right=rv.right,
-                               fix=rv.fix, stats=rv.stats[:4], pct=rv.pct_in_range, grade=rv.score)
+                               fix=rv.fix, stats=rv.stats, parts=rv.parts, pct=rv.pct_in_range, grade=rv.score)
             out.append(row)
     return list(reversed(out))
 

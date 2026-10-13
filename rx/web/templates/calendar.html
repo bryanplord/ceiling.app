@@ -37,6 +37,17 @@
   .was-card .why { color:var(--lichen); }
   .phase { font-weight:500; color:var(--lichen); font-size:12px; margin-left:6px; }
   .opts { font-size:13px; color:var(--lichen); margin:6px 0 0; }
+  .done-card { margin:0 0 4px; }
+  .dx { display:flex; flex-direction:column; margin:0 0 12px; }
+  .dx .dl { display:flex; align-items:center; gap:6px; font-size:13px; font-weight:700; }
+  .dx .ck { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px;
+            border-radius:50%; background:#2fae6b; color:#fff; font-size:11px; }
+  .dx .dw1 { font-size:20px; font-weight:600; line-height:1.25; margin-top:4px; color:var(--ink); }
+  .dx .dsc { font-size:14px; font-weight:600; margin-top:2px; }
+  .dx.t-good { color:#1d6b45; } .dx.t-ok { color:#8a5a10; } .dx.t-bad { color:#a8321f; } .dx.t-muted { color:var(--lichen); }
+  .planned { display:block; font-size:12px; color:var(--lichen); padding-top:10px; border-top:1px solid rgba(0,0,0,.08); margin-bottom:4px; }
+  .day.today.did-good { background:#e6f4ec; } .day.today.did-ok { background:#fbf1dc; } .day.today.did-bad { background:#fde8e5; }
+  .day.today.did-good .db > .kind, .day.today.did-ok .db > .kind, .day.today.did-bad .db > .kind { color:var(--lichen); }
   .tabs { display:flex; gap:24px; margin-top:24px; font-size:17px; }
   .tabs a { text-decoration:none; color:var(--lichen); padding-bottom:4px; }
   .tabs a.on { color:var(--ink); box-shadow:inset 0 -2px 0 var(--ink); }
@@ -74,6 +85,7 @@
     .day .db, .day .dw, .day > .conf { grid-column:2; }
     .day .vbar { width:40px; margin:8px 0 0; }
     .day .conf { padding-top:8px; }
+    .day.today[class*="did-"] { padding:16px 12px; margin:0 -12px; border-radius:10px; border-bottom:0; }
   }
 </style>
 {% endblock %}
@@ -86,10 +98,17 @@
 <p class="rowsub">{{ plan.note }}</p>
 <div class="week">
 {% for d in plan.days %}{% set dd = date.fromisoformat(d.date) %}
-  <div class="day{{ ' today' if d.confidence == 'Today' }}{{ ' sketch' if d.confidence == 'Sketch' }}">
+  {% set dt = (done|selectattr('score','ne',none)|list or done)[0].tone if (d.confidence == 'Today' and done) else none %}
+  <div class="day{{ ' today' if d.confidence == 'Today' }}{{ ' did-' ~ dt if dt }}{{ ' sketch' if d.confidence == 'Sketch' }}">
     <div class="dh"><span class="wd">{{ 'Today' if d.confidence == 'Today' else dd.strftime('%a') }}</span>
       <span class="dn">{{ dd.day }}</span><span class="vbar v-{{ d.verdict }}"></span></div>
-    <div class="db">{% set kind = {'rest':'Day off','light':'Walk','easy':'Easy','steady':'Steady','hard':'Hard'}[d.verdict] %}
+    <div class="db">{% if d.confidence == 'Today' and done %}<div class="done-card">
+        {% for x in done %}<div class="dx t-{{ x.tone or 'muted' }}">
+          <span class="dl">{% if x.tone == 'good' %}<span class="ck" aria-hidden="true">✓</span>{% endif %}Done</span>
+          <span class="dw1">{{ x.sport }} {{ x.dur }}</span>
+          {% if x.score is not none %}<span class="dsc">{{ x.score }}%{% if x.word %}, {{ x.word|lower }}{% endif %}</span>{% endif %}
+        </div>{% endfor %}
+        <span class="planned">The plan was</span></div>{% endif %}{% set kind = {'rest':'Day off','light':'Walk','easy':'Easy','steady':'Steady','hard':'Hard'}[d.verdict] %}
       <span class="kind">{{ kind }}{% if d.phase %} <span class="phase">{{ d.phase }}</span>{% endif %}</span>
       {% if d.title != kind %}<p class="ttl">{{ d.title }}</p>{% endif %}
       {% if d.options %}<p class="opts">{{ d.options }}</p>{% endif %}

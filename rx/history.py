@@ -111,6 +111,9 @@ def day_cell(p, d: str, today: str, live: dict | None = None, store=None) -> dic
         if u:
             rec = "good" if w.hrv >= u * 0.95 else "bad" if w.hrv < u * 0.88 else "ok"
     cell.update(verdict=v, kind=KIND[v], did=did, status=status[0], tone=status[1], rec=rec, score=sc,
+                trained=bool(train), short=f"{sc}%" if sc is not None and v not in (REST, LIGHT) else
+                {"Rested": "Rest", "Trained on a rest day": "Trained", "Walked, no workout": "Walk",
+                 "Skipped": "", "Too hard": "Hard", "Too easy": "Easy", "Nailed it": "Done"}.get(status[0], ""),
                 both=status[1] == "good" and rec == "good")
     return cell
 
@@ -119,7 +122,7 @@ def month(p, ym: str, today: str, live: dict | None = None, store=None) -> dict:
     y, m = map(int, ym.split("-"))
     weeks = calendar.Calendar(firstweekday=0).monthdatescalendar(y, m)
     grid = [[(day_cell(p, d.isoformat(), today, live, store) if d.month == m else None) for d in wk] for wk in weeks]
-    cells = [c for wk in grid for c in wk if c and not c["future"] and not c["today"]]
+    cells = [c for wk in grid for c in wk if c and not c["future"] and (not c["today"] or c.get("status"))]
     nailed = sum(1 for c in cells if c.get("tone") == "good")
     recov = [c for c in cells if c.get("rec")]
     first = date(y, m, 1)

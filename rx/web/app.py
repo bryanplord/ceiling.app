@@ -464,12 +464,25 @@ def plan_page(request: Request):
     p, rx = today_rx(store)
     pl, changed = cached(store, "planx", rx.date, lambda: plan_with_changes(store))
     hist = None
+    try:                                              # what today's synced workouts actually were
+        after = cached(store, "cal_after", rx.date, lambda: today_after(store, p, rx))
+    except Exception:
+        after = None
+    from ..history import SHORT
+    from ..prescribe.engine import SUBTYPE
+    acts = sorted((a for a in p.activities if a.date == rx.date and (a.moving_s or 0) >= 10 * 60),
+                  key=lambda a: a.start_local or "")       # the same order today_after lists them in
+    done = []
+    for a, s in zip(acts, (after or {}).get("sessions", [])):
+        if not s.get("walk"):
+            k = SUBTYPE.get(a.raw_type or "", a.sport)
+            done.append(dict(s, sport=SHORT.get(k, k.capitalize())))
     email = auth.verify("session", request.cookies.get(auth.COOKIE)) if auth.enabled() else None
     feed = None
     if email:
         tok = auth.sign("cal", email, 10 * 365 * 24 * 3600)
         feed = f"{request.url.netloc}/plan.ics?k={tok}"
-    return _page(request, "calendar.html", plan=pl, changed=changed, hist=hist, feed=feed, date=date)
+    return _page(request, "calendar.html", plan=pl, changed=changed, hist=hist, feed=feed, date=date, done=done)
 
 
 @app.get("/plan.ics")

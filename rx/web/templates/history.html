@@ -15,32 +15,45 @@
   .note { color:var(--lichen); font-size:15px; max-width:70ch; margin:16px 0 0; }
   .cal { display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); margin-top:24px; border-top:2px solid var(--ink); }
   .dow { font-size:13px; font-weight:600; color:var(--lichen); padding:10px 8px; border-bottom:1px solid var(--rule); }
-  .c { min-height:128px; padding:8px; border-bottom:1px solid var(--rule); border-right:1px solid var(--rule); display:flex; flex-direction:column; gap:4px; }
+  .c { min-height:128px; padding:8px; border-bottom:1px solid var(--rule); border-right:1px solid var(--rule); display:flex; flex-direction:column; gap:4px; min-width:0; }
   .c:nth-child(7n) { border-right:0; }
   .c.out { background:#fafafa; }
   .c.fut { color:var(--rule); }
   .c.tod { box-shadow:inset 0 0 0 2px var(--ink); }
+  .c.done.t-good { background:#e6f4ec; } .c.done.t-ok { background:#fbf1dc; } .c.done.t-bad { background:#fde8e5; }
   .c .n { font-size:15px; font-weight:600; display:flex; justify-content:space-between; align-items:center; }
-  .c .vb { height:4px; }
+  .c .vb { height:4px; border-radius:2px; }
   .c .k { font-size:12px; color:var(--lichen); }
-  .c .did { font-size:13px; line-height:1.3; }
-  .c .st { margin-top:auto; font-size:12px; font-weight:700; }
-  .st.t-good { color:#1d6b45; } .st.t-bad { color:#a8321f; } .st.t-ok { color:#8a5a10; } .st.t-muted { color:var(--lichen); }
-  .rdot { width:9px; height:9px; border-radius:50%; display:inline-block; }
+  .c.done .k { color:#55555a; }
+  .c .did { font-size:13px; line-height:1.3; overflow-wrap:anywhere; }
+  .c .st { margin-top:auto; font-size:12px; font-weight:700; display:flex; align-items:center; gap:5px; line-height:1.25; }
+  .c .sm { display:none; }
+  .t-good .st, .st.t-good { color:#1d6b45; } .st.t-bad { color:#a8321f; } .st.t-ok { color:#8a5a10; } .st.t-muted { color:var(--lichen); font-weight:500; }
+  .rdot { width:9px; height:9px; border-radius:50%; display:inline-block; flex:none; }
   .rdot.good { background:#2fae6b; } .rdot.ok { background:#e6c13d; } .rdot.bad { background:#d9433b; }
-  .c.both { background:#f2faf5; }
-  .c.hit .vb { height:5px; }
-  .ck { display:inline-block; width:16px; height:16px; line-height:16px; text-align:center; border-radius:50%;
-        background:var(--good); color:#fff; font-size:11px; margin-right:5px; vertical-align:1px; }
+  .ck { flex:none; display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%;
+        background:#2fae6b; color:#fff; font-size:11px; font-weight:700; }
+  .c:not(.done) .ck { width:14px; height:14px; font-size:9px; background:#9fd3b6; }
   .v-rest { background:#c9c9cd; } .v-light { background:#b3a6dc; } .v-easy { background:#7fa7d9; }
   .v-steady { background:#46b07f; } .v-hard { background:#ec9550; }
-  .key { display:flex; flex-wrap:wrap; gap:6px 18px; font-size:13px; color:var(--lichen); margin-top:16px; }
-  .key i { display:inline-block; width:14px; height:4px; margin-right:6px; vertical-align:middle; }
+  .key { display:flex; flex-wrap:wrap; gap:8px 20px; font-size:13px; color:var(--lichen); margin-top:16px; align-items:center; }
+  .key > span { display:inline-flex; align-items:center; gap:6px; }
+  .key i { display:inline-block; width:14px; height:4px; border-radius:2px; }
+  .key .sw { width:14px; height:14px; border-radius:3px; }
+  .key .br { flex-basis:100%; height:0; }
   @media (max-width:760px) {
-    .c { min-height:76px; padding:5px; }
-    .c .k, .c .did { display:none; }
-    .c .st { font-size:10px; }
+    .stats { gap:20px 28px; }
+    .stat b { font-size:28px; }
+    .c { min-height:72px; padding:5px 4px; gap:3px; }
+    .c .k, .c .did, .c .st .lg { display:none; }
+    .c .sm { display:inline; }
+    .c .st { font-size:11px; gap:3px; }
+    .c .n { font-size:13px; }
+    .ck { width:14px; height:14px; font-size:9px; }
+    .rdot { width:7px; height:7px; }
     .dow { padding:8px 4px; font-size:11px; }
+    .mhead { gap:14px; flex-wrap:wrap; }
+    .mhead h2 { font-size:24px; }
   }
 </style>
 {% endblock %}
@@ -69,20 +82,24 @@
     {% elif c.future %}<div class="c fut"><span class="n">{{ c.day }}</span></div>
     {% elif c.today and not c.status %}<div class="c tod"><span class="n">{{ c.day }}</span><span class="k">Today</span></div>
     {% else %}
-    <div class="c{{ ' both' if c.both }}{{ ' tod' if c.today }}{{ ' hit' if c.tone == 'good' }}" title="{{ c.kind }}: {{ c.status }}">
+    <div class="c t-{{ c.tone }}{{ ' done' if c.trained }}{{ ' tod' if c.today }}" title="{{ c.kind }}: {{ c.status }}">
       <span class="n">{{ c.day }}{% if c.rec %}<span class="rdot {{ c.rec }}" title="Next morning: {{ {'good':'recovered','ok':'mostly recovered','bad':'not recovered'}[c.rec] }}"></span>{% endif %}</span>
       <span class="vb v-{{ c.verdict }}"></span>
-      <span class="k">{{ c.kind }}</span>
+      <span class="k">{{ 'Today, ' ~ c.kind|lower if c.today else c.kind }}</span>
       <span class="did">{{ c.did|join(', ') if c.did else '' }}</span>
-      <span class="st t-{{ c.tone }}">{% if c.tone == 'good' %}<span class="ck" aria-hidden="true">✓</span>{% endif %}{{ c.status }}</span>
+      <span class="st t-{{ c.tone }}">{% if c.tone == 'good' %}<span class="ck" aria-hidden="true">✓</span>{% endif %}<span class="lg">{{ c.status }}</span><span class="sm">{{ c.short }}</span></span>
     </div>
     {% endif %}
   {% endfor %}{% endfor %}
 </div>
 <div class="key">
+  <span>Bar, what the morning called for:</span>
   <span><i class="v-easy"></i>Easy</span><span><i class="v-steady"></i>Steady</span><span><i class="v-hard"></i>Hard</span>
   <span><i class="v-light"></i>Walk</span><span><i class="v-rest"></i>Day off</span>
-  <span><span class="rdot good"></span> recovered next morning</span><span><span class="rdot ok"></span> mostly</span><span><span class="rdot bad"></span> not recovered</span>
-  <span>✓ did what the morning called for</span><span>Green day: did it, and recovered</span>
+  <span class="br"></span>
+  <span><i class="sw" style="background:#e6f4ec"></i>Did what it called for</span>
+  <span><i class="sw" style="background:#fbf1dc"></i>Close</span>
+  <span><i class="sw" style="background:#fde8e5"></i>Off plan</span>
+  <span><span class="rdot good"></span><span class="rdot ok"></span><span class="rdot bad"></span>Recovered next morning, mostly, not</span>
 </div>
 {% endblock %}

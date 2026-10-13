@@ -102,10 +102,12 @@ def _rank_note(vals: list[float], v: float, noun_pl: str, higher_word: str, lowe
     if below == 0:
         return f"Your {lower_word} of {n + 1} {noun_pl} this year."
     share = below / n
+    comp = {"highest": "Higher", "lowest": "Lower", "steepest": "Steeper", "flattest": "Flatter",
+            "longest": "Longer", "shortest": "Shorter"}
     if share >= 0.8:
-        return f"{higher_word[:1].upper() + higher_word[1:].replace('highest', 'Higher').replace('longest', 'Longer')} than {share * 100:.0f}% of your {noun_pl}."
+        return f"{comp.get(higher_word, 'More')} than {share * 100:.0f}% of your {noun_pl}."
     if share <= 0.2:
-        return f"{lower_word[:1].upper() + lower_word[1:].replace('lowest', 'Lower').replace('shortest', 'Shorter')} than {(1 - share) * 100:.0f}% of your {noun_pl}."
+        return f"{comp.get(lower_word, 'Less')} than {(1 - share) * 100:.0f}% of your {noun_pl}."
     return f"About your usual ({statistics.median(vals):.0f})."
 
 
