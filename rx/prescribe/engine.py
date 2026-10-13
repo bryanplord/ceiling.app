@@ -639,13 +639,13 @@ def what_how(rx: Rx, kind: str | None, mins: int, low, ceiling, steps) -> tuple[
         how = [f"Heart rate under {ceiling}. A stroll, not a power walk.",
                "No riding, no running, no speed-walking to rack up steps."]
     elif v == EASY:
-        what = f"An easy {noun}, {mins} minutes."
-        how = [f"Heart rate {low}–{ceiling}, around {round((low + ceiling) / 2)}. It should feel almost too easy: "
+        what = f"An easy {noun}, {mins} minutes at {round((low + ceiling) / 2)}."
+        how = [f"Hold {round((low + ceiling) / 2)}, never over {ceiling}. It should feel almost too easy: "
                f"full sentences the whole way.",
                f"On the climbs, shift down, spin or walk the steep pitches to stay in range."]
     elif v == STEADY:
-        what = f"A steady {noun}, up to {mins} minutes."
-        how = [f"Heart rate {low}–{ceiling}, settling around {round((low + ceiling) / 2)}. All-day pace: you can "
+        what = f"A steady {noun}, up to {mins} minutes at {round((low + ceiling) / 2)}."
+        how = [f"Hold {round((low + ceiling) / 2)}, never over {ceiling}. All-day pace: you can "
                f"talk, just not sing.",
                f"No chasing, no attacking climbs, no intervals."]
     else:
@@ -668,11 +668,10 @@ def _mix(p: Profile, day: str, days: int) -> dict[str, float]:
 
 
 def easy_band(z) -> tuple[int, int]:
-    """Easy day: the top of Recovery into the bottom of Aerobic, staying clear of the top of
-    Aerobic (your aerobic threshold) by at least 4 beats. Easy should never brush tempo."""
-    low = z.top("Z1 Recovery") - 8
-    ceiling = min(z.bottom("Z2 Aerobic") + 2, z.top("Z2 Aerobic") - 4)
-    return low, max(ceiling, low + 8)
+    """Easy day: the top 10 beats of your Easy zone. That sits well under your aerobic threshold
+    (the top of Steady), which is what easy means physiologically: below LT1, all conversation."""
+    ceiling = z.top("Z1 Recovery")
+    return ceiling - 10, ceiling
 
 
 def _band(verdict: str, p: Profile) -> tuple[int, int] | None:

@@ -18,6 +18,7 @@ import numpy as np
 from .hr import clean, rolling_mean_full
 
 HR_TARGET = {"Z1 Recovery": 0.25, "Z2 Aerobic": 0.53, "Z3 Tempo": 0.07, "Z4 Threshold": 0.10, "Z5 Max": 0.05}
+from .hr import ZONE_LABEL
 HR_FEEL = {"Z1 Recovery": "barely working", "Z2 Aerobic": "all day, full sentences",
            "Z3 Tempo": "comfortably hard", "Z4 Threshold": "hard, a few words", "Z5 Max": "all out"}
 PWR_ZONES = [("Z1 Recovery", 0.0, 0.55), ("Z2 Endurance", 0.55, 0.75), ("Z3 Tempo", 0.75, 0.90),
@@ -118,7 +119,7 @@ def _build(kind, names, ranges, feels, targets, per_act, acts, end: date, colors
     total = sum(last4)
     if total < 0.5:
         return None
-    rows = [ZoneRow(k, k.split(" ", 1)[1], ranges[i], feels[i], last4[i], targets[k] * total,
+    rows = [ZoneRow(k, ZONE_LABEL.get(k, k.split(" ", 1)[1]), ranges[i], feels[i], last4[i], targets[k] * total,
                     last4[i] / total, targets[k], colors[i]) for i, k in enumerate(names)]
     return Distribution(kind, rows, total, sorted(weeks.items()), basis=basis, easy_keys=easy_keys)
 

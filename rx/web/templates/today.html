@@ -69,7 +69,7 @@
   .room .brk { fill:none; stroke:var(--lichen); stroke-width:1.5; }
   .room .ref { stroke:var(--lichen); stroke-width:1.2; stroke-dasharray:2 5; }
   .room .reft, .room .small { fill:var(--lichen); font-size:12px; }
-  .room .hc { opacity:.3; stroke:none; } .room .tbar { fill:var(--ink); } .room .hl { fill:none; stroke:var(--ink); stroke-width:1.25; opacity:.55; stroke-linejoin:round; }
+  .room .hc { opacity:.3; stroke:none; } .room .aimdot { fill:var(--ink); } .room .tick.aim { fill:var(--ink); font-size:17px; font-weight:700; } .room .taimbig { fill:var(--ink); font-size:56px; font-weight:600; font-stretch:125%; letter-spacing:-.01em; } .room .trng2 { fill:var(--lichen); font-size:15px; } .room .hl { fill:none; stroke:var(--ink); stroke-width:1.25; opacity:.55; stroke-linejoin:round; }
   .room .tlab { fill:var(--ink); font-size:12px; font-weight:600; font-stretch:125%; letter-spacing:.12em; }
   .room .trng { fill:var(--ink); font-size:28px; font-weight:600; font-stretch:125%; font-variant-numeric:tabular-nums; }
   .room .taim { fill:var(--lichen); font-size:13px; }
@@ -170,7 +170,7 @@
     .room { margin:0; max-width:100%; }
     .room .zn { font-size:20px; } .room .zd { font-size:16px; } .room .tick { font-size:17px; }
     .room .tick.strong { font-size:18px; } .room .reft, .room .small { font-size:16px; }
-    .room .trng { font-size:34px; } .room .tlab, .room .taim { font-size:16px; }
+    .room .trng { font-size:34px; } .room .tlab, .room .taim { font-size:16px; } .room .tick.aim { font-size:22px; } .room .trng2 { font-size:19px; }
     .roomcap, .roomh, .roomsub { text-align:left; }
     .split, .trade, .next, .twocol { grid-template-columns:1fr; gap:36px; }
     .hist .lbl, .hist .tick { font-size:30px; } .hist .lbl.strong { font-size:34px; }
@@ -229,9 +229,9 @@
   {% if room %}
   <div>
     <p class="roomh">Your heart today</p>
-    <p class="roomsub">Your zones, resting to max. Today's range is marked in black.</p>
+    <p class="roomsub">Your zones, resting to max, and where you should be today.</p>
     {{ room | safe }}
-    <p class="roomcap">Stay in the black range.{% if rx.max_minutes %} {{ rx.max_minutes }} minutes max.{% endif %}</p>
+    <p class="roomcap">Aim for the number. Stay in the range.{% if rx.max_minutes %} {{ rx.max_minutes }} minutes max.{% endif %}</p>
   </div>
   {% endif %}
 </section>

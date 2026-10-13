@@ -24,6 +24,8 @@ from . import auth
 
 app = FastAPI(title="Ceiling")
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
+from ..analysis.hr import ZONE_LABEL as _ZL
+templates.env.globals["zone_label"] = _ZL
 app.mount("/static", StaticFiles(directory=str(Path(__file__).parent / "static")), name="static")
 
 REFRESH_EVERY_S = 60 * 60

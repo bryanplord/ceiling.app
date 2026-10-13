@@ -15,7 +15,7 @@
 <h2>Your zones</h2>
 <p class="muted">{{ p.zones.basis }}</p>
 {% for n, lo, hi in p.zones.bounds %}
-<div class="row num"><span>{{ n }}</span><span>{{ lo }}–{{ hi }}</span></div>
+<div class="row num"><span>{{ zone_label.get(n, n) }}</span><span>{{ lo }}–{{ hi }}</span></div>
 {% endfor %}
 {% endif %}
 

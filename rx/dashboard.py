@@ -347,8 +347,7 @@ def ceiling_band(rx: Rx, p: Profile) -> str:
     return "".join(parts)
 
 
-ZONE_SHORT = {"Z1 Recovery": "Recovery", "Z2 Aerobic": "Aerobic", "Z3 Tempo": "Tempo",
-              "Z4 Threshold": "Threshold", "Z5 Max": "Max"}
+from .analysis.hr import ZONE_LABEL as ZONE_SHORT
 ZONE_FEEL = {"Z1 Recovery": "barely working", "Z2 Aerobic": "all day, full sentences",
              "Z3 Tempo": "comfortably hard, short sentences", "Z4 Threshold": "hard, a few words",
              "Z5 Max": "all out, no words"}
@@ -424,11 +423,16 @@ def room(rx: Rx, p: Profile, hist=None, usual: float | None = None, mode: str = 
 
     # SPINE: the numbers
     last_y = None
-    for v in sorted({*range((knee // 10 + 1) * 10, top, 10), band_lo, c}):
+    aim_ = round((band_lo + c) / 2) if lo is not None else None
+    keep = {band_lo, c} | ({aim_} if aim_ else set())
+    ticks = sorted({*range((knee // 10 + 1) * 10, top, 10)} | keep)
+    ticks = [v for v in ticks if v in keep or all(abs(Y(v) - Y(k)) >= 22 for k in keep)]
+    for v in ticks:
         y = Y(v)
-        if last_y is not None and abs(last_y - y) < 15:
+        if last_y is not None and abs(last_y - y) < 14 and v not in keep:
             continue
-        o.append(f'<text class="tick{" strong" if v in (band_lo, c) else ""}" x="{SX}" y="{y + 5:.1f}" text-anchor="middle">{v}</text>')
+        cls = "tick aim" if v == aim_ else ("tick strong" if v in keep else "tick")
+        o.append(f'<text class="{cls}" x="{SX}" y="{y + 5:.1f}" text-anchor="middle">{v}</text>')
         last_y = y
     if mode == "stretch":
         o.append(f'<path class="brk" d="M{SX - 10},{KY + 3:.1f} l5,-5 l5,5 l5,-5 l5,5"/>')
@@ -465,15 +469,12 @@ def room(rx: Rx, p: Profile, hist=None, usual: float | None = None, mode: str = 
 
     # today's range: one outline across both sides, so a zone never looks like two
 
-    # today's range: a black bracket on the spine, nothing else, so every zone keeps one color
-    o.append(f'<rect class="tbar" x="{L1 + 5}" y="{yt:.1f}" width="5" height="{yb - yt:.1f}" rx="2.5"/>')
-
-    # today's label, right side of the band
-    mid = (yt + yb) / 2
-    rng = f"{band_lo}–{c}" if lo is not None else f"under {c}"
-    o.append(f'<text class="tlab" x="{W - 8}" y="{mid - 12:.1f}" text-anchor="end">TODAY</text>')
-    o.append(f'<text class="trng" x="{W - 8}" y="{mid + 16:.1f}" text-anchor="end">{rng}</text>')
-    if lo is not None and (yb - yt) > 70:
-        o.append(f'<text class="taim" x="{W - 8}" y="{mid + 36:.1f}" text-anchor="end">aim {round((lo + c) / 2)}</text>')
+    # today's target: the number that matters, big, at its height; the range under it, small
+    aim = round((band_lo + c) / 2) if lo is not None else c
+    ya = Y(aim)
+    o.append(f'<text class="tlab" x="{W - 4}" y="{ya - 30:.1f}" text-anchor="end">{"AIM" if lo is not None else "UNDER"}</text>')
+    o.append(f'<text class="taimbig" x="{W - 4}" y="{ya + 14:.1f}" text-anchor="end">{aim}</text>')
+    if lo is not None:
+        o.append(f'<text class="trng2" x="{W - 4}" y="{ya + 38:.1f}" text-anchor="end">stay {band_lo}–{c}</text>')
     o.append("</svg>")
     return "".join(o)

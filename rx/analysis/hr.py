@@ -206,6 +206,11 @@ class Zones:
         return next(lo for n, lo, hi in self.bounds if n == name)
 
 
+# What people see. Easy = well under your aerobic threshold; Steady = up to it.
+ZONE_LABEL = {"Z1 Recovery": "Easy", "Z2 Aerobic": "Steady", "Z3 Tempo": "Tempo",
+              "Z4 Threshold": "Threshold", "Z5 Max": "Max"}
+
+
 def zones_from_anchors(lt1: int, lthr: int, max_hr: int | None) -> Zones:
     """Zones from two measured points: aerobic threshold (LT1) and threshold (LT2).
 
