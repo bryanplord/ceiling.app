@@ -79,6 +79,18 @@
   .jnote { font-size:16px; margin:12px 0 0; max-width:56ch; }
   .jpat { font-size:16px; margin:12px 0 0; }
   .jhint { color:var(--lichen); font-size:15px; margin:12px 0 0; max-width:56ch; }
+  .tiles { display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:0; margin:0 0 36px;
+           border-top:1px solid var(--rule); border-bottom:1px solid var(--rule); }
+  .tile { display:flex; flex-direction:column; gap:2px; padding:14px 14px 12px; text-decoration:none; border-right:1px solid var(--rule); min-width:0; }
+  .tile:last-child { border-right:0; }
+  .tile:hover { background:var(--frost); }
+  .tn { font-size:12px; font-weight:600; color:var(--lichen); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tv { font-size:24px; font-weight:600; font-stretch:115%; line-height:1.15; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ts { font-size:13px; font-weight:600; }
+  .ts.good { color:var(--good); } .ts.ok { color:var(--warn); } .ts.bad { color:var(--bad); } .ts.none { color:var(--lichen); }
+  .tsp svg { width:100%; height:26px; display:block; margin-top:6px; }
+  @media (max-width:760px) { .tiles { display:flex; overflow-x:auto; scroll-snap-type:x mandatory; margin:0 -20px 28px; padding:0 20px; }
+    .tile { flex:0 0 42%; scroll-snap-align:start; } }
   .goalline { display:inline-block; margin:14px 0 0; font-size:15px; font-weight:600; text-decoration:none; color:var(--ink); border-bottom:2px solid var(--ceiling); }
   .goalline.muted { color:var(--lichen); border-color:var(--rule); }
   .gnote { font-size:17px; margin:10px 0 0; color:var(--lichen); max-width:52ch; }
@@ -249,7 +261,20 @@
 {% if waiting %}
 <p class="waiting">Waiting on last night's sleep and HRV. Open Garmin Connect on your phone so your watch syncs; Ceiling checks every 10 minutes. Until it lands, today is built from yesterday's data.</p>
 {% endif %}
-<section class="hero">
+<nav class="tiles" aria-label="Your status">
+  <a class="tile" href="#rx"><span class="tn">Today</span><span class="tv">{{ {'rest':'Day off','light':'Walk','easy':'Easy','steady':'Steady','hard':'Hard'}[rx.verdict] }}</span><span class="ts {{ d.recovery.tone }}">{{ d.recovery.state }}</span></a>
+  {% set T = [(d.hrv, '/trends#hrv'), (d.rhr, '/trends#rhr'), (d.sleep, '/trends#sleep'), (d.freshness, '/trends#load'), (d.fitness, '/progress')] %}
+  {% for m, href in T %}
+  <a class="tile" href="{{ href }}">
+    <span class="tn">{{ m.name }}</span>
+    <span class="tv">{{ m.value }}</span>
+    <span class="ts {{ m.tone }}">{{ m.state }}</span>
+    {% if m.series %}<span class="tsp">{{ spark(m.series[-30:], 120, 26, m.band) | safe }}</span>{% endif %}
+  </a>
+  {% endfor %}
+  {% if p.program %}<a class="tile" href="/plan"><span class="tn">Goal</span><span class="tv">{{ p.program.days_left if p.program.days_left is not none else '∞' }}</span><span class="ts none">{{ 'days to go' if p.program.days_left is not none else p.program.phase }}</span></a>{% endif %}
+</nav>
+<section class="hero" id="rx">
   <div>
     <div class="date">{{ day_label }}
       {% if syncing %}<span class="upd syncing">Syncing your Garmin data… this page refreshes itself.</span>

@@ -336,6 +336,11 @@ def today(request: Request, d: str | None = None):
                  day_label=when.strftime("%A, %B %-d"))
 
 
+@app.get("/me", response_class=HTMLResponse)
+def me_page(request: Request):
+    return _page(request, "me.html")
+
+
 @app.get("/plan", response_class=HTMLResponse)
 def plan_goal(request: Request):
     from .. import goals as gl

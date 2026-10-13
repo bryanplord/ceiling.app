@@ -91,16 +91,10 @@
   <nav>
     <a href="/" class="{{ 'on' if active=='today' }}">Today</a>
     <a href="/plan" class="{{ 'on' if active=='plan' }}">Plan</a>
-    <a href="/calendar" class="{{ 'on' if active=='calendar' }}">Calendar</a>
+    <a href="/calendar" class="{{ 'on' if active in ('calendar', 'history') }}">Calendar</a>
     <a href="/workouts" class="{{ 'on' if active=='workouts' }}">Workouts</a>
-    <a href="/trends" class="{{ 'on' if active=='trends' }}">Trends</a>
-    <a href="/zones" class="{{ 'on' if active=='zones' }}">Zones</a>
-    <a href="/you" class="{{ 'on' if active=='you' }}">You vs age</a>
-    <a href="/recovery" class="{{ 'on' if active=='recovery' }}">Recovery</a>
     <a href="/progress" class="{{ 'on' if active=='progress' }}">Progress</a>
-    <a href="/profile" class="{{ 'on' if active=='profile' }}">Profile</a>
-    <a href="/data" class="{{ 'on' if active=='data' }}">Data</a>
-    <a href="/logout">Sign out</a>
+    <a href="/me" class="{{ 'on' if active in ('me', 'trends', 'zones', 'you', 'recovery', 'profile', 'data', 'yesterday') }}">You</a>
   </nav>
 </header>
 {% endblock %}
