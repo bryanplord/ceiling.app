@@ -16,7 +16,7 @@ from fastapi.templating import Jinja2Templates
 
 from .. import dashboard
 from .. import profile as prof
-from ..service import open_store, recovery_history, scored_day, today_rx
+from ..service import cached, open_store, profile_for, recovery_history, scored_day, today_rx
 from ..clock import local_today
 from . import auth
 
@@ -108,6 +108,7 @@ def _refresh_in_background() -> None:
                 store.set_meta("sync_state", "ok, but intervals.icu returned no activities or wellness")
                 store.set_meta("last_sync", "0")   # try again on the next visit
             store.sync()
+            _warm(store)
         except Exception as e:  # never take the site down over a sync
             print(f"sync failed: {e}")
             if store:
@@ -119,6 +120,21 @@ def _refresh_in_background() -> None:
             _sync_lock.release()
 
     threading.Thread(target=run, daemon=True).start()
+
+
+def _warm(store=None) -> None:
+    """Build today's page ahead of the first visitor."""
+    try:
+        store = store or open_store()
+        p, rx = today_rx(store)
+        cached(store, "dash", rx.date, lambda: dashboard.build(store, p, rx))
+    except Exception as e:
+        print(f"warm failed: {e}")
+
+
+@app.on_event("startup")
+def _startup() -> None:
+    threading.Thread(target=_warm, daemon=True).start()
 
 
 @app.get("/healthz", response_class=PlainTextResponse)
@@ -149,7 +165,7 @@ def today(request: Request, d: str | None = None):
     _refresh_in_background()
     store = open_store()
     p, rx = today_rx(store, d)
-    dash = dashboard.build(store, p, rx)
+    dash = cached(store, "dash", rx.date, lambda: dashboard.build(store, p, rx))
     when = date.fromisoformat(rx.date)
     recent = []
     for a in sorted(p.activities, key=lambda a: a.start_local or a.date, reverse=True):
@@ -182,12 +198,12 @@ def recovery(request: Request):
 
 @app.get("/profile", response_class=HTMLResponse)
 def profile(request: Request):
-    return _page(request, "profile.html", p=prof.build(open_store()))
+    return _page(request, "profile.html", p=profile_for(open_store()))
 
 
 @app.get("/progress", response_class=HTMLResponse)
 def progress(request: Request):
-    return _page(request, "progress.html", p=prof.build(open_store()))
+    return _page(request, "progress.html", p=profile_for(open_store()))
 
 
 @app.get("/api/today")

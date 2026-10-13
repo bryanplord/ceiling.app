@@ -14,10 +14,30 @@ PEAK_WINDOW_S = 15      # a max must be held this long to count
 MAX_GAP_S = 5           # gaps longer than this are not interpolated
 
 
+_CLEAN_CACHE: dict = {}
+_CLEAN_MAX = 800
+
+
 def clean(time: list, hr: list) -> np.ndarray:
-    """Return 1 Hz heart rate with glitches and long gaps set to NaN."""
+    """Return 1 Hz heart rate with glitches and long gaps set to NaN.
+
+    Memoized: the same stream is cleaned by several analyses per page build."""
     t = np.asarray(time, dtype=float)
-    h = np.asarray([np.nan if v is None else v for v in hr], dtype=float)
+    h0 = np.asarray([np.nan if v is None else v for v in hr], dtype=float)
+    key = (t.tobytes(), h0.tobytes())
+    key = (len(t), hash(key))
+    hit = _CLEAN_CACHE.get(key)
+    if hit is not None:
+        return hit.copy()
+    out = _clean(t, h0)
+    if len(_CLEAN_CACHE) >= _CLEAN_MAX:
+        _CLEAN_CACHE.pop(next(iter(_CLEAN_CACHE)))
+    _CLEAN_CACHE[key] = out
+    return out.copy()
+
+
+def _clean(t: np.ndarray, h: np.ndarray) -> np.ndarray:
+    h = h.copy()
     if len(t) == 0 or len(t) != len(h):
         return np.array([])
     h[(h < HR_MIN) | (h > HR_MAX)] = np.nan
@@ -34,7 +54,7 @@ def clean(time: list, hr: list) -> np.ndarray:
     nxt = tk[np.clip(idx, 0, len(tk) - 1)]
     out[(nxt - prev) > MAX_GAP_S] = np.nan
     # spike filter against a centered rolling median
-    med = _rolling(out, 11, np.nanmedian)
+    med = _rolling_nanmedian(out, 11)
     out[np.abs(out - med) > SPIKE_BPM] = np.nan
     return out
 
@@ -52,13 +72,31 @@ def _rolling(x: np.ndarray, w: int, fn) -> np.ndarray:
             return fn(win, axis=1)
 
 
+def _rolling_nanmedian(x: np.ndarray, w: int) -> np.ndarray:
+    """Centered rolling median ignoring NaN (NaN sorts last, so index by valid count)."""
+    if len(x) < w:
+        return np.full(len(x), np.nan)
+    pad = w // 2
+    xp = np.pad(x, pad, constant_values=np.nan)
+    win = np.sort(np.lib.stride_tricks.sliding_window_view(xp, w)[: len(x)], axis=1)
+    n = (~np.isnan(win)).sum(axis=1)
+    rows = np.arange(len(x))
+    lo = win[rows, np.maximum((n - 1) // 2, 0)]
+    hi = win[rows, np.maximum(n // 2, 0)]
+    med = (lo + hi) / 2
+    med[n == 0] = np.nan
+    return med
+
+
 def rolling_mean_full(x: np.ndarray, w: int) -> np.ndarray:
     """Trailing mean over w seconds; NaN unless the whole window has data."""
     if len(x) < w:
         return np.array([])
-    win = np.lib.stride_tricks.sliding_window_view(x, w)
-    m = win.mean(axis=1)
-    m[np.isnan(win).any(axis=1)] = np.nan
+    bad = np.isnan(x)
+    c = np.concatenate(([0.0], np.cumsum(np.where(bad, 0.0, x))))
+    b = np.concatenate(([0], np.cumsum(bad)))
+    m = (c[w:] - c[:-w]) / w
+    m[(b[w:] - b[:-w]) > 0] = np.nan
     return m
 
 
