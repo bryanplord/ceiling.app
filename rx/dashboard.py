@@ -404,23 +404,29 @@ def room(rx: Rx, p: Profile, hist=None, usual: float | None = None, mode: str = 
                 return i + 1
         return 1
 
-    yt, yb = Y(c), Y(band_lo)
+    yt, yb = Y(c + 1), Y(band_lo)
+    # Display bands: Recovery is split off the bottom of zone 1 (under ~68% of threshold, Coggan's
+    # active recovery); the rest of zone 1, up to the aerobic band, is Endurance.
+    z1top = p.zones.top("Z1 Recovery")
+    rec_top = min(round(0.68 * p.zones.lthr), z1top - 6)
+    bands = [("Recovery", "z0", floor, rec_top + 1), ("Endurance", "z1", rec_top + 1, z1top + 1)]
+    for i, (name, zlo, zhi) in enumerate(p.zones.bounds[1:], start=2):
+        bands.append((ZONE_SHORT.get(name, name), f"z{i}", zlo, top if i == len(p.zones.bounds) else zhi + 1))
     o = [f'<svg class="room" viewBox="0 0 {W} {H}" role="img" '
          f'aria-label="Your heart today: {band_lo} to {c}. Resting {rest}, max {mx}.">']
 
     # ZONES, colored and named
     bounds = []
-    for i, (name, zlo, zhi) in enumerate(p.zones.bounds):
-        za = floor if i == 0 else max(zlo, floor)
-        zb = min(zhi + 1, top)
+    for k_, (name, cls, za, zb) in enumerate(bands):
+        za, zb = max(za, floor), min(zb, mx)
         if zb <= za:
             continue
         y1, y2 = Y(zb), Y(za)
-        o.append(f'<rect class="zf z{i + 1}" x="{L0}" y="{y1:.1f}" width="{L1 - L0}" height="{y2 - y1:.1f}"/>')
+        o.append(f'<rect class="zf {cls}" x="{L0}" y="{y1:.1f}" width="{L1 - L0}" height="{y2 - y1:.1f}"/>')
         if y2 - y1 >= 16:
-            o.append(f'<text class="zn" x="{L0 + 14}" y="{(y1 + y2) / 2 + 5:.1f}">{ZONE_SHORT.get(name, name)}</text>')
-        if i > 0:
-            bounds.append(zlo)
+            o.append(f'<text class="zn" x="{L0 + 14}" y="{(y1 + y2) / 2 + 5:.1f}">{name}</text>')
+        if k_ > 0:
+            bounds.append(za)
 
     # NUMBERS on the left: every zone edge, resting and max, and round tens where there's room
     edges = [rest, *bounds, mx]
@@ -442,42 +448,33 @@ def room(rx: Rx, p: Profile, hist=None, usual: float | None = None, mode: str = 
     o.append(f'<line class="ref" x1="{L0}" x2="{W}" y1="{Y(rest):.1f}" y2="{Y(rest):.1f}"/>')
     o.append(f'<text class="reft" x="{W}" y="{Y(rest) - 6:.1f}" text-anchor="end">resting</text>')
 
-    # SLIDER: a track from resting to max, and today's range as the fixed thumb
-    o.append(f'<rect class="track" x="{SC - 3}" y="{Y(mx):.1f}" width="6" height="{Y(rest) - Y(mx):.1f}"/>')
+    # TODAY: a box over the range, one segment per band it crosses, in that band's color
     o.append(f'<rect fill="#fff" x="{SC - 24}" y="{yt:.1f}" width="48" height="{yb - yt:.1f}"/>')
-    # one segment per zone it crosses, each in that zone's own color
-    for i, (_, zlo, zhi) in enumerate(p.zones.bounds):
-        a_ = max(band_lo, floor if i == 0 else zlo)
-        b_ = min(c + 1, top if i == len(p.zones.bounds) - 1 else zhi + 1)
+    for name, cls, za, zb in bands:
+        a_, b_ = max(band_lo, za), min(c + 1, zb)
         if b_ > a_:
-            o.append(f'<rect class="thumb z{i + 1}" x="{SC - 24}" y="{Y(b_):.1f}" width="48" height="{Y(a_) - Y(b_):.1f}"/>')
-    o.append(f'<text class="bnum" x="{SC}" y="{yt + 16:.1f}" text-anchor="middle">{c}</text>')
+            o.append(f'<rect class="thumb {cls}" x="{SC - 24}" y="{Y(b_):.1f}" width="48" height="{Y(a_) - Y(b_):.1f}"/>')
+    o.append(f'<text class="bnum" x="{SC}" y="{yt + 15:.1f}" text-anchor="middle">{c}</text>')
     if lo is not None:
-        o.append(f'<text class="bnum" x="{SC}" y="{yb - 7:.1f}" text-anchor="middle">{band_lo}</text>')
+        o.append(f'<text class="bnum" x="{SC}" y="{yb - 6:.1f}" text-anchor="middle">{band_lo}</text>')
 
-    # RIGHT: where you trained, a smooth curve colored by zone, full color inside today's band
+    # RIGHT: where you trained, a histogram in 2-beat bins, each bin in its band's color
     if hist is not None and hist.sum() > 0:
-        import numpy as _np
-        v0, v1 = max(floor, knee), min(mx + 1, len(hist))
-        k = _np.exp(-0.5 * (_np.arange(-8, 9) / 2.5) ** 2)
-        dens = _np.convolve(_np.asarray(hist, float), k / k.sum(), mode="same")
+        v0, v1 = max(floor, knee) // 2 * 2, min(mx + 1, len(hist))
+        bins = [(v, float(hist[v:v + 2].sum())) for v in range(v0, v1, 2)]
+        peak = max(x for _, x in bins) or 1.0
         span = (R1 - R0) * 0.5
-        peak = float(dens[v0:v1].max()) or 1.0
-        X = lambda v: R0 + span * float(dens[min(max(int(v), 0), len(dens) - 1)]) / peak
 
-        def area(a_, b_, cls):
-            if b_ <= a_:
-                return
-            pts = [(X(v), Y(v)) for v in range(a_, b_ + 1)]
-            d = f"M{R0},{Y(a_):.1f} " + " ".join(f"L{x:.1f},{y:.1f}" for x, y in pts) + f" L{R0},{Y(b_):.1f}Z"
-            o.append(f'<path class="{cls}" d="{d}"/>')
-
-        for i, (_, zlo, zhi) in enumerate(p.zones.bounds):
-            za = v0 if i == 0 else max(zlo, v0)
-            zb = (v1 - 1) if i == len(p.zones.bounds) - 1 else min(zhi + 1, v1 - 1)
-            area(za, zb, f"hc z{i + 1}")
-        line = " ".join(f"{'M' if v == v0 else 'L'}{X(v):.1f},{Y(v):.1f}" for v in range(v0, v1))
-        o.append(f'<path class="hl" d="{line}"/>')
+        def band_of(v):
+            return next((cls for _, cls, za, zb in bands if za <= v < zb), "z1")
+        pts = []
+        for v, x in bins:
+            w_ = span * x / peak
+            y1, y2 = Y(v + 2), Y(v)
+            if w_ > 0.3:
+                o.append(f'<rect class="hc {band_of(v)}" x="{R0}" y="{y1:.1f}" width="{w_:.1f}" height="{y2 - y1:.1f}"/>')
+            pts += [(R0 + w_, y2), (R0 + w_, y1)]
+        o.append('<path class="hl" d="' + " ".join(f"{'M' if j == 0 else 'L'}{x:.1f},{y:.1f}" for j, (x, y) in enumerate(pts)) + '"/>')
         o.append(f'<text class="small" x="{R0}" y="{B + 18}">where you trained, last 4 weeks</text>')
         o.append(f'<text class="small" x="{L0}" y="{B + 18}">your zones</text>')
         o.append(f'<text class="small" x="{SC}" y="{B + 18}" text-anchor="middle">today</text>')

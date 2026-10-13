@@ -207,7 +207,7 @@ class Zones:
 
 
 # What people see: the standard five-zone names.
-ZONE_LABEL = {"Z1 Recovery": "Recovery", "Z2 Aerobic": "Aerobic", "Z3 Tempo": "Tempo",
+ZONE_LABEL = {"Z1 Recovery": "Endurance", "Z2 Aerobic": "Aerobic", "Z3 Tempo": "Tempo",
               "Z4 Threshold": "Threshold", "Z5 Max": "Max"}
 
 
