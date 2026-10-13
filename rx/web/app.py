@@ -353,7 +353,7 @@ def today(request: Request, d: str | None = None):
         energy = None
     pats = cached(store, "patterns", rx.date, lambda: jr.patterns(store, p.wellness))
     return _page(request, "today.html", rx=rx, waiting=not _have_last_night(store), updated=mins_ago,
-                 after=after, energy=energy, entry=entry, entry_tags=jr.label(entry["tags"]) if entry else [], patterns=pats,
+                 after=after, energy=energy, entry=entry, timeline=jr.timeline(entry), jnote=jr.effect(entry["tags"])[1] if entry else "", patterns=pats,
                  syncing=syncing, d=dash, p=p, recent=recent,
                  spark=dashboard.spark, room=_room(store, p, rx, after),
                  st=st, hist=storymod.history_chart(st),
@@ -566,28 +566,17 @@ async def journal_save(request: Request):
     now = _dt.now(_Z(_settings().tz))
     store = open_store()
     day = now.date().isoformat()
-    tags = jr.save(store, day, text, taps, now.strftime("%-I:%M %p")) if (text or any(taps.values())) else {}
+    at = now.strftime("%-I:%M %p")                      # 12-hour, athlete's local time
+    saved = bool(text or any(taps.values()))
+    if saved:
+        jr.save(store, day, text, taps, at)
     if "application/json" in request.headers.get("accept", ""):
         entry = jr.load(store, day) or {}
         cap, note = jr.effect(entry.get("tags", {}))
-        return JSONResponse({"ok": True, "at": now.strftime("%-I:%M %p"), "tags": jr.label(entry.get("tags", {})),
-                             "note": note, "log": [{"at": e.get("at", ""), "what": ", ".join(
-                                 jr.label(jr.parse(e.get("text", "")) | _taps_tags(e.get("taps", {})))) or e.get("text", "")}
-                                 for e in entry.get("log", [])][-8:]})
+        log = entry.get("log") or []
+        return JSONResponse({"ok": saved, "at": at, "note": note,
+                             "entry": jr.view(log[-1]) if saved and log else None})
     return RedirectResponse("/#journal", status_code=303)
-
-
-def _taps_tags(t: dict) -> dict:
-    out = {}
-    if t.get("feel") == "sick":
-        out["sick"] = True
-    elif t.get("feel") in ("good", "tired"):
-        out["feel"] = t["feel"]
-    if t.get("drinks") in ("2", "3"):
-        out["drinks"] = int(t["drinks"]); out["_tap_drinks"] = True
-    if t.get("food") in ("good", "poor"):
-        out["food"] = t["food"]
-    return out
 
 
 @app.post("/connect")

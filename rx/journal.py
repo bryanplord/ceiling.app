@@ -153,6 +153,40 @@ def save(store, day: str, text: str, taps: dict | None = None, at: str = "") -> 
     return tags
 
 
+TAP = {"feel": {"good": ("Energized", "good"), "normal": ("Normal", "plain"), "tired": ("Tired", "warn"),
+                "sick": ("Sick", "bad")},
+       "drinks": {"0": ("No drinks", "drink"), "2": ("1 or 2 drinks", "drink"), "3": ("3 or more drinks", "drink")},
+       "food": {"good": ("Ate well", "good"), "ok": ("Ate OK", "food"), "poor": ("Ate poorly", "food")}}
+
+
+def view(e: dict) -> dict:
+    """One check-in as the timeline shows it: its time (12-hour, local; blank on old entries),
+    the pills tapped, then anything Ceiling read from the text that a tap didn't already say."""
+    taps = e.get("taps") or {}
+    pills = [TAP[k][taps[k]] for k in ("feel", "drinks", "food") if taps.get(k) in TAP[k]]
+    t = parse(e.get("text") or "")
+    d = t.get("drinks")
+    if d and "drinks" not in taps:
+        pills.append(("Drinks" if d < 0 else f"{d} drink{'s' if d != 1 else ''}", "drink"))
+    if t.get("sick") and taps.get("feel") != "sick":
+        pills.append(("Sick", "bad"))
+    if t.get("food") and "food" not in taps:
+        pills.append(TAP["food"][t["food"]])
+    if t.get("feel") and "feel" not in taps and not t.get("sick"):
+        pills.append(TAP["feel"]["good" if t["feel"] == "good" else "tired"])
+    if t.get("stress"):
+        pills.append(("Stressed", "warn"))
+    if t.get("late"):
+        pills.append(("Late night", "plain"))
+    return {"at": e.get("at") or "", "pills": [{"label": l, "tone": c} for l, c in pills],
+            "text": (e.get("text") or "").strip()}
+
+
+def timeline(entry: dict | None) -> list[dict]:
+    """Today's check-ins, oldest first."""
+    return [view(e) for e in ((entry or {}).get("log") or []) if e.get("text") or e.get("taps")]
+
+
 def load(store, day: str) -> dict | None:
     v = store.get_meta(f"journal:{day}")
     try:

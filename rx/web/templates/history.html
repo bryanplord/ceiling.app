@@ -5,11 +5,16 @@
   .tabs { display:flex; gap:24px; margin-top:24px; font-size:17px; }
   .tabs a { text-decoration:none; color:var(--lichen); padding-bottom:4px; }
   .tabs a.on { color:var(--ink); box-shadow:inset 0 -2px 0 var(--ink); }
+  .mnav { display:flex; align-items:center; justify-content:center; gap:28px; margin:44px 0 18px; }
+  .mnav h2 { font-size:clamp(24px, 3vw, 32px); font-weight:600; margin:0; min-width:9em; text-align:center; color:var(--ink); }
+  .arr { display:inline-flex; align-items:center; justify-content:center; width:44px; height:44px; border-radius:50%;
+         border:1px solid var(--rule); color:var(--ink); text-decoration:none; font-size:26px; line-height:1; padding-bottom:3px; }
+  .arr:hover { background:var(--frost); } .arr.off { color:var(--rule); }
   .mhead { display:flex; align-items:baseline; gap:20px; margin-top:40px; }
   .mhead h2 { color:var(--ink); font-size:28px; margin:0; font-weight:600; }
   .mhead a { color:var(--lichen); text-decoration:none; font-size:15px; }
   .mhead a:hover { color:var(--ink); }
-  .stats { display:flex; flex-wrap:wrap; gap:32px; margin:20px 0 0; }
+  .stats { display:flex; flex-wrap:wrap; gap:32px; margin:40px 0 0; }
   .stat b { display:block; font-size:34px; font-weight:600; font-stretch:125%; line-height:1.1; }
   .stat span { color:var(--lichen); font-size:14px; }
   .note { color:var(--lichen); font-size:15px; max-width:70ch; margin:16px 0 0; }
@@ -61,11 +66,6 @@
 <h1 class="plan-h">Calendar</h1>
 <nav class="tabs"><a href="/calendar">Upcoming</a><a class="on" href="/calendar/history">History</a></nav>
 
-<div class="mhead">
-  <h2>{{ mon.title }}</h2>
-  <a href="/calendar/history?m={{ mon.prev }}">← {{ 'Previous' }}</a>
-  {% if mon.next %}<a href="/calendar/history?m={{ mon.next }}">Next →</a>{% endif %}
-</div>
 {% if mon.days %}
 <div class="stats">
   <div class="stat"><b>{{ mon.nailed }}/{{ mon.days }}</b><span>days you did what the morning called for</span></div>
@@ -75,6 +75,11 @@
 {% endif %}
 {% if mon.replayed %}<p class="note">Days before Ceiling saved its prescriptions are replayed: what Ceiling would have told you that morning, from your sleep, HRV and training up to the day before.</p>{% endif %}
 
+<div class="mnav">
+  <a class="arr" href="/calendar/history?m={{ mon.prev }}" aria-label="Previous month">‹</a>
+  <h2>{{ mon.title }}</h2>
+  {% if mon.next %}<a class="arr" href="/calendar/history?m={{ mon.next }}" aria-label="Next month">›</a>{% else %}<span class="arr off" aria-hidden="true">›</span>{% endif %}
+</div>
 <div class="cal">
   {% for d in ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}<div class="dow">{{ d }}</div>{% endfor %}
   {% for wk in mon.grid %}{% for c in wk %}

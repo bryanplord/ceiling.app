@@ -85,27 +85,43 @@
   .jform { display:grid; gap:12px; }
   .jrow { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
   .jk { width:72px; font-size:14px; font-weight:600; color:var(--lichen); }
-  .pill input { position:absolute; opacity:0; pointer-events:none; }
-  .pill span { display:inline-block; font-size:15px; padding:8px 14px; border:1px solid #d4d4d8; border-radius:999px; cursor:pointer; }
-  .pill input:checked + span { background:var(--ink); color:#fff; border-color:var(--ink); }
-  .pill input:focus-visible + span { outline:2px solid var(--ceiling); outline-offset:2px; }
+  .pill { font:inherit; font-size:15px; padding:8px 14px; border:1px solid #d4d4d8; border-radius:999px; background:#fff;
+          color:var(--ink); cursor:pointer; transition:background .2s ease, color .2s ease, border-color .2s ease, transform .1s ease; }
+  .pill:hover { border-color:var(--ink); }
+  .pill:active { transform:scale(.96); }
+  .pill.on { background:var(--ink); color:#fff; border-color:var(--ink); }
   .jnoteRow { display:flex; gap:10px; margin-top:4px; }
   .jtext { flex:1; min-width:0; font:inherit; font-size:16px; padding:10px 14px; border:1px solid #d4d4d8; border-radius:8px; }
-  .jnoteRow button { margin-top:0 !important; }
-  .jr textarea { width:100%; font:inherit; font-size:17px; padding:14px; border:1px solid #d4d4d8; border-radius:8px; resize:vertical; }
-  .jr button { margin-top:10px; font:inherit; font-weight:600; font-size:15px; padding:10px 20px; border:0; border-radius:8px; background:var(--ink); color:#fff; cursor:pointer; }
+  @media (max-width:560px) { .jrow { gap:8px 6px; } .jk { flex-basis:100%; width:auto; margin-bottom:-2px; } }
+  .jsave { font:inherit; font-weight:600; font-size:15px; padding:10px 20px; border:0; border-radius:8px; background:var(--ink); color:#fff; cursor:pointer; }
   .jsaved { margin:12px 0 0; font-size:15px; font-weight:600; color:var(--good); opacity:0; transform:translateY(-4px);
             transition:opacity .25s ease, transform .25s ease; min-height:1.4em; }
   .jsaved.show { opacity:1; transform:none; }
   .jsaved.show::before { content:"✓"; display:inline-grid; place-items:center; width:20px; height:20px; margin-right:8px;
             border-radius:50%; background:var(--good); color:#fff; font-size:12px; animation:pop .35s ease; }
+  .jsaved.err { color:var(--bad); } .jsaved.err::before { content:none; }
   @keyframes pop { 0% { transform:scale(.4); } 70% { transform:scale(1.15); } 100% { transform:scale(1); } }
-  @media (prefers-reduced-motion: reduce) { .jsaved, .jsaved.show::before { transition:none; animation:none; } }
-  .jlog { list-style:none; padding:0; margin:10px 0 0; font-size:14px; color:var(--lichen); display:flex; flex-wrap:wrap; gap:4px 18px; }
-  .jlog b { color:var(--ink); font-weight:600; margin-right:4px; }
-  .jtags { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0 0; }
-  .jtags span { font-size:13px; font-weight:600; padding:4px 10px; border-radius:999px; background:var(--frost); }
-  .jnote { font-size:16px; margin:12px 0 0; max-width:56ch; }
+  .jtl { list-style:none; padding:0; margin:14px 0 0; max-width:560px; }
+  .jtl:empty { display:none; }
+  .jtl li { position:relative; padding:0 0 22px 28px; }
+  .jtl li::before { content:""; position:absolute; left:5px; top:14px; bottom:-4px; width:2px; background:var(--rule); }
+  .jtl li:last-child { padding-bottom:4px; } .jtl li:last-child::before { content:none; }
+  .jtl li::after { content:""; position:absolute; left:0; top:4px; width:8px; height:8px; border-radius:50%;
+                   border:2px solid var(--ink); background:#fff; box-sizing:content-box; }
+  .jtl li:last-child::after { background:var(--ink); }
+  .jt { display:block; font-size:13px; font-weight:600; color:var(--lichen); line-height:18px; margin-bottom:6px; }
+  .jt:empty { display:none; }
+  .jb { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+  .jx { flex-basis:100%; margin:2px 0 0; font-size:16px; line-height:1.45; overflow-wrap:anywhere; }
+  .tp { font-size:13px; font-weight:600; padding:3px 10px; border-radius:999px; background:var(--frost); color:var(--ink); }
+  .tp-good { background:#e6f4ec; color:#1d6141; } .tp-warn { background:#fbf1dc; color:#87570c; }
+  .tp-bad { background:#fde8e5; color:#a52a17; } .tp-drink { background:#efeafb; color:#5a3ea3; }
+  .tp-food { background:#e6effa; color:#1f5596; }
+  .jtl li.drop { animation:drop .45s cubic-bezier(.2,.8,.2,1); }
+  .jtl li.drop::after { animation:pop .4s ease .1s backwards; }
+  @keyframes drop { from { opacity:0; transform:translateY(-12px); } to { opacity:1; transform:none; } }
+  @media (prefers-reduced-motion: reduce) { .jsaved, .jsaved.show::before, .pill, .jtl li.drop, .jtl li.drop::after { transition:none; animation:none; } }
+  .jnote { font-size:16px; margin:16px 0 0; max-width:56ch; }
   .jpat { font-size:16px; margin:12px 0 0; }
   .jhint { color:var(--lichen); font-size:15px; margin:12px 0 0; max-width:56ch; }
   .tiles { display:grid; grid-template-columns:repeat(auto-fit, minmax(132px, 1fr)); gap:10px; margin:0 0 40px; }
@@ -407,30 +423,30 @@
       <p class="env"><b>{{ energy.now }}</b> now. You woke at {{ energy.wake }}. {{ energy.say }}</p>
       <div class="cards">{% for n, pt, of, note in energy.parts %}<div class="card t-{{ 'good' if pt >= of * 0.8 else 'ok' if pt >= of * 0.55 else 'bad' }}"><span class="cl">{{ n }}</span><span class="cv">{{ pt }}<small>/{{ of }}</small></span><span class="cn">{{ note }}</span></div>{% endfor %}
       {% for n, c in energy.drain if c > 0 %}<div class="card dr"><span class="cl">Drain: {{ n }}</span><span class="cv">−{{ c }}</span></div>{% endfor %}</div>
-      <p class="parts">Ceiling's own formula: charged by sleep, HRV, resting HR and freshness; drained 2 an hour awake and a quarter of each session's load.</p>
+      <p class="parts">Ceiling's formula: sleep, HRV, resting HR and freshness charge it. Each hour awake costs 2.5. Each session costs 0.3 × its load × how hard it was.</p>
     </section>{% endif %}
     <section class="jr" id="journal">
       <p class="dlab">How are you today?</p>
-      {% set tp = entry.taps if entry and entry.taps else {} %}
       <form method="post" action="/journal" class="jform">
         <div class="jrow"><span class="jk">Feeling</span>
           {% for v, l in [('good','Energized'),('normal','Normal'),('tired','Tired'),('sick','Sick')] %}
-          <label class="pill"><input type="radio" name="feel" value="{{ v }}" {{ 'checked' if tp.feel == v }}><span>{{ l }}</span></label>{% endfor %}</div>
+          <button type="submit" class="pill" name="feel" value="{{ v }}">{{ l }}</button>{% endfor %}</div>
         <div class="jrow"><span class="jk">Drinks</span>
           {% for v, l in [('0','None'),('2','1 or 2'),('3','3 or more')] %}
-          <label class="pill"><input type="radio" name="drinks" value="{{ v }}" {{ 'checked' if tp.drinks == v }}><span>{{ l }}</span></label>{% endfor %}</div>
+          <button type="submit" class="pill" name="drinks" value="{{ v }}">{{ l }}</button>{% endfor %}</div>
         <div class="jrow"><span class="jk">Food</span>
           {% for v, l in [('good','Ate well'),('ok','OK'),('poor','Ate poorly')] %}
-          <label class="pill"><input type="radio" name="food" value="{{ v }}" {{ 'checked' if tp.food == v }}><span>{{ l }}</span></label>{% endfor %}</div>
-        <div class="jnoteRow"><input class="jtext" name="text" id="jtext" value="" placeholder="Anything else? Pizza and a beer, long day at work…">
-          <button type="submit">Save</button></div>
+          <button type="submit" class="pill" name="food" value="{{ v }}">{{ l }}</button>{% endfor %}</div>
+        <div class="jnoteRow"><input class="jtext" name="text" id="jtext" value="" autocomplete="off" placeholder="Anything else?" aria-label="Anything else">
+          <button type="submit" class="jsave">Save</button></div>
       </form>
       <p class="jsaved" id="jsaved" role="status" aria-live="polite"></p>
-      <p class="jtags" id="jtags">{% for t in entry_tags %}<span>{{ t }}</span>{% endfor %}</p>
-      <ol class="jlog" id="jlog">{% if entry and entry.log %}{% for e in entry.log[-8:] %}{% if e.at %}<li><b>{{ e.at }}</b> {{ ((e.taps.feel or '')|replace('good','Energized')|replace('tired','Tired')|replace('sick','Sick')|replace('normal','Normal')) }}{{ ' · ' ~ e.text if e.text }}</li>{% endif %}{% endfor %}{% endif %}</ol>
-      {% if after and after.journal_note %}<p class="jnote">{{ after.journal_note }}</p>{% endif %}
+      <ol class="jtl" id="jtl" aria-label="Today's check-ins">{% for e in timeline %}
+        <li><span class="jt">{{ e.at }}</span><div class="jb">{% for x in e.pills %}<span class="tp tp-{{ x.tone }}">{{ x.label }}</span>{% endfor %}{% if e.text %}<p class="jx">{{ e.text }}</p>{% endif %}</div></li>{% endfor %}
+      </ol>
+      <p class="jnote" id="jnote"{% if not jnote %} hidden{% endif %}>{{ jnote }}</p>
       {% if patterns %}<ul class="jpat">{% for x in patterns %}<li>{{ x }}</li>{% endfor %}</ul>
-      {% else %}<p class="jhint">Log a line most days. After a few weeks Ceiling shows you what drinks, food, stress and late nights actually do to your recovery.</p>{% endif %}
+      {% else %}<p class="jhint">Check in most days. After a few weeks Ceiling shows you what drinks, food, stress and late nights do to your recovery.</p>{% endif %}
     </section>
   </div>
   {% if room %}
@@ -576,29 +592,53 @@
 (() => {
   const form = document.querySelector('.jform');
   if (!form) return;
-  const saved = document.getElementById('jsaved'), tags = document.getElementById('jtags'),
-        log = document.getElementById('jlog'), text = document.getElementById('jtext');
+  const saved = document.getElementById('jsaved'), tl = document.getElementById('jtl'),
+        note = document.getElementById('jnote'), text = document.getElementById('jtext');
   let timer;
-  async function send(extra) {
-    const body = new URLSearchParams(extra);
-    try {
-      const r = await fetch('/journal', {method: 'POST', body, headers: {'Accept': 'application/json'}});
-      const j = await r.json();
-      tags.innerHTML = j.tags.map(t => `<span>${t}</span>`).join('');
-      log.innerHTML = j.log.filter(e => e.at).map(e => `<li><b>${e.at}</b> ${e.what}</li>`).join('');
-      saved.textContent = `Got it, ${j.at}. Add more any time.`;
-      saved.classList.remove('show'); void saved.offsetWidth; saved.classList.add('show');
-      clearTimeout(timer); timer = setTimeout(() => saved.classList.remove('show'), 2600);
-    } catch (e) {
-      saved.textContent = "Couldn't save. Check your connection and tap again.";
-      saved.classList.add('show');
-    }
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  function drop(e) {
+    const li = document.createElement('li');
+    li.innerHTML = `<span class="jt">${esc(e.at)}</span><div class="jb">` +
+      e.pills.map(p => `<span class="tp tp-${esc(p.tone)}">${esc(p.label)}</span>`).join('') +
+      (e.text ? `<p class="jx">${esc(e.text)}</p>` : '') + '</div>';
+    li.className = 'drop';
+    tl.appendChild(li);
   }
-  form.querySelectorAll('input[type=radio]').forEach(r => r.addEventListener('change', () => send({[r.name]: r.value})));
+  function flash(msg, err) {
+    saved.textContent = msg;
+    saved.classList.toggle('err', !!err);
+    saved.classList.remove('show'); void saved.offsetWidth; saved.classList.add('show');
+    clearTimeout(timer); timer = setTimeout(() => saved.classList.remove('show'), 2400);
+  }
+  async function send(data, pill) {
+    if (pill) pill.classList.add('on');
+    try {
+      const r = await fetch('/journal', {method: 'POST', body: new URLSearchParams(data), headers: {'Accept': 'application/json'}});
+      const j = await r.json();
+      if (j.entry) drop(j.entry);
+      note.textContent = j.note || ''; note.hidden = !j.note;
+      flash(`Saved, ${j.at}.`);
+    } catch (e) {
+      flash("Couldn't save. Check your connection and try again.", true);
+      return false;
+    } finally {
+      if (pill) setTimeout(() => pill.classList.remove('on'), 350);   // pills are actions, not settings
+    }
+    return true;
+  }
+  async function saveText() {
+    const v = text.value.trim();
+    if (!v) { text.focus(); return; }
+    text.value = '';
+    if (!(await send({text: v}))) text.value = v;
+  }
+  // Enter in the text field saves the text (the browser would otherwise "click" the first pill).
+  text.addEventListener('keydown', ev => { if (ev.key === 'Enter' && !ev.isComposing) { ev.preventDefault(); saveText(); } });
   form.addEventListener('submit', ev => {
     ev.preventDefault();
-    if (!text.value.trim()) return;
-    send({text: text.value.trim()}); text.value = '';
+    const b = ev.submitter;
+    if (b && b.classList.contains('pill')) send({[b.name]: b.value}, b);
+    else saveText();
   });
 })();
 </script>
