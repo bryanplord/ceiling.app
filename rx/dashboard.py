@@ -369,7 +369,7 @@ def room(rx: Rx, p: Profile, hist=None, usual: float | None = None, mode: str = 
     top = mx + 4
     floor = rest - 3
     knee = max(floor + 10, min(band_lo, p.zones.bottom("Z2 Aerobic")) - 20)
-    W, H, T, B = 640, 600, 24, 572
+    W, H, T, B = 640, 780, 24, 752
     KY = B - (B - T) * 0.09
     L0, L1 = 0, 296                 # zones panel
     SX = 320                        # spine (numbers) centre
@@ -423,10 +423,7 @@ def room(rx: Rx, p: Profile, hist=None, usual: float | None = None, mode: str = 
         if lb > la_:
             o.append(f'<rect class="zon z{i + 1}" x="{L0}" y="{Y(lb):.1f}" width="{L1 - L0}" height="{Y(la_) - Y(lb):.1f}"/>')
         ya, yb2 = Y(max(za, knee)), Y(zb)
-        if ya - yb2 >= 34:
-            o.append(f'<text class="zn" x="{L0 + 14}" y="{(ya + yb2) / 2 - 2:.1f}">{ZONE_SHORT.get(name, name)}</text>')
-            o.append(f'<text class="zd" x="{L0 + 14}" y="{(ya + yb2) / 2 + 15:.1f}">{ZONE_FEEL.get(name, "")}</text>')
-        elif ya - yb2 >= 16:
+        if ya - yb2 >= 16:
             o.append(f'<text class="zn" x="{L0 + 14}" y="{(ya + yb2) / 2 + 5:.1f}">{ZONE_SHORT.get(name, name)}</text>')
 
     # SPINE: the numbers

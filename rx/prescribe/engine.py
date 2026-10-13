@@ -414,21 +414,33 @@ def consequences(p: Profile, rx: Rx) -> tuple[str | None, str | None]:
     return if_skip, if_overdo
 
 
-def _session(p: Profile, v: str) -> tuple[str, float]:
-    """What a verdict looks like as an actual session for you, and roughly what it costs."""
+def _session(p: Profile, v: str, day: str | None = None) -> tuple[str, float]:
+    """A verdict written out as the actual session for you, activity included,
+    and roughly what it costs in load."""
     z = p.zones
+    noun = "session"
+    if day and v not in (REST, LIGHT):
+        try:
+            sport, kind, _, _ = choose_activity(v, p, day)
+            noun = NOUN.get(kind or "", None) or {BIKE: "ride", RUN: "run", SKI: "ski tour", WALK: "walk"}.get(sport, "session")
+        except Exception:
+            pass
+    Noun = noun[:1].upper() + noun[1:]
     if v == HARD:
         lo, hi = z.bottom("Z4 Threshold"), z.top("Z4 Threshold")
-        return (f"your hard day: 4 × 8 minutes at {lo}–{hi}",
+        return (f"a hard day. {Noun}, 75 minutes on a steady climb or flat road: 15 easy under "
+                f"{z.top('Z2 Aerobic')}, then 4 × 8 minutes at {lo}–{hi} with 4 easy between, 10 easy to finish",
                 _est_load(p, 32, (lo + hi) / 2) + _est_load(p, 43, z.top("Z1 Recovery")))
     if v == STEADY:
         lo, hi = z.bottom("Z2 Aerobic"), z.top("Z2 Aerobic")
-        return f"a steady day: up to 90 minutes at {lo}–{hi}, no intervals", _est_load(p, 90, (lo + hi) / 2)
+        return (f"a steady day. {Noun}, up to 90 minutes at {lo}–{hi}: you can talk, not sing. No intervals",
+                _est_load(p, 90, (lo + hi) / 2))
     if v == EASY:
         lo, hi = easy_band(z)
-        return f"an easy hour at {lo}–{hi}", _est_load(p, 60, (lo + hi) / 2)
+        return (f"an easy day. {Noun}, 60 minutes at {lo}–{hi}, full sentences the whole way",
+                _est_load(p, 60, (lo + hi) / 2))
     if v == LIGHT:
-        return "a walk, nothing more", _est_load(p, 45, z.top("Z1 Recovery") - 15)
+        return "a walk day. 30 to 45 minutes, nothing more", _est_load(p, 45, z.top("Z1 Recovery") - 15)
     return "a day off", 0.0
 
 
@@ -451,7 +463,7 @@ def tomorrow_plan(p: Profile, rx: Rx, kind: str | None = None) -> list:
 
     def path(today_load):
         v = _next_verdict(p, rx, today_load)
-        txt, tl = _session(p, v)
+        txt, tl = _session(p, v, nxt)
         d1 = la.step(y, today_load, rx.date)
         d2 = la.step(d1, tl, nxt)
         return v, txt, d2
@@ -460,12 +472,29 @@ def tomorrow_plan(p: Profile, rx: Rx, kind: str | None = None) -> list:
     v_ov, t_ov, d_ov = path(over_load)
     out = [("Do it as written", "good", f"Tomorrow is {t_rx}.")]
 
+    # The minimum: what it does to tomorrow.
+    if rx.minimum and rx.verdict not in (REST, LIGHT):
+        z = p.zones
+        if rx.verdict == HARD:
+            lo, hi = z.bottom("Z4 Threshold"), z.top("Z4 Threshold")
+            min_load = _est_load(p, 20, (lo + hi) / 2) + _est_load(p, 20, z.top("Z1 Recovery"))
+        else:
+            floor = 30 if (rx.max_minutes or 0) >= 60 else 20
+            min_load = _est_load(p, floor, ((rx.hr_low or rx.hr_ceiling - 15) + rx.hr_ceiling) / 2)
+        v_min, t_min, _ = path(min_load)
+        if v_min == v_rx:
+            rx.minimum += " Tomorrow doesn't change."
+        elif ORDER.index(v_min) > ORDER.index(v_rx):
+            rx.minimum += f" Tomorrow opens up to {t_min.split('.')[0]}, since you'll be fresher."
+        else:
+            rx.minimum += f" Tomorrow becomes {t_min.split('.')[0]}."
+
     # Overdo: what tomorrow becomes, what your body does, and the two-day trade.
     parts = []
     if ORDER.index(v_ov) < ORDER.index(v_rx):
         parts.append(f"Tomorrow drops to {t_ov}.")
     else:
-        parts.append(f"Tomorrow can still be {t_ov}, but only after a full night's sleep.")
+        parts.append(f"Tomorrow can still be {t_ov.split('.')[0]}, but only after a full night's sleep.")
     r, rel = p.response, (over_load / y.ctl if y.ctl > 1 else None)
     pct = r.hrv_change_pct(rel) if (r and r.fitted and rel is not None) else None
     if pct is not None and pct < -2:
@@ -484,14 +513,14 @@ def tomorrow_plan(p: Profile, rx: Rx, kind: str | None = None) -> list:
 
     # Skip.
     if rx.verdict in (REST, LIGHT):
-        out.append(("Skip it", "muted", f"Tomorrow is still {t_rx}. Skipping a light day costs nothing."))
+        out.append(("Skip it", "muted", f"Tomorrow is still {t_rx.split('.')[0]}. Skipping a light day costs nothing."))
     else:
         v_sk, t_sk, d_sk = path(0.0)
         lost = (d_rx.ctl - d_sk.ctl) / max(d_rx.ctl, 1) * 100
         same = ORDER.index(v_sk) <= ORDER.index(v_rx)
         out.append(("Skip it", "muted",
-                    (f"Tomorrow is still {t_sk}, so you gain nothing by resting. " if same
-                     else f"Tomorrow opens up to {t_sk}, so you've only moved today. ")
+                    (f"Tomorrow is still {t_sk.split('.')[0]}, so you gain nothing by resting. " if same
+                     else f"Tomorrow opens up to {t_sk.split('.')[0]}, so you've only moved today. ")
                     + f"Two days out you're {lost:.0f}% less fit than if you'd done it."))
     return out
 
