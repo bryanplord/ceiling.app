@@ -88,3 +88,41 @@ def test_calendar_feed_needs_a_signed_key(tmp_path, monkeypatch):
     r = c.get("/plan.ics?k=" + auth.sign("cal", "bryan@example.com", 3600))
     assert r.status_code == 200 and "BEGIN:VEVENT" in r.text
     assert c.get("/plan.ics?k=" + auth.sign("session", "bryan@example.com", 3600)).status_code == 404
+
+
+def test_each_account_sees_only_its_own_data(tmp_path, monkeypatch):
+    monkeypatch.setenv("RX_DATA_DIR", str(tmp_path))
+    monkeypatch.delenv("RX_OPEN", raising=False)
+    monkeypatch.delenv("INTERVALS_API_KEY", raising=False)
+    monkeypatch.setenv("RX_SECRET", "y" * 40)
+    from rx.web import auth
+    monkeypatch.setenv("RX_USERS", f"bryan@example.com={auth.hash_password('a')},jack@example.com={auth.hash_password('b')}")
+    monkeypatch.setenv("RX_PRIMARY_EMAIL", "bryan@example.com")
+    demo.seed(Store(tmp_path / "rx.db"), days=90, end=date.today())
+    from rx.web.app import app
+    from rx.service import open_store
+    form = {"Content-Type": "application/x-www-form-urlencoded"}
+
+    bryan = TestClient(app)
+    bryan.post("/login", content="email=bryan%40example.com&password=a", headers=form)
+    assert bryan.get("/").status_code == 200 and "Connect your data" not in bryan.get("/data").text
+
+    jack = TestClient(app)
+    jack.post("/login", content="email=jack%40example.com&password=b", headers=form)
+    r = jack.get("/", follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/data"
+    assert "Connect your data" in jack.get("/data").text
+    assert open_store("jack").counts()["activities"] == 0
+    assert open_store("").counts()["activities"] > 0
+
+    # Jack's data lands in his own tables and Bryan's view never sees it
+    open_store("jack").set_meta("marker", "jack-only")
+    assert open_store("").get_meta("marker") is None
+
+
+def test_api_keys_are_sealed(monkeypatch):
+    monkeypatch.setenv("RX_SECRET", "z" * 40)
+    from rx.web import auth
+    sealed = auth.seal("my-secret-key")
+    assert "my-secret-key" not in sealed and auth.unseal(sealed) == "my-secret-key"
+    assert auth.unseal(sealed[:-2] + "AA") == ""

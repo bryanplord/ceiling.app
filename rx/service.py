@@ -16,16 +16,39 @@ from .clock import local_today
 _shared: Store | None = None
 
 
-def open_store() -> Store:
+import contextvars
+
+current_owner: contextvars.ContextVar[str] = contextvars.ContextVar("current_owner", default="")
+_views: dict = {}
+
+
+def owner_of(email: str | None) -> str:
+    """Which athlete an account is. The primary athlete (RX_PRIMARY_EMAIL, Bryan by default)
+    keeps the original data; every other account gets its own, empty until they connect."""
+    import os
+    import re
+    if not email:
+        return ""
+    primary = {e.strip().lower() for e in os.getenv("RX_PRIMARY_EMAIL", "bryanplord@gmail.com").split(",")}
+    e = email.strip().lower()
+    return "" if e in primary else re.sub(r"[^a-z0-9]", "", e.split("@")[0])[:24] or "user"
+
+
+def open_store(owner: str | None = None) -> Store:
     """Plain SQLite: a fresh connection each time. Turso: one shared replica per
-    process (opening one means pulling from Turso, too slow to do per request)."""
+    process (opening one means pulling from Turso, too slow to do per request).
+    Either way you get the signed-in athlete's view and nobody else's."""
     global _shared
+    owner = current_owner.get() if owner is None else owner
     s = settings()
     if not s.turso_url:
-        return Store(s.db_path)
+        base = Store(s.db_path)
+        return base.view(owner)
     if _shared is None:
         _shared = Store(s.data_dir / "replica.db", s.turso_url, s.turso_token)
-    return _shared
+    if owner not in _views:
+        _views[owner] = _shared.view(owner)
+    return _views[owner]
 
 
 _built: dict = {}
@@ -39,7 +62,7 @@ def data_version(store: Store) -> tuple:
     # pull runs every 10 minutes and must not throw away every cached page when nothing changed.
     since = (local_today() - timedelta(days=3)).isoformat()
     recent = tuple((w.date, w.hrv, w.rhr, w.sleep_score, w.sleep_secs) for w in store.wellness(since))
-    return (c["activities"], c["streams"], c["wellness"], hash(recent))
+    return (store.owner, c["activities"], c["streams"], c["wellness"], hash(recent))
 
 
 def today_rx(store: Store, day: str | None = None):

@@ -18,7 +18,7 @@ from .. import dashboard, story as storymod
 from ..analysis import sleep as sleepmod
 from ..analysis import distribution as dist
 from .. import profile as prof
-from ..service import cached, peek, plan_history, plan_with_changes, open_store, profile_for, recovery_history, scored_day, today_rx
+from ..service import current_owner, owner_of, cached, peek, plan_history, plan_with_changes, open_store, profile_for, recovery_history, scored_day, today_rx
 from ..clock import local_today
 from . import auth
 
@@ -36,7 +36,6 @@ def _have_last_night(store) -> bool:
     today = local_today().isoformat()
     w = next((w for w in store.wellness() if w.date == today), None)
     return bool(w and (w.hrv or w.sleep_secs or w.sleep_score))
-_sync_lock = threading.Lock()
 
 
 def _signed_in(request: Request) -> bool:
@@ -50,7 +49,19 @@ async def sign_in_gate(request: Request, call_next):
     """Health data is private. Fails closed: with no accounts configured, nothing opens.
     The home page is the sign-in page until you're signed in."""
     path = request.url.path
-    if path in ("/", "/healthz", "/login", "/logout", "/plan.ics") or path.startswith("/static/") or _signed_in(request):
+    email = auth.verify("session", request.cookies.get(auth.COOKIE)) if auth.enabled() else None
+    current_owner.set(owner_of(email))
+    if path in ("/healthz", "/login", "/logout", "/plan.ics") or path.startswith("/static/"):
+        return await call_next(request)
+    if _signed_in(request):
+        # A new athlete has no data yet: every page sends them to Data to connect it.
+        o = current_owner.get()
+        if o and path not in ("/data", "/connect", "/sync", "/logout") and not path.startswith("/coach"):
+            c = open_store(o).counts()
+            if not (c["activities"] or c["wellness"]):
+                return RedirectResponse("/data", status_code=303)
+        return await call_next(request)
+    if path == "/":
         return await call_next(request)
     if path.startswith("/api/"):
         return Response("Sign in required.", status_code=401)
@@ -87,18 +98,41 @@ def logout():
     return r
 
 
-def _refresh_in_background(force: bool = False) -> None:
+_sync_locks: dict = {}
+
+
+def _creds(owner: str) -> tuple[str, str]:
+    """intervals.icu key and athlete id: the primary athlete's from the environment,
+    everyone else's from what they entered on their Data page (kept in their own tables)."""
+    if not owner:
+        return os.getenv("INTERVALS_API_KEY", ""), os.getenv("INTERVALS_ATHLETE_ID", "0")
+    st = open_store(owner)
+    return auth.unseal(st.get_meta("intervals_key") or ""), st.get_meta("intervals_athlete") or "0"
+
+
+def _all_owners() -> list[str]:
+    return sorted({owner_of(e) for e in auth.users()} | {""})
+
+
+def _refresh_all(force: bool = False) -> None:
+    for o in _all_owners():
+        _refresh_in_background(force, o)
+
+
+def _refresh_in_background(force: bool = False, owner: str | None = None) -> None:
     """Pull the last few days from intervals.icu at most once an hour, without
     making the page wait. The page shows what's stored; the next load is fresh."""
-    key = os.getenv("INTERVALS_API_KEY", "")
-    if not key or not _sync_lock.acquire(blocking=False):
+    owner = current_owner.get() if owner is None else owner
+    key, athlete = _creds(owner)
+    lock = _sync_locks.setdefault(owner, threading.Lock())
+    if not key or not lock.acquire(blocking=False):
         return
 
     def run():
         store = None
         try:
             from ..sources import intervals
-            store = open_store()
+            store = open_store(owner)
             last = float(store.get_meta("last_sync") or 0)
             # Backfill a year until a backfill has actually brought data in; an empty
             # pull (source not ready yet) must not mark history as done or wait an hour.
@@ -110,7 +144,7 @@ def _refresh_in_background(force: bool = False) -> None:
                 return
             days = 3 if backfilled else 365
             store.set_meta("sync_state", f"running since {int(time.time())}")
-            client = intervals.IntervalsClient(key, os.getenv("INTERVALS_ATHLETE_ID", "0"))
+            client = intervals.IntervalsClient(key, athlete)
             intervals.sync(client, store, days=days,
                            log=lambda msg: store.set_meta("sync_progress", str(msg).strip()))
             try:
@@ -135,7 +169,7 @@ def _refresh_in_background(force: bool = False) -> None:
                 except Exception:
                     pass
         finally:
-            _sync_lock.release()
+            lock.release()
 
     threading.Thread(target=run, daemon=True).start()
 
@@ -186,9 +220,9 @@ def healthz():
     exist. No dates, names, heart rates or anything else about the athlete.
     The keep-awake ping hits this every 10 minutes, so it also drives the refresh:
     the morning's data is pulled before you open the page."""
-    _refresh_in_background()
+    _refresh_all()
     try:
-        s = open_store()
+        s = open_store("")
         n = s.counts()
         state = s.get_meta("sync_state") or "never run (sign in to start it)"
         last = s.get_meta("last_sync")
@@ -231,7 +265,8 @@ def today(request: Request, d: str | None = None):
             break
     last = store.get_meta("last_sync")
     mins_ago = int((time.time() - float(last)) / 60) if last and float(last) > 0 else None
-    syncing = _sync_lock.locked()   # only a sync actually in progress; never a stale flag
+    lk = _sync_locks.get(current_owner.get())
+    syncing = bool(lk and lk.locked())   # only a sync actually in progress; never a stale flag
     return _page(request, "today.html", rx=rx, waiting=not _have_last_night(store), updated=mins_ago,
                  syncing=syncing, d=dash, p=p, recent=recent,
                  spark=dashboard.spark, room=dashboard.room(rx, p, *cached(store, "hrhist", rx.date, lambda: dist.hr_histogram(store, p))),
@@ -282,9 +317,10 @@ def plan_page(request: Request):
 def plan_ics(k: str = ""):
     """Calendar subscription. Calendar apps can't sign in, so the link carries a long-lived signed key."""
     from ..prescribe import plan as planmod
-    if not (os.getenv("RX_OPEN") == "1" or (auth.enabled() and auth.verify("cal", k))):
+    email = auth.verify("cal", k) if auth.enabled() else None
+    if not (os.getenv("RX_OPEN") == "1" or email):
         return Response("Not found.", status_code=404)
-    store = open_store()
+    store = open_store(owner_of(email))
     p, rx = today_rx(store)
     pl, _ = cached(store, "planx", rx.date, lambda: plan_with_changes(store))
     return Response(planmod.ics(pl), media_type="text/calendar; charset=utf-8",
@@ -311,10 +347,13 @@ def you_page(request: Request):
 
 
 @app.get("/data", response_class=HTMLResponse)
-def data_page(request: Request):
-    """What Ceiling actually received, day by day. For checking a missing night."""
+def data_page(request: Request, msg: str | None = None):
+    """What Ceiling actually received, day by day. For checking a missing night.
+    Also where a new athlete connects their own data."""
     import json as _json
     store = open_store()
+    owner = current_owner.get()
+    connected = bool(not owner or store.get_meta("intervals_key"))
     since = (local_today() - timedelta(days=9)).isoformat()
     rows = []
     for r in store.wellness_raw(since):
@@ -335,7 +374,35 @@ def data_page(request: Request):
     return _page(request, "data.html", rows=rows, missing=[d for d in days if d not in have],
                  today=local_today().isoformat(), state=store.get_meta("sync_state") or "",
                  progress=store.get_meta("sync_progress") or "",
-                 last=int((time.time() - float(last)) / 60) if last and float(last) > 0 else None)
+                 last=int((time.time() - float(last)) / 60) if last and float(last) > 0 else None,
+                 owner=owner, connected=connected, msg=msg,
+                 athlete=store.get_meta("intervals_athlete") or "",
+                 empty=not (store.counts()["activities"] or store.counts()["wellness"]))
+
+
+@app.post("/connect")
+async def connect(request: Request):
+    """Connect (or change) your intervals.icu account. The key is encrypted before it's stored,
+    in your own tables, and only ever sent back to intervals.icu."""
+    form = parse_qs((await request.body()).decode())
+    athlete = (form.get("athlete", [""])[0] or "").strip()
+    key = (form.get("key", [""])[0] or "").strip()
+    owner = current_owner.get()
+    if not owner:
+        return RedirectResponse("/data?msg=primary", status_code=303)
+    if not athlete or not key:
+        return RedirectResponse("/data?msg=missing", status_code=303)
+    from ..sources import intervals
+    try:
+        intervals.IntervalsClient(key, athlete).wellness(local_today().isoformat(), local_today().isoformat())
+    except Exception:
+        return RedirectResponse("/data?msg=bad", status_code=303)
+    st = open_store(owner)
+    st.set_meta("intervals_athlete", athlete)
+    st.set_meta("intervals_key", auth.seal(key))
+    st.set_meta("backfilled", "0")
+    _refresh_in_background(force=True, owner=owner)
+    return RedirectResponse("/data?msg=ok", status_code=303)
 
 
 @app.get("/trends", response_class=HTMLResponse)

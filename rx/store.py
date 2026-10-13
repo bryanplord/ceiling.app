@@ -153,6 +153,37 @@ class _Locked:
         self.conn.close()
 
 
+import re as _re
+
+_TABLES = _re.compile(r"\b(activities_date|activities|streams|power|wellness|meta)\b")
+
+
+class _Prefixed:
+    """One athlete's view of a shared connection: every table name gets the athlete's prefix,
+    so each person's data lives in its own tables and no query can reach anyone else's."""
+
+    def __init__(self, db, prefix: str):
+        self._db, self._p = db, prefix
+
+    def _q(self, sql: str) -> str:
+        return _TABLES.sub(lambda m: self._p + m.group(1), sql)
+
+    def execute(self, sql, args=()):
+        return self._db.execute(self._q(sql), args)
+
+    def executescript(self, script):
+        return self._db.executescript(self._q(script))
+
+    def commit(self):
+        return self._db.commit()
+
+    def sync(self):
+        return self._db.sync() if hasattr(self._db, "sync") else None
+
+    def close(self):
+        pass
+
+
 class Store:
     """Local SQLite by default. With TURSO_DATABASE_URL set, a local replica of the
     hosted Turso database: reads are local and fast, writes go to Turso, so the data
@@ -177,6 +208,24 @@ class Store:
         if "speed" not in cols:  # migrate databases created before speed was stored
             self.db.execute("ALTER TABLE streams ADD COLUMN speed TEXT")
             self.db.commit()
+
+    owner: str = ""
+
+    def view(self, owner: str) -> "Store":
+        """The same database, seen as one athlete. The primary athlete (owner "") keeps the
+        original table names; everyone else gets tables of their own, created on first use."""
+        if not owner:
+            return self
+        import copy
+        v = copy.copy(self)
+        v.owner = owner
+        v.db = _Prefixed(self.db, f"u_{owner}__")
+        v.db.executescript(SCHEMA)
+        cols = {r[1] for r in v.db.execute("PRAGMA table_info(streams)")}
+        if "speed" not in cols:
+            v.db.execute("ALTER TABLE streams ADD COLUMN speed TEXT")
+        v.db.commit()
+        return v
 
     def _one(self, sql: str, args: tuple = ()):
         for row in self.db.execute(sql, args):
