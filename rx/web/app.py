@@ -612,7 +612,12 @@ def profile(request: Request):
 
 @app.get("/progress", response_class=HTMLResponse)
 def progress(request: Request):
-    return _page(request, "progress.html", p=profile_for(open_store()))
+    from .. import motivation as mv
+    store = open_store()
+    p, rx = today_rx(store)
+    m = cached(store, "motivation", rx.date, lambda: mv.build(p, rx, store))
+    c = cached(store, "calls", rx.date, lambda: mv.calls(p, store, rx.date))
+    return _page(request, "progress.html", p=p, m=m, calls=c)
 
 
 @app.get("/api/today")
