@@ -43,27 +43,26 @@
   .whyhead { margin:0; font-size:18px; line-height:1.45; }
   .whyhead b.good { color:var(--good); } .whyhead b.ok { color:var(--warn); } .whyhead b.bad { color:var(--bad); }
   .room { width:100%; max-width:540px; display:block; margin-left:auto; overflow:visible; font-family:var(--face); }
-  .room .zt { opacity:.07; } .room .zr { opacity:1; }
+  .room .xsec { fill:var(--ink); opacity:.06; }
+  .room .zf { opacity:.16; } .room .zon { opacity:1; }
   .room .z1 { fill:var(--z1); } .room .z2 { fill:var(--z2); } .room .z3 { fill:var(--z3); }
   .room .z4 { fill:var(--z4); } .room .z5 { fill:var(--z5); }
-  .room .zname { fill:var(--lichen); font-size:14px; font-weight:600; }
+  .room .zn { fill:var(--lichen); font-size:15px; font-weight:650; }
+  .room .zd { fill:var(--lichen); font-size:12px; }
+  .room .zn.on { fill:#fff; } .room .zd.on { fill:#fff; opacity:.9; }
   .room .tick { fill:var(--lichen); font-size:13px; font-variant-numeric:tabular-nums; }
   .room .tick.strong { fill:var(--ink); font-weight:700; }
   .room .brk { fill:none; stroke:var(--lichen); stroke-width:1.5; }
   .room .ref { stroke:var(--lichen); stroke-width:1.2; stroke-dasharray:2 5; }
-  .room .reft { fill:var(--lichen); font-size:13px; }
-  .room .dens { fill:var(--ink); opacity:.10; stroke:var(--ink); stroke-opacity:.35; stroke-width:1.2; }
-  .room .densax { stroke:var(--rule); stroke-width:1; }
-  .room .usual { stroke:var(--ink); stroke-width:1.5; stroke-dasharray:3 3; }
-  .room .usualt, .room .small { fill:var(--lichen); font-size:13px; }
-  .room .today { fill:var(--ink); }
-  .room .tlab { fill:#fff; font-size:13px; font-weight:600; font-stretch:125%; letter-spacing:.12em; }
-  .room .trng { fill:#fff; font-size:34px; font-weight:600; font-stretch:125%; font-variant-numeric:tabular-nums; }
-  .room .taim { fill:#fff; opacity:.75; font-size:14px; }
-  .room .aim { stroke:#fff; stroke-width:2; stroke-dasharray:4 4; opacity:.7; }
-  .room .ceil { fill:var(--ceiling); }
-  .room .ceilt { fill:var(--ceiling); font-size:13px; font-weight:600; font-stretch:125%; letter-spacing:.1em; }
-  .room .ceiln { font-size:24px; letter-spacing:.02em; }
+  .room .reft, .room .small { fill:var(--lichen); font-size:12px; }
+  .room .dens { fill:var(--ink); opacity:.13; }
+  .room .usual { stroke:var(--ink); stroke-width:1.5; stroke-dasharray:3 3; opacity:.6; }
+  .room .tlab { fill:var(--ink); font-size:12px; font-weight:600; font-stretch:125%; letter-spacing:.12em; }
+  .room .trng { fill:var(--ink); font-size:28px; font-weight:600; font-stretch:125%; font-variant-numeric:tabular-nums; }
+  .room .taim { fill:var(--lichen); font-size:13px; }
+  .room .edge { stroke:var(--ceiling); stroke-width:1.5; }
+  .room .edgelo { stroke:var(--ink); stroke-width:1; opacity:.35; }
+  .room .edget { fill:var(--ceiling); font-size:12px; font-weight:600; }
   .roomh { font-size:22px; font-weight:750; margin:0 0 2px; text-align:right; }
   .roomsub { color:var(--lichen); font-size:15px; margin:0 0 10px; text-align:right; }
   .roomcap { text-align:right; color:var(--lichen); font-size:15px; margin:6px 0 0; }
@@ -210,9 +209,9 @@
   {% if room %}
   <div>
     <p class="roomh">Your heart today</p>
-    <p class="roomsub">Your zones, resting to max. Today's range in black.</p>
+    <p class="roomsub">Your zones, resting to max. Today's range is highlighted.</p>
     {{ room | safe }}
-    <p class="roomcap">Stay in the black. <b>Never above {{ rx.hr_ceiling }}.</b>{% if rx.max_minutes %} {{ rx.max_minutes }} minutes max.{% endif %}</p>
+    <p class="roomcap">Stay in the highlighted range.{% if rx.max_minutes %} {{ rx.max_minutes }} minutes max.{% endif %}</p>
   </div>
   {% endif %}
 </section>

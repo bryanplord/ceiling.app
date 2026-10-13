@@ -355,9 +355,10 @@ ZONE_FEEL = {"Z1 Recovery": "barely working", "Z2 Aerobic": "all day, full sente
 
 
 def room(rx: Rx, p: Profile, hist=None, usual: float | None = None) -> str:
-    """Your heart today. Today's band is the hero: one solid block with the range in it,
-    the red ceiling on top. Your zones are a thin color rail with quiet names. Where you've
-    actually trained the last 4 weeks is one smooth shape beside it."""
+    """Your heart today. Your zones as a column (name and feel), the range you actually train
+    in as a soft shape beside it, and today's range as a highlighted cross-section running the
+    full width: the zones inside it light up in full color. The top of today's range is a thin
+    red edge, not an alarm."""
     if rx.hr_ceiling is None or not p.zones:
         return ""
     c = rx.hr_ceiling
@@ -368,41 +369,46 @@ def room(rx: Rx, p: Profile, hist=None, usual: float | None = None) -> str:
     top = mx + 4
     floor = rest - 3
     knee = max(floor + 10, min(band_lo, p.zones.bottom("Z2 Aerobic")) - 20)
-    W, H, T, B = 560, 620, 36, 600
-    KY = B - (B - T) * 0.10            # resting-to-knee squeezed into the bottom 10%
-    AX, RX0, RX1 = 40, 50, 58          # axis labels, zone rail
-    BX0, BX1 = 74, 300                 # today's band
-    DX0, DX1 = 318, 430                # where you train
-
-    # The scale stretches around today's range (3× per beat) so the band reads as the hero,
-    # and squeezes resting-to-knee into the bottom 10%. Ticks stay honest: they follow the scale.
-    segs = [(knee, band_lo, 1.0), (band_lo, c, 3.0), (c, top, 1.0)]
-    units = sum((b - a) * w for a, b, w in segs if b > a)
+    W, H, T, B = 560, 620, 30, 600
+    KY = B - (B - T) * 0.10
+    AX, X0, X1 = 40, 50, 300           # axis labels, zone column
+    DX0, DX1 = 310, 400                # where you train
+    segs = [(knee, band_lo, 1.0), (band_lo, c, 2.6), (c, top, 1.0)]
+    units = sum((bb - aa) * w for aa, bb, w in segs if bb > aa)
 
     def Y(v):
         if v <= knee:
             return B - (B - KY) * (v - floor) / max(1, knee - floor)
         u = 0.0
-        for a, b, w in segs:
-            if b <= a:
-                continue
-            u += (min(max(v, a), b) - a) * w
+        for aa, bb, w in segs:
+            if bb > aa:
+                u += (min(max(v, aa), bb) - aa) * w
         return KY - (KY - T) * u / units
 
+    yt, yb = Y(c), Y(band_lo)
     o = [f'<svg class="room" viewBox="0 0 {W} {H}" role="img" '
-         f'aria-label="Your heart today: {band_lo} to {c}, never above {c}. Resting {rest}, max {mx}.">']
+         f'aria-label="Your heart today: {band_lo} to {c}. Resting {rest}, max {mx}.">']
 
-    # zones: faint full-width tint + a solid color rail + a quiet name at the right edge
+    # today's cross-section, behind everything: the full width of the chart
+    o.append(f'<rect class="xsec" x="{AX - 32}" y="{yt:.1f}" width="{W - AX + 32}" height="{yb - yt:.1f}"/>')
+
+    # zones column: tint, name, feel; the part inside today's range lit in full color
     for i, (name, zlo, zhi) in enumerate(p.zones.bounds):
-        a = floor if i == 0 else max(zlo, floor)
-        b = min(zhi + 1, top)
-        if b <= a:
+        za = floor if i == 0 else max(zlo, floor)
+        zb = min(zhi + 1, top)
+        if zb <= za:
             continue
-        o.append(f'<rect class="zt z{i + 1}" x="{RX1}" y="{Y(b):.1f}" width="{W - RX1}" height="{Y(a) - Y(b):.1f}"/>')
-        o.append(f'<rect class="zr z{i + 1}" x="{RX0}" y="{Y(b):.1f}" width="{RX1 - RX0}" height="{max(1, Y(a) - Y(b) - 1.5):.1f}"/>')
-        ya, yb = Y(max(a, knee)), Y(b)
-        if ya - yb >= 18:
-            o.append(f'<text class="zname" x="{W - 4}" y="{(ya + yb) / 2 + 5:.1f}" text-anchor="end">{ZONE_SHORT.get(name, name)}</text>')
+        o.append(f'<rect class="zf z{i + 1}" x="{X0}" y="{Y(zb):.1f}" width="{X1 - X0}" height="{Y(za) - Y(zb):.1f}"/>')
+        la_, lb = max(za, band_lo), min(zb, c + 1)
+        if lb > la_:
+            o.append(f'<rect class="zon z{i + 1}" x="{X0}" y="{Y(lb):.1f}" width="{X1 - X0}" height="{Y(la_) - Y(lb):.1f}"/>')
+        ya, yb2 = Y(max(za, knee)), Y(zb)
+        inside = band_lo <= (za + zb) / 2 <= c
+        if ya - yb2 >= 34:
+            o.append(f'<text class="zn{" on" if inside else ""}" x="{X0 + 12}" y="{(ya + yb2) / 2 - 2:.1f}">{ZONE_SHORT.get(name, name)}</text>')
+            o.append(f'<text class="zd{" on" if inside else ""}" x="{X0 + 12}" y="{(ya + yb2) / 2 + 15:.1f}">{ZONE_FEEL.get(name, "")}</text>')
+        elif ya - yb2 >= 16:
+            o.append(f'<text class="zn{" on" if inside else ""}" x="{X0 + 12}" y="{(ya + yb2) / 2 + 5:.1f}">{ZONE_SHORT.get(name, name)}</text>')
 
     last_y = None
     for v in sorted({*range((knee // 10 + 1) * 10, top, 10), band_lo, c}):
@@ -412,14 +418,12 @@ def room(rx: Rx, p: Profile, hist=None, usual: float | None = None) -> str:
         o.append(f'<text class="tick{" strong" if v in (band_lo, c) else ""}" x="{AX}" y="{y + 5:.1f}" text-anchor="end">{v}</text>')
         last_y = y
     o.append(f'<path class="brk" d="M{AX - 18},{KY + 3:.1f} l5,-5 l5,5 l5,-5 l5,5"/>')
+    o.append(f'<line class="ref" x1="{X0}" x2="{W}" y1="{Y(mx):.1f}" y2="{Y(mx):.1f}"/>')
+    o.append(f'<text class="reft" x="{W}" y="{Y(mx) - 6:.1f}" text-anchor="end">your max {mx}</text>')
+    o.append(f'<line class="ref" x1="{X0}" x2="{W}" y1="{Y(rest):.1f}" y2="{Y(rest):.1f}"/>')
+    o.append(f'<text class="reft" x="{W}" y="{Y(rest) - 6:.1f}" text-anchor="end">resting {rest}</text>')
 
-    # max and resting, quiet
-    o.append(f'<line class="ref" x1="{RX1}" x2="{W}" y1="{Y(mx):.1f}" y2="{Y(mx):.1f}"/>')
-    o.append(f'<text class="reft" x="{BX0}" y="{Y(mx) - 8:.1f}">your max {mx}</text>')
-    o.append(f'<line class="ref" x1="{RX1}" x2="{W}" y1="{Y(rest):.1f}" y2="{Y(rest):.1f}"/>')
-    o.append(f'<text class="reft" x="{BX0}" y="{Y(rest) - 8:.1f}">resting {rest}</text>')
-
-    # where you've trained: a smooth horizontal density, last 4 weeks
+    # where you've trained, last 4 weeks
     if hist is not None and hist.sum() > 0:
         vs = list(range(max(floor, knee), top))
         raw = np.array([float(hist[v]) if 0 <= v < len(hist) else 0.0 for v in vs])
@@ -427,34 +431,23 @@ def room(rx: Rx, p: Profile, hist=None, usual: float | None = None) -> str:
         sm = np.convolve(raw, k / k.sum(), mode="same")
         if sm.max() > 0:
             sm = sm / sm.max()
-            pts = [(DX0 + (DX1 - DX0) * s, Y(v + 0.5)) for v, s in zip(vs, sm)]
+            pts = [(DX0 + (DX1 - DX0) * q, Y(v + 0.5)) for v, q in zip(vs, sm)]
             d = f"M{DX0},{Y(vs[0]):.1f} " + " ".join(f"L{x:.1f},{y:.1f}" for x, y in pts) + f" L{DX0},{Y(vs[-1] + 1):.1f} Z"
             o.append(f'<path class="dens" d="{d}"/>')
-            o.append(f'<line class="densax" x1="{DX0}" x2="{DX0}" y1="{Y(vs[-1] + 1):.1f}" y2="{Y(vs[0]):.1f}"/>')
-            o.append(f'<text class="small" x="{DX0}" y="{B + 16}">where you trained, last 4 weeks</text>')
-            if usual:
-                u = round(usual)
-                o.append(f'<line class="usual" x1="{DX0}" x2="{DX1 + 6}" y1="{Y(u):.1f}" y2="{Y(u):.1f}"/>')
-                uy = Y(u) + 5 if abs(Y(u) - Y(c)) > 14 else Y(c) + 22
-                o.append(f'<text class="usualt" x="{DX1 + 10}" y="{uy:.1f}">you usually</text>')
-                o.append(f'<text class="usualt" x="{DX1 + 10}" y="{uy + 16:.1f}">average {u}</text>')
+            o.append(f'<text class="small" x="{DX0}" y="{B + 16}">where you trained, 4 weeks</text>')
 
-    # TODAY: the hero
-    yt, yb = Y(c), Y(band_lo)
-    o.append(f'<rect class="today" x="{BX0}" y="{yt:.1f}" width="{BX1 - BX0}" height="{yb - yt:.1f}" rx="10"/>')
-    hgt = yb - yt
+    # today's label, inside the cross-section at the right
+    mid = (yt + yb) / 2
     rng = f"{band_lo}–{c}" if lo is not None else f"under {c}"
-    if hgt >= 74:
-        cy = yt + hgt / 2
-        o.append(f'<text class="tlab" x="{BX0 + 20}" y="{cy - 14:.1f}">TODAY</text>')
-        o.append(f'<text class="trng" x="{BX0 + 20}" y="{cy + 20:.1f}">{rng}</text>')
-        if lo is not None:
-            o.append(f'<text class="taim" x="{BX0 + 20}" y="{cy + 44:.1f}">aim {round((lo + c) / 2)}</text>')
-    else:
-        o.append(f'<text class="tlab" x="{BX0 + 16}" y="{yt + hgt / 2 + 6:.1f}">TODAY {rng}</text>')
+    o.append(f'<text class="tlab" x="{W - 6}" y="{mid - 12:.1f}" text-anchor="end">TODAY</text>')
+    o.append(f'<text class="trng" x="{W - 6}" y="{mid + 16:.1f}" text-anchor="end">{rng}</text>')
+    if lo is not None and (yb - yt) > 70:
+        o.append(f'<text class="taim" x="{W - 6}" y="{mid + 36:.1f}" text-anchor="end">aim {round((lo + c) / 2)}</text>')
+    if usual and abs(Y(usual) - mid) > 30:
+        o.append(f'<line class="usual" x1="{DX0}" x2="{DX1}" y1="{Y(usual):.1f}" y2="{Y(usual):.1f}"/>')
 
-    # the ceiling
-    o.append(f'<rect class="ceil" x="{RX0}" y="{yt - 3:.1f}" width="{W - RX0}" height="6" rx="3"/>')
-    o.append(f'<text class="ceilt" x="{BX0}" y="{yt - 14:.1f}">NEVER ABOVE <tspan class="ceiln">{c}</tspan></text>')
+    # today's range edges: quiet lines; the range itself says where the top is
+    o.append(f'<line class="edgelo" x1="{AX - 32}" x2="{W}" y1="{yt:.1f}" y2="{yt:.1f}"/>')
+    o.append(f'<line class="edgelo" x1="{AX - 32}" x2="{W}" y1="{yb:.1f}" y2="{yb:.1f}"/>')
     o.append("</svg>")
     return "".join(o)

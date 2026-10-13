@@ -236,6 +236,7 @@ def build_rx(p: Profile, day: str | None = None) -> Rx:
                                          EASY: "tomorrow is easy only",
                                          LIGHT: "tomorrow is a stroll at most",
                                          REST: "tomorrow is a day off"}[cap]))
+    p._today_low = low
     rx.example = example_ride(p, sport, verdict, mins, ceiling, kind)
     rx.diagnosis, rx.activity_why = diag, sport_reason
     rx.why_title, rx.why_tone, rx.why_says = why_lead(verdict, p, day, reading)
@@ -418,7 +419,7 @@ SUBTYPE = {"MountainBikeRide": "mountain bike", "EMountainBikeRide": "mountain b
            "Ride": "road ride", "road_biking": "road ride", "GravelRide": "gravel ride", "gravel_cycling": "gravel ride",
            "VirtualRide": "trainer ride", "Run": "run", "TrailRun": "trail run", "trail_running": "trail run",
            "BackcountrySki": "ski tour", "backcountry_skiing": "ski tour", "NordicSki": "nordic ski",
-           "Hike": "hike", "Walk": "walk"}
+           "Hike": "hike", "hiking": "hike", "Walk": "walk", "walking": "walk"}
 
 
 def usual_kind(p: Profile, sport: str) -> str | None:
@@ -444,8 +445,10 @@ def example_ride(p: Profile, sport: str, verdict: str, mins: int, ceiling: int |
     names = [a.name for a in pool if a.name]
     usual = max(set(names), key=names.count) if names else None
     group = [a for a in pool if a.name == usual] if usual and names.count(usual) >= 2 else pool
+    low_ = getattr(p, "_today_low", None) or (ceiling - 15)
+    mid = (low_ + ceiling) / 2
     pick = (max(group, key=lambda a: a.elev_m or 0) if verdict == HARD
-            else min(group, key=lambda a: a.avg_hr or 999))
+            else min(group, key=lambda a: abs((a.avg_hr or 0) - mid)))
     h, m = divmod(round(pick.moving_s / 60), 60)
     dur = f"{h}h {m:02d}m" if h else f"{m} min"
     climb = f", {round(pick.elev_m * 3.281 / 50) * 50:,} ft of climbing" if pick.elev_m else ""
@@ -455,7 +458,14 @@ def example_ride(p: Profile, sport: str, verdict: str, mins: int, ceiling: int |
     s = f"{lead} works: {dur}{climb}."
     if pick.avg_hr and verdict in (EASY, STEADY):
         diff = round(pick.avg_hr - ceiling)
-        if diff > 2:
+        low_ = getattr(p, "_today_low", None)
+        if low_ and pick.avg_hr < low_ - 3:
+            s += (f" You averaged {pick.avg_hr:.0f} that day, under today's range: push the climbs a little "
+                  f"more to keep it above {low_}.")
+            diff = None
+        if diff is None:
+            pass
+        elif diff > 2:
             s += (f" You averaged {pick.avg_hr:.0f} that day. Today the same route sits {diff}+ beats lower, "
                   f"so climb slower than you want to.")
         else:
@@ -485,18 +495,17 @@ def what_how(rx: Rx, kind: str | None, mins: int, low, ceiling, steps) -> tuple[
         what = f"An easy {noun}, {mins} minutes."
         how = [f"Heart rate {low}–{ceiling}, around {round((low + ceiling) / 2)}. It should feel almost too easy: "
                f"full sentences the whole way.",
-               f"Never over {ceiling}. Shift down, spin or walk the steep pitches."]
+               f"On the climbs, shift down, spin or walk the steep pitches to stay in range."]
     elif v == STEADY:
         what = f"A steady {noun}, up to {mins} minutes."
         how = [f"Heart rate {low}–{ceiling}, settling around {round((low + ceiling) / 2)}. All-day pace: you can "
                f"talk, just not sing.",
-               f"No chasing, no attacking climbs, no intervals. Never over {ceiling}."]
+               f"No chasing, no attacking climbs, no intervals."]
     else:
         what = f"A hard {noun}: 4 × 8 minutes at threshold, {mins} minutes total."
         how = list(steps) + [f"Never over {ceiling}, even on the last one."]
     if rx.sport in (BIKE, SKI) and v in (EASY, STEADY):
-        how.append(f"A spike on a steep pitch is fine if it's under 30 seconds. Over {ceiling} for a full minute "
-                   f"means back off.")
+        how.append(f"A short spike on a steep pitch is fine. If you're over {ceiling} for a full minute, ease off.")
     if rx.example:
         how.insert(1, rx.example)
     return what, how
@@ -511,55 +520,111 @@ def _mix(p: Profile, day: str, days: int) -> dict[str, float]:
     return out
 
 
+def _band(verdict: str, p: Profile) -> tuple[int, int] | None:
+    z = p.zones
+    if not z:
+        return None
+    if verdict == EASY:
+        return z.top("Z1 Recovery") - 10, z.bottom("Z2 Aerobic") + 6
+    if verdict == STEADY:
+        return z.bottom("Z2 Aerobic"), z.top("Z2 Aerobic")
+    return None
+
+
+def kind_stats(p: Profile, day: str, days: int = 150) -> dict[str, dict]:
+    """What each kind of session actually does to YOUR heart: median average HR, typical
+    length, how often. A fit athlete's hike may sit at 110; that's not aerobic work for them."""
+    cut = (date.fromisoformat(day) - timedelta(days=days)).isoformat()
+    by: dict[str, list] = {}
+    for a in p.activities:
+        k = SUBTYPE.get(a.raw_type or "")
+        if not k or not (cut <= a.date < day) or not a.avg_hr or (a.moving_s or 0) < 20 * 60:
+            continue
+        by.setdefault(k, []).append(a)
+    out = {}
+    for k, acts in by.items():
+        hrs = sorted(a.avg_hr for a in acts)
+        mins = sorted(a.moving_s / 60 for a in acts)
+        out[k] = {"n": len(acts), "hr": hrs[len(hrs) // 2], "hr_hi": hrs[int(len(hrs) * 0.8)],
+                  "mins": mins[len(mins) // 2], "sport": acts[0].sport}
+    return out
+
+
+SPORT_OF = {"mountain bike": BIKE, "road ride": BIKE, "gravel ride": BIKE, "trainer ride": BIKE,
+            "run": RUN, "trail run": RUN, "ski tour": SKI, "nordic ski": SKI, "hike": WALK, "walk": WALK}
+CONTROLLED = {"road ride", "gravel ride", "trainer ride", "run", "hike"}   # easy to hold a steady HR
+
+
 def choose_activity(verdict: str, p: Profile, day: str) -> tuple[str, str | None, str, int | None]:
     """Which activity, and why that one. Returns (sport, kind, reason, max minutes or None).
 
-    Easy days: pick what you can't overdo and what balances the last two weeks.
-    Mountain biking forces heart-rate spikes on climbs, so easy riding goes to road, gravel or
-    the trainer. A mostly-cycling fortnight gets an easy run (different muscles, and bone
-    loading cycling doesn't give), kept short if you haven't been running."""
-    mix14 = _mix(p, day, 14)
-    tot = sum(v for k, v in mix14.items() if k != WALK) or 0.0
-    bike_share = mix14.get(BIKE, 0.0) / tot if tot else 0.0
-    cut30 = (date.fromisoformat(day) - timedelta(days=30)).isoformat()
-    runs30 = sum(1 for a in p.activities if a.sport == RUN and cut30 <= a.date < day)
-    skied14 = mix14.get(SKI, 0.0) > 0
-    road_kinds = [SUBTYPE.get(a.raw_type or "") for a in p.activities if a.sport == BIKE and a.date >= cut30]
-    has_road = any(k in ("road ride", "gravel ride", "trainer ride") for k in road_kinds)
-    pct = f"{bike_share * 100:.0f}%"
-
+    First rule: it has to actually put YOUR heart in today's range. That's judged from your own
+    sessions of that kind (median average HR over the last 5 months), not a generic rule.
+    Then: balance (do less of what's dominated the last two weeks) and control (terrain that
+    lets you hold an easy HR; mountain bike climbs force spikes)."""
     if verdict == REST:
         return WALK, "walk", "Rest is the session today. Walking keeps you loose without adding anything to recover from.", None
     if verdict == LIGHT:
         return WALK, "walk", ("A walk moves blood through tired legs and speeds recovery without adding load. "
                               "Anything with a climb or a pace would."), None
 
-    if verdict == EASY:
-        if bike_share >= 0.7 and runs30 >= 2:
-            return RUN, "run", (f"Run instead of ride: {pct} of your last two weeks was on the bike. A run works "
-                                f"different muscles and loads your bones, which cycling doesn't. Flat ground makes "
-                                f"it easy to keep your heart rate where it belongs."), 50
-        if bike_share >= 0.7:
-            return WALK, "hike", (f"Hike instead of ride: {pct} of your last two weeks was on the bike. A hike gives "
-                                  f"your legs a different job without the pounding of a run you haven't been doing."), 90
-        if has_road:
-            return BIKE, "road ride", ("Ride the road or gravel bike, not the mountain bike. Trail climbs force your "
-                                       "heart rate up whether you like it or not; flat roads let you stay easy."), None
-        return BIKE, "mountain bike", ("If you ride the mountain bike, pick the flattest loop you have. Steep climbs "
-                                       "make an easy day impossible."), None
+    mix14 = _mix(p, day, 14)
+    tot = sum(v for k, v in mix14.items() if k != WALK) or 0.0
+    stats = kind_stats(p, day)
+    skied14 = mix14.get(SKI, 0.0) > 0
+    band = _band(verdict, p)
 
-    if verdict == STEADY:
-        if skied14:
-            return SKI, "ski tour", "You've been skiing: a steady skin is perfect aerobic time.", None
-        if bike_share >= 0.85 and runs30 >= 2:
-            return BIKE, None, (f"Ride, but notice the mix: {pct} of your last two weeks was on the bike. "
-                                f"Make your next easy day a run."), None
-        return BIKE if bike_share >= 0.5 or not runs30 else RUN, None, \
-            "Your main sport. Long steady time is where your aerobic engine grows.", None
+    if verdict == HARD or not band or not stats:
+        main = max(stats, key=lambda k: stats[k]["n"]) if stats else None
+        return (SPORT_OF.get(main, BIKE), main,
+                "Do the hard efforts on a steady climb or a flat road where you control the effort. "
+                "Technical trail breaks intervals into spikes and rests.", None)
 
-    # HARD
-    return BIKE, None, ("Do the hard efforts on a steady climb or a flat road where you control the effort. "
-                        "Technical trail breaks intervals into spikes and rests."), None
+    lo, hi = band
+    best, best_score, notes = None, -99.0, {}
+    for k, st in stats.items():
+        if k == "walk" or st["n"] < 3:
+            continue
+        if SPORT_OF.get(k) == SKI and not skied14:
+            continue
+        hr = st["hr"]
+        fits = lo - 3 <= hr <= hi + 2
+        reach = st["hr_hi"] >= lo           # your harder sessions of this kind do reach it
+        share = mix14.get(SPORT_OF.get(k, BIKE), 0.0) / tot if tot else 0.0
+        score = (4 if fits else 1.5 if reach else -10) + 2 * (1 - share) + (1 if k in CONTROLLED and verdict == EASY else 0)
+        notes[k] = (fits, reach, hr, st, share)
+        if score > best_score:
+            best, best_score = k, score
+    if best is None:
+        return BIKE, None, "Your main sport, kept easy.", None
+
+    fits, reach, hr, st, share = notes[best]
+    sport = SPORT_OF.get(best, BIKE)
+    noun = NOUN.get(best, best)
+    parts = []
+    if fits:
+        parts.append(f"Your {noun}s average {hr:.0f}, " + (f"right in today's {lo}–{hi}." if lo <= hr <= hi
+                     else f"right around today's {lo}–{hi}."))
+    else:
+        parts.append(f"Your {noun}s usually average {hr:.0f}, under today's {lo}–{hi}. Pick a route with steady "
+                     f"climbing so you spend the time in range; your harder ones get there.")
+    dominant = max(mix14, key=mix14.get) if mix14 else None
+    if dominant and SPORT_OF.get(best) != dominant and tot and mix14.get(dominant, 0) / tot >= 0.6:
+        dom = {BIKE: "the bike", RUN: "running", SKI: "skis", WALK: "your feet"}.get(dominant, dominant)
+        parts.append(f"And {mix14[dominant] / tot * 100:.0f}% of your last two weeks was on {dom}: "
+                     + ("a run works different muscles and loads your bones, which cycling doesn't."
+                        if sport == RUN else "this gives your legs a different job."))
+    if best == "mountain bike" and verdict == EASY:
+        parts.append("Pick your flattest loop: steep climbs make an easy day impossible.")
+    elif best in ("road ride", "gravel ride", "trainer ride") and verdict == EASY:
+        parts.append("Smooth terrain lets you hold an easy heart rate; trail climbs force it up.")
+    cap = None
+    if sport == RUN:
+        cut30 = (date.fromisoformat(day) - timedelta(days=30)).isoformat()
+        if sum(1 for a in p.activities if a.sport == RUN and cut30 <= a.date < day) < 3:
+            cap = 40
+            parts.append("Keep it to 40 minutes: your legs aren't used to much running right now.")
+    return sport, best, " ".join(parts), cap
 
 
 def _hm_short(h: float) -> str:
