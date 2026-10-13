@@ -5,7 +5,7 @@
   .hero { display:grid; grid-template-columns:minmax(0, 7fr) minmax(0, 5fr); gap:56px; align-items:start;
           padding:28px 0 72px; }
   .date { color:var(--lichen); margin:0 0 18px; font-size:16px; }
-  .verdict { font-size:clamp(84px, 12.5vw, 176px); text-wrap:balance; }
+  .verdict { font-size:clamp(44px, 7.4vw, 104px); text-wrap:balance; }
   .move { font-size:clamp(22px, 2.6vw, 30px); line-height:1.25; font-weight:560; letter-spacing:-0.01em;
           margin:32px 0 0; max-width:30ch; text-wrap:pretty; }
   .because { color:var(--lichen); font-size:18px; margin:16px 0 0; max-width:52ch; text-wrap:pretty; }
@@ -39,8 +39,8 @@
   .room .z4 { fill:var(--z4); } .room .z5 { fill:var(--z5); }
   .room .zn { fill:var(--lichen); font-size:16px; font-weight:650; }
   .room .zd { fill:var(--lichen); font-size:13px; }
-  .room .zn.on, .room .zd.on { fill:#0d1114; }
-  .room .avgl { stroke:#0d1114; stroke-width:2; stroke-dasharray:6 4; }
+  .room .zn.on, .room .zd.on { fill:#0a0a0a; }
+  .room .avgl { stroke:#0a0a0a; stroke-width:2; stroke-dasharray:6 4; }
   .room .hbin { fill:var(--lichen); opacity:.8; }
   .room .brk { fill:none; stroke:var(--lichen); stroke-width:1.5; }
   .room .strip { fill:var(--lichen); font-size:13px; }
@@ -54,14 +54,14 @@
   .room .lol { stroke:var(--lichen); stroke-width:1.5; }
   .room .maxl { stroke:var(--lichen); stroke-width:1.5; stroke-dasharray:3 5; }
   .room .ceil { fill:var(--ceiling); }
-  .room .cnum { fill:var(--ceiling); font-size:72px; font-weight:850; font-stretch:68%; font-variant-numeric:tabular-nums; }
+  .room .cnum { fill:var(--ceiling); font-size:56px; font-weight:600; font-stretch:125%; font-variant-numeric:tabular-nums; }
   .roomh { font-size:22px; font-weight:750; margin:0 0 2px; text-align:right; }
   .roomsub { color:var(--lichen); font-size:15px; margin:0 0 10px; text-align:right; }
   .roomcap { text-align:right; color:var(--lichen); font-size:15px; margin:6px 0 0; }
   .roomcap b { color:var(--ceiling); font-weight:650; }
 
   .because b.good { color:var(--good); } .because b.ok { color:var(--warn); } .because b.bad { color:var(--bad); }
-  .rtitle { font-size:clamp(40px, 6vw, 72px); font-weight:850; font-stretch:68%; line-height:.95; margin:0 0 16px; }
+  .rtitle { font-size:clamp(30px, 4.2vw, 52px); font-weight:600; font-stretch:125%; letter-spacing:.01em; line-height:1.05; margin:0 0 16px; }
   .rtitle.good { color:var(--good); } .rtitle.ok { color:var(--warn); } .rtitle.bad { color:var(--bad); }
   .rsays { font-size:clamp(19px, 2vw, 22px); line-height:1.45; max-width:60ch; margin:0 0 20px; text-wrap:pretty; }
   .evidence { list-style:none; padding:0; margin:0 0 8px; max-width:70ch; }
@@ -111,7 +111,7 @@
   .mname { font-weight:600; }
   .state { font-weight:650; }
   .good { color:var(--good); } .ok { color:var(--warn); } .bad { color:var(--bad); } .none { color:var(--lichen); }
-  .mval { font-size:52px; line-height:1; font-weight:800; font-stretch:68%; font-variant-numeric:tabular-nums;
+  .mval { font-size:40px; line-height:1; font-weight:600; font-stretch:125%; font-variant-numeric:tabular-nums;
           white-space:nowrap; min-width:3.2ch; }
   .mval small { font-size:22px; font-weight:600; color:var(--lichen); margin-left:3px; }
   .chart { min-width:0; padding-bottom:4px; }
@@ -132,7 +132,7 @@
   .recent div:last-child { border-bottom:0; }
   .recent span:first-child { color:var(--lichen); }
 
-  .call { font-size:clamp(44px, 6.4vw, 84px); font-weight:850; font-stretch:68%; line-height:.95; margin:0 0 20px;
+  .call { font-size:clamp(32px, 4.6vw, 60px); font-weight:600; font-stretch:125%; line-height:1.05; margin:0 0 20px;
           max-width:16ch; text-wrap:balance; }
   .callwhy { font-size:19px; color:var(--lichen); max-width:58ch; margin:0 0 8px; text-wrap:pretty; }
   .todo { font-size:19px; max-width:58ch; }
