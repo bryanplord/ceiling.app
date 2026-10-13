@@ -21,44 +21,44 @@ def test_pages_render(tmp_path, monkeypatch):
     assert j["verdict"] and j["do"] and j["tonight"]
 
 
-def test_magic_link(tmp_path, monkeypatch, capsys):
+def test_password_login(tmp_path, monkeypatch):
     monkeypatch.setenv("RX_DATA_DIR", str(tmp_path))
     monkeypatch.delenv("RX_OPEN", raising=False)
-    monkeypatch.delenv("RESEND_API_KEY", raising=False)
     monkeypatch.delenv("INTERVALS_API_KEY", raising=False)
     monkeypatch.setenv("RX_SECRET", "x" * 40)
-    monkeypatch.setenv("RX_ALLOWED_EMAILS", "bryan@example.com, jack@example.com")
+    from rx.web import auth
+    monkeypatch.setenv("RX_USERS", f"bryan@example.com={auth.hash_password('correct horse')},"
+                                    f"jack@example.com={auth.hash_password('battery staple')}")
     demo.seed(Store(tmp_path / "rx.db"), days=30, end=date.today())
     from rx.web.app import app
-    from rx.web import auth
     c = TestClient(app)
+    form = {"content-type": "application/x-www-form-urlencoded"}
 
-    # locked by default
-    r = c.get("/", follow_redirects=False)
-    assert r.status_code == 303 and r.headers["location"] == "/login"
+    # home page is the sign-in page; everything else is locked
+    r = c.get("/")
+    assert r.status_code == 200 and 'name="password"' in r.text and "Ideal" not in r.text
+    assert c.get("/profile", follow_redirects=False).headers["location"] == "/"
     assert c.get("/api/today").status_code == 401
     assert c.get("/healthz").status_code == 200
+    assert c.get("/static/favicon.svg").status_code == 200
 
-    # stranger gets the same page, no link
-    r = c.post("/login", content="email=stranger@example.com",
-               headers={"content-type": "application/x-www-form-urlencoded"})
-    assert "Check your email" in r.text
-    assert "stranger" not in capsys.readouterr().out
+    # wrong password, unknown email
+    r = c.post("/login", content="email=bryan%40example.com&password=nope", headers=form)
+    assert "don't match" in r.text
+    r = c.post("/login", content="email=who%40example.com&password=correct+horse", headers=form)
+    assert "don't match" in r.text
 
-    # allowed address gets a link (printed when no email provider is set)
-    c.post("/login", content="email=Jack@Example.com",
-           headers={"content-type": "application/x-www-form-urlencoded"})
-    link = capsys.readouterr().out.strip().split()[-1]
-    token = link.split("t=")[1]
-
-    # forged or session-typed tokens don't work as links
-    assert auth.verify("link", token[:-2] + "aa") is None
-    assert auth.verify("session", token) is None
-
-    r = c.get(f"/auth?t={token}", follow_redirects=False)
+    # right password (email case-insensitive)
+    r = c.post("/login", content="email=Jack%40Example.com&password=battery+staple",
+               headers=form, follow_redirects=False)
     assert r.status_code == 303 and auth.COOKIE in r.cookies
-    assert c.get("/").status_code == 200
+    assert "Ideal" in c.get("/").text or "<h1>" in c.get("/").text
+    assert c.get("/profile").status_code == 200
 
-    # removing someone from the list locks them out even with a valid cookie
-    monkeypatch.setenv("RX_ALLOWED_EMAILS", "bryan@example.com")
-    assert c.get("/", follow_redirects=False).status_code == 303
+    # removing an account locks it out even with a valid cookie
+    monkeypatch.setenv("RX_USERS", f"bryan@example.com={auth.hash_password('x')}")
+    assert c.get("/profile", follow_redirects=False).status_code == 303
+
+    # sign out
+    c.get("/logout")
+    assert 'name="password"' in c.get("/").text

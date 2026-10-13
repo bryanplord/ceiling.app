@@ -1,20 +1,23 @@
 {% extends "base.html" %}
 {% block nav %}{% endblock %}
 {% block body %}
-{% if sent %}
-<h1>Check your email.</h1>
-<p class="big">If that address is on the list, a sign-in link is on its way. It works for 15 minutes.</p>
-{% else %}
-<h1>Ceiling.</h1>
-<form method="post" action="/login">
-  <input type="email" name="email" required autocomplete="email" placeholder="you@example.com"
-         style="width:100%;font:inherit;font-size:22px;padding:16px 18px;border:1px solid var(--line);
-                border-radius:14px;background:transparent;color:var(--fg);">
-  <button type="submit"
-          style="margin-top:16px;width:100%;font:inherit;font-size:18px;font-weight:600;padding:16px;
-                 border:0;border-radius:14px;background:var(--fg);color:var(--bg);cursor:pointer;">
-    Email me a sign-in link
-  </button>
-</form>
-{% endif %}
+<div style="min-height:70vh;display:flex;flex-direction:column;justify-content:center;">
+  <img src="/static/ceiling-wordmark.svg" alt="ceiling" class="wm-light" style="height:72px;width:auto;align-self:flex-start;margin-bottom:56px;">
+  <img src="/static/ceiling-wordmark-white.svg" alt="ceiling" class="wm-dark" style="height:72px;width:auto;align-self:flex-start;margin-bottom:56px;">
+  <form method="post" action="/login" style="display:grid;gap:12px;max-width:420px;">
+    <input type="email" name="email" required autocomplete="email" placeholder="Email" class="field">
+    <input type="password" name="password" required autocomplete="current-password" placeholder="Password" class="field">
+    {% if error %}<p style="margin:4px 0 0;color:var(--red);">That email and password don't match.</p>{% endif %}
+    <button type="submit" class="go">Sign in</button>
+  </form>
+</div>
+<style>
+  .field { width:100%; font:inherit; font-size:20px; padding:16px 18px; border:1px solid var(--line);
+           border-radius:14px; background:transparent; color:var(--fg); }
+  .field:focus { outline:2px solid var(--fg); outline-offset:1px; }
+  .go { margin-top:8px; font:inherit; font-size:18px; font-weight:600; padding:16px; border:0;
+        border-radius:14px; background:var(--fg); color:var(--bg); cursor:pointer; }
+  .wm-dark { display:none; }
+  @media (prefers-color-scheme: dark) { .wm-light { display:none; } .wm-dark { display:block; } }
+</style>
 {% endblock %}

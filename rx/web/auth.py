@@ -1,31 +1,27 @@
-"""Magic-link sign-in for a short allowlist. No passwords, no user table.
+"""Simple email + password sign-in for a short list of accounts. No user table.
 
-How it works:
-1. You enter your email on /login.
-2. If it's on RX_ALLOWED_EMAILS, we email a link containing a signed token
-   (email + expiry, HMAC-signed with RX_SECRET). Valid 15 minutes.
-3. Clicking it sets a signed session cookie (30 days). Nothing is stored server-side.
+Accounts live in one setting, RX_USERS, as  email=salt$hash  pairs, comma-separated.
+Passwords are never stored: only a salted PBKDF2-SHA256 hash. Create an entry with:
 
-Env:
-  RX_ALLOWED_EMAILS  comma-separated, e.g. "a@x.com,b@y.com"
-  RX_SECRET          long random string; changing it signs everyone out
-  RX_BASE_URL        e.g. https://ceiling.app
-  RESEND_API_KEY     https://resend.com — if unset, the link is printed to the server log
-  RX_FROM_EMAIL      e.g. "Ceiling <signin@ceiling.app>" (domain verified in Resend)
+    python -m rx.web.auth someone@example.com
+
+A successful sign-in sets a signed session cookie (30 days). Nothing is stored server-side.
+RX_SECRET (32+ random characters) signs the cookie; changing it signs everyone out.
 """
 from __future__ import annotations
 
 import base64
+import getpass
 import hashlib
 import hmac
 import os
+import secrets
+import sys
 import time
 
-import requests
-
-LINK_TTL = 15 * 60
 SESSION_TTL = 30 * 24 * 3600
 COOKIE = "ceiling_session"
+ITERATIONS = 600_000
 
 
 def _secret() -> bytes:
@@ -35,12 +31,32 @@ def _secret() -> bytes:
     return s.encode()
 
 
-def allowed() -> set[str]:
-    return {e.strip().lower() for e in os.getenv("RX_ALLOWED_EMAILS", "").split(",") if e.strip()}
+def users() -> dict[str, str]:
+    out = {}
+    for pair in os.getenv("RX_USERS", "").split(","):
+        email, _, h = pair.strip().partition("=")
+        if email and h:
+            out[email.strip().lower()] = h.strip()
+    return out
 
 
 def enabled() -> bool:
-    return bool(allowed())
+    return bool(users())
+
+
+def hash_password(password: str, salt: str | None = None) -> str:
+    salt = salt or secrets.token_hex(16)
+    h = hashlib.pbkdf2_hmac("sha256", password.encode(), bytes.fromhex(salt), ITERATIONS).hex()
+    return f"{salt}${h}"
+
+
+def check_password(email: str, password: str) -> bool:
+    stored = users().get(email.strip().lower())
+    if not stored or "$" not in stored:
+        hash_password(password)          # same work either way: no timing hint
+        return False
+    salt, _ = stored.split("$", 1)
+    return hmac.compare_digest(hash_password(password, salt), stored)
 
 
 def sign(kind: str, email: str, ttl: int) -> str:
@@ -50,7 +66,7 @@ def sign(kind: str, email: str, ttl: int) -> str:
 
 
 def verify(kind: str, token: str | None) -> str | None:
-    """Return the email if the token is genuine, unexpired, the right kind, and still allowed."""
+    """Return the email if the token is genuine, unexpired, the right kind, and the account still exists."""
     if not token:
         return None
     try:
@@ -61,25 +77,10 @@ def verify(kind: str, token: str | None) -> str | None:
     good = hmac.new(_secret(), f"{k}|{email}|{exp}".encode(), hashlib.sha256).hexdigest()
     if not hmac.compare_digest(good, mac) or k != kind or int(exp) < time.time():
         return None
-    return email if email in allowed() else None
+    return email if email in users() else None
 
 
-def send_link(email: str) -> None:
-    base = os.getenv("RX_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
-    link = f"{base}/auth?t={sign('link', email, LINK_TTL)}"
-    key = os.getenv("RESEND_API_KEY", "")
-    if not key:
-        print(f"[sign-in link for {email}] {link}")   # local development
-        return
-    r = requests.post(
-        "https://api.resend.com/emails",
-        headers={"Authorization": f"Bearer {key}"},
-        json={
-            "from": os.getenv("RX_FROM_EMAIL", "Ceiling <signin@ceiling.app>"),
-            "to": [email],
-            "subject": "Your Ceiling sign-in link",
-            "text": f"Sign in to Ceiling:\n\n{link}\n\nThis link works once in the next 15 minutes.",
-        },
-        timeout=20,
-    )
-    r.raise_for_status()
+if __name__ == "__main__":  # python -m rx.web.auth someone@example.com
+    email = sys.argv[1].strip().lower()
+    pw = getpass.getpass(f"Password for {email}: ")
+    print(f"{email}={hash_password(pw)}")

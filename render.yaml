@@ -24,12 +24,8 @@ services:
       - key: INTERVALS_API_KEY
         sync: false          # entered by hand in the Render dashboard, never in git
       - key: RX_SECRET
-        generateValue: true  # Render creates a random secret; signs sign-in links and sessions
+        generateValue: true  # Render creates a random secret that signs sessions
       - key: RX_BASE_URL
         value: https://ceiling.app
-      - key: RX_ALLOWED_EMAILS
-        sync: false          # the two addresses allowed to sign in, comma-separated
-      - key: RESEND_API_KEY
-        sync: false          # from resend.com; sends the sign-in emails
-      - key: RX_FROM_EMAIL
-        value: "Ceiling <signin@ceiling.app>"
+      - key: RX_USERS
+        sync: false          # accounts: email=salt$hash pairs, comma-separated; never in git

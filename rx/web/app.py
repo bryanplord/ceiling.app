@@ -11,6 +11,7 @@ from urllib.parse import parse_qs
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .. import profile as prof
@@ -20,49 +21,41 @@ from . import auth
 
 app = FastAPI(title="Ceiling")
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
+app.mount("/static", StaticFiles(directory=str(Path(__file__).parent / "static")), name="static")
 
 REFRESH_EVERY_S = 60 * 60
 _sync_lock = threading.Lock()
 
 
-PUBLIC_PATHS = {"/healthz", "/login", "/auth"}
+def _signed_in(request: Request) -> bool:
+    if os.getenv("RX_OPEN") == "1":   # local development only
+        return True
+    return auth.enabled() and bool(auth.verify("session", request.cookies.get(auth.COOKIE)))
 
 
 @app.middleware("http")
 async def sign_in_gate(request: Request, call_next):
-    """Health data is private. Fails closed: without an allowlist the site is locked,
-    unless RX_OPEN=1 (local development only)."""
-    if request.url.path in PUBLIC_PATHS or os.getenv("RX_OPEN") == "1":
+    """Health data is private. Fails closed: with no accounts configured, nothing opens.
+    The home page is the sign-in page until you're signed in."""
+    path = request.url.path
+    if path in ("/", "/healthz", "/login", "/logout") or path.startswith("/static/") or _signed_in(request):
         return await call_next(request)
-    if auth.enabled() and auth.verify("session", request.cookies.get(auth.COOKIE)):
-        return await call_next(request)
-    if request.url.path.startswith("/api/"):
+    if path.startswith("/api/"):
         return Response("Sign in required.", status_code=401)
-    return RedirectResponse("/login", status_code=303)
+    return RedirectResponse("/", status_code=303)
 
 
-@app.get("/login", response_class=HTMLResponse)
-def login_page(request: Request):
-    return templates.TemplateResponse(request, "login.html", {"active": "login", "sent": False})
+def _login(request: Request, error: bool = False):
+    return templates.TemplateResponse(request, "login.html", {"active": "login", "error": error})
 
 
 @app.post("/login", response_class=HTMLResponse)
 async def login_submit(request: Request):
-    email = (parse_qs((await request.body()).decode()).get("email", [""])[0]).strip().lower()
-    if email in auth.allowed():
-        try:
-            auth.send_link(email)
-        except Exception as e:
-            print(f"sign-in email failed: {e}")
-    # Same answer either way, so the page never reveals who's on the list.
-    return templates.TemplateResponse(request, "login.html", {"active": "login", "sent": True})
-
-
-@app.get("/auth")
-def auth_callback(t: str = ""):
-    email = auth.verify("link", t)
-    if not email:
-        return RedirectResponse("/login?expired=1", status_code=303)
+    form = parse_qs((await request.body()).decode())
+    email = form.get("email", [""])[0].strip().lower()
+    password = form.get("password", [""])[0]
+    if not (auth.enabled() and auth.check_password(email, password)):
+        return _login(request, error=True)
     r = RedirectResponse("/", status_code=303)
     r.set_cookie(auth.COOKIE, auth.sign("session", email, auth.SESSION_TTL),
                  max_age=auth.SESSION_TTL, httponly=True, samesite="lax",
@@ -70,9 +63,14 @@ def auth_callback(t: str = ""):
     return r
 
 
+@app.get("/login")
+def login_get():
+    return RedirectResponse("/", status_code=303)
+
+
 @app.get("/logout")
 def logout():
-    r = RedirectResponse("/login", status_code=303)
+    r = RedirectResponse("/", status_code=303)
     r.delete_cookie(auth.COOKIE)
     return r
 
@@ -114,6 +112,8 @@ def _page(request: Request, name: str, **ctx):
 
 @app.get("/", response_class=HTMLResponse)
 def today(request: Request, d: str | None = None):
+    if not _signed_in(request):
+        return _login(request)
     _refresh_in_background()
     _, rx = today_rx(open_store(), d)
     return _page(request, "today.html", rx=rx)

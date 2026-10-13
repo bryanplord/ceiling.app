@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ceiling</title>
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
 <style>
   :root { --fg:#111; --muted:#6e6e73; --line:#e5e5ea; --bg:#fff;
           --green:#1f9d55; --amber:#c27c0e; --red:#d0342c; --unknown:#aeaeb2; }
@@ -41,6 +43,7 @@
   <a href="/recovery" class="{{ 'on' if active=='recovery' }}">Recovery</a>
   <a href="/progress" class="{{ 'on' if active=='progress' }}">Progress</a>
   <a href="/profile" class="{{ 'on' if active=='profile' }}">Profile</a>
+  <a href="/logout" style="margin-left:auto">Sign out</a>
 </nav>
 {% endblock %}
 <main>{% block body %}{% endblock %}</main>
