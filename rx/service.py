@@ -111,7 +111,8 @@ def today_rx(store: Store, day: str | None = None):
                 try:
                     import json as _json
                     rx_ = hit[1]
-                    store.set_meta(f"rx:{day}", _json.dumps([rx_.verdict, rx_.hr_low, rx_.hr_ceiling]))
+                    store.set_meta(f"rx:{day}", _json.dumps([rx_.verdict, rx_.hr_low, rx_.hr_ceiling, rx_.max_minutes,
+                                                          rx_.sport, [[o[3], o[4]] for o in (rx_.options or [])]]))
                 except Exception:
                     pass
     return hit
@@ -255,11 +256,13 @@ def plan_history(store: Store, days: int = 7):
 
 
 def today_after(store: Store, p, rx) -> dict | None:
-    """Once today's session has synced: what you did against what was prescribed, and
-    tomorrow re-decided from what you actually did (and tonight's journal)."""
+    """Once today's session has synced, Today stops being about what to do and becomes:
+    how it went (a score out of 100, what went right, what to fix, the numbers worth knowing),
+    what more you could do if you want it, what happens if you stop here, and tomorrow,
+    re-decided from what you actually did (and tonight's journal)."""
     from .prescribe import engine as eng
-    from .prescribe.score import score
-    from .workouts import grade, zone_minutes, bands
+    from .workouts import zone_minutes, bands
+    from .review import review
     from . import journal as jr
     acts = [a for a in p.activities if a.date == rx.date and (a.moving_s or 0) >= 10 * 60]
     entry = jr.load(store, rx.date)
@@ -268,19 +271,28 @@ def today_after(store: Store, p, rx) -> dict | None:
         return None
     out = {"sessions": [], "journal_note": note}
     load = 0.0
-    for a in acts:
+    trained_min = 0
+    for a in sorted(acts, key=lambda a: a.start_local or ""):
         load += p.session_load.get(a.id, 0.0) or eng._est_load(p, (a.moving_s or 0) / 60, a.avg_hr or 0)
+        if a.sport != "walk":
+            trained_min += round((a.moving_s or 0) / 60)
         h, m = divmod(round((a.moving_s or 0) / 60), 60)
         row = {"name": a.name or a.sport.capitalize(), "dur": f"{h}h {m:02d}m" if h else f"{m} min",
-               "avg": round(a.avg_hr) if a.avg_hr else None, "grade": None}
+               "avg": round(a.avg_hr) if a.avg_hr else None, "score": None, "walk": a.sport == "walk",
+               "time": (a.start_local or "")[11:16]}
         st = store.stream(a.id) if a.sport != "walk" else None
         if st:
-            sc = score(rx, st[0], st[1], a.sport)
-            g, tone = grade(sc.score)
-            mins = zone_minutes(p, st[0], st[1])
-            tot = sum(mins) or 1
-            row.update(grade=g, tone=tone, summary=sc.summary, cost=sc.cost,
-                       zones=[(n, c, round(mm), mm / tot * 100) for (n, c, _, _), mm in zip(bands(p), mins)])
+            try:
+                rv = review(p, rx, a, st, store.raw(a.id))
+            except Exception as e:                      # a review must never take Today down
+                print(f"review failed: {e}")
+                rv = None
+            if rv:
+                mins = zone_minutes(p, st[0], st[1])
+                tot = sum(mins) or 1
+                row.update(score=rv.score, word=rv.word, tone=rv.tone, head=rv.headline, right=rv.right,
+                           fix=rv.fix, stats=rv.stats, parts=rv.parts,
+                           zones=[(n, c, round(mm), mm / tot * 100) for (n, c, _, _), mm in zip(bands(p), mins)])
         out["sessions"].append(row)
     nxt = (date.fromisoformat(rx.date) + timedelta(days=1)).isoformat()
     planned = eng._next_verdict(p, rx, eng._rx_load(p, rx))
@@ -290,6 +302,82 @@ def today_after(store: Store, p, rx) -> dict | None:
         now, why = cap, "because of what you logged tonight"
     elif acts and now != planned:
         why = "because of what you actually did today"
+    trained = [s for s in out["sessions"] if not s["walk"]]
+    scored = [s for s in trained if s.get("score") is not None]
+    main = max(scored, key=lambda s: s["score"] if len(scored) == 1 else 0, default=None)
     out.update(tomorrow=eng._session_short(p, now, nxt), changed=now != planned, why=why,
-               was=eng._session_short(p, planned, nxt) if now != planned else "", done=bool(acts))
+               was=eng._session_short(p, planned, nxt) if now != planned else "", done=bool(trained),
+               main=main, trained_min=trained_min)
+    if trained:
+        out.update(more=_more_today(p, rx, load, trained_min, now, nxt, main), stop=_stop_here(p, rx, now, nxt, main, trained_min))
     return out
+
+
+def _aday(v: str) -> str:
+    return {"rest": "a day off", "light": "a walk day", "easy": "an easy day", "steady": "a steady day",
+            "hard": "a hard day"}.get(v, v)
+
+
+def _more_today(p, rx, load: float, done_min: int, tomorrow_now: str, nxt: str, main: dict | None = None) -> dict:
+    """If you want more today: what fits, and what it would do to tomorrow (run through the engine,
+    not guessed)."""
+    from .prescribe import engine as eng
+    cap = rx.max_minutes or 60
+    left = cap - done_min
+    ceil = rx.hr_ceiling or 130
+    ideas = []
+    if rx.verdict in (eng.REST, eng.LIGHT):
+        return {"left": 0, "ideas": [("A walk", "As long as you like, under " + str(ceil) + ". It's the only thing today was for.", "good")],
+                "line": "Nothing more today. Today was for recovering."}
+    hot = main and main.get("score") is not None and main["parts"]["Ceiling"] < 30
+    if hot and rx.verdict != eng.HARD:
+        return {"left": 0, "ideas": [
+            ("A walk, or 15 minutes of mobility", "Free: no cost to tomorrow.", "good"),
+            (f"Not: more time over {ceil}", f"You've already had today's intensity and then some. More of it comes out of tomorrow.", "bad")],
+            "line": f"You went harder than today called for, so today's budget is spent. A walk is the most to add."}
+    if rx.verdict == eng.HARD:
+        ideas = [("A 20-minute cool-down spin or walk", f"Under {eng.easy_band(p.zones)[0]}. Flushes the legs, costs nothing.", "good"),
+                 ("15 minutes of mobility", "Hips, calves, upper back. The hard work is done; this helps it land.", "good")]
+        return {"left": 0, "ideas": ideas,
+                "line": "The hard work is done. More hard work now costs tomorrow and buys nothing extra."}
+    if left >= 15:
+        extra = left
+        hr = ceil - 5
+        v_more = eng._next_verdict(p, rx, load + eng._est_load(p, extra, hr))
+        v_over = eng._next_verdict(p, rx, load + eng._est_load(p, extra + 45, ceil + 8))
+        kind = {"easy": "an easy", "steady": "a steady"}.get(rx.verdict, "an easy")
+        ideas.append((f"Up to {extra} more minutes, under {ceil}",
+                      f"{kind[:1].upper() + kind[1:]} spin, hike or walk. Tomorrow "
+                      + (f"stays {_aday(tomorrow_now)}." if v_more == tomorrow_now else f"becomes {_aday(v_more)}."), "good"))
+        ideas.append(("Or 20–30 minutes of strength",
+                      "Squats, lunges, step-ups, core. It doesn't show up in heart-rate load, and it's what keeps "
+                      "a 43-year-old's legs and back durable.", "good"))
+        if v_over != tomorrow_now:
+            ideas.append((f"Not: another {extra + 45} minutes, or going over {ceil}",
+                          f"That turns tomorrow from {_aday(tomorrow_now)} into {_aday(v_over)}.", "bad"))
+        line = f"You've done {done_min} of today's {cap} minutes. There's room for {left} more, easy."
+    else:
+        ideas = [("A walk or 15 minutes of mobility", "Both are free: no cost to tomorrow.", "good")]
+        line = f"You've used today's {cap} minutes. Anything more should be a walk."
+    return {"left": max(0, left), "ideas": ideas, "line": line}
+
+
+def _stop_here(p, rx, tomorrow_now: str, nxt: str, main: dict | None, done_min: int) -> str:
+    """If you do nothing more today: what that means."""
+    from .prescribe import engine as eng
+    cap = rx.max_minutes or 60
+    score = main["score"] if main else None
+    if rx.verdict in (eng.REST, eng.LIGHT):
+        return (f"You trained on a recovery day. Stop here and it costs a little; go further and tomorrow pays. "
+                f"Tomorrow is {_aday(tomorrow_now)} as it stands.")
+    if rx.verdict == eng.HARD:
+        return f"That's the day. Tomorrow is {_aday(tomorrow_now)}: the adaptation from today happens while you recover."
+    if main and main.get("score") is not None and main["parts"]["Ceiling"] < 30:
+        return (f"Good idea. You went harder than {_aday(rx.verdict)} calls for, so the best thing now is nothing. "
+                f"Tomorrow is {_aday(tomorrow_now)}" + (" as it stands; if HRV dips overnight, it'll come down." if tomorrow_now in ("hard", "steady") else "."))
+    if done_min < cap * 0.5:
+        return (f"Fine. It's {_aday(rx.verdict)}, so a shorter session gives up a little aerobic work and nothing else. "
+                f"Tomorrow stays {_aday(tomorrow_now)}, and you'll come into it fresher.")
+    good = score is not None and score >= 75
+    return ("That's the day done" + (", and done right" if good else "") +
+            f". Tomorrow is {_aday(tomorrow_now)}. Sleep tonight is what decides whether it stays that way.")

@@ -11,7 +11,6 @@ from datetime import date, timedelta
 import numpy as np
 
 from .analysis.hr import clean
-from .prescribe.score import score
 
 ZONES = ["Recovery", "Endurance", "Aerobic", "Tempo", "Threshold", "Max"]
 CLS = ["z0", "z1", "z2", "z3", "z4", "z5"]
@@ -52,7 +51,7 @@ def build(store, days: int = 14) -> list[dict]:
     w = {x.date: x for x in p_now.wellness}
     hrv = sorted((x.date, x.hrv) for x in p_now.wellness if x.hrv)
     out = []
-    for k in range(days, 0, -1):
+    for k in range(days, -1, -1):                      # through today: a workout shows as soon as it syncs
         d = (end - timedelta(days=k)).isoformat()
         acts = [a for a in p_now.activities if a.date == d and a.sport != "walk" and (a.moving_s or 0) >= 15 * 60]
         if not acts:
@@ -79,13 +78,18 @@ def build(store, days: int = 14) -> list[dict]:
                    "range": f"{rx.hr_low}–{rx.hr_ceiling}" if rx.hr_low else f"under {rx.hr_ceiling}",
                    "rec": rec, "zones": None, "grade": None}
             if st:
-                sc = score(rx, st[0], st[1], a.sport)
-                g, tone = grade(sc.score)
+                from .review import review
+                try:
+                    rv = review(p, rx, a, st, store.raw(a.id))
+                except Exception as e:
+                    print(f"review failed: {e}")
+                    rv = None
                 mins = zone_minutes(p, st[0], st[1])
                 tot = sum(mins) or 1
-                row.update(grade=g, tone=tone, score=sc.score, summary=sc.summary, cost=sc.cost,
-                           pct=sc.pct_in_range,
-                           zones=[(n, c, round(mm), mm / tot * 100) for (n, c, _, _), mm in zip(bands(p), mins)])
+                row.update(zones=[(n, c, round(mm), mm / tot * 100) for (n, c, _, _), mm in zip(bands(p), mins)])
+                if rv:
+                    row.update(score=rv.score, word=rv.word, tone=rv.tone, head=rv.headline, right=rv.right,
+                               fix=rv.fix, stats=rv.stats[:4], pct=rv.pct_in_range, grade=rv.score)
             out.append(row)
     return list(reversed(out))
 

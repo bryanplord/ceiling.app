@@ -1,7 +1,7 @@
 """Web app. Server-rendered pages, no build step, works on a phone browser."""
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import os
@@ -245,7 +245,7 @@ def _warm(store=None) -> None:
         cached(store, "patterns", rx.date, lambda: jr.patterns(store, p.wellness))
         cached(store, "hrhist", rx.date, lambda: dist.hr_histogram(store, p))
         ym = rx.date[:7]
-        cached(store, f"month:{ym}", rx.date, lambda: histmod.month(p, ym, rx.date, _live_rx(store, ym)))
+        cached(store, f"month:{ym}", rx.date, lambda: histmod.month(p, ym, rx.date, _live_rx(store, ym), store))
     except Exception as e:
         print(f"warm failed: {e}")
 
@@ -339,11 +339,23 @@ def today(request: Request, d: str | None = None):
     from .. import journal as jr
     entry = jr.load(store, rx.date)
     after = today_after(store, p, rx)
+    from ..analysis import energy as en
+    from zoneinfo import ZoneInfo
+    try:
+        wk = float(store.get_meta("wake_hour") or 7.0)
+    except ValueError:
+        wk = 7.0
+    try:
+        from ..config import settings as _st
+        energy = en.build(p, rx.date, datetime.now(ZoneInfo(_st().tz)).replace(tzinfo=None), wk)
+    except Exception as e:
+        print(f"energy failed: {e}")
+        energy = None
     pats = cached(store, "patterns", rx.date, lambda: jr.patterns(store, p.wellness))
     return _page(request, "today.html", rx=rx, waiting=not _have_last_night(store), updated=mins_ago,
-                 after=after, entry=entry, entry_tags=jr.label(entry["tags"]) if entry else [], patterns=pats,
+                 after=after, energy=energy, entry=entry, entry_tags=jr.label(entry["tags"]) if entry else [], patterns=pats,
                  syncing=syncing, d=dash, p=p, recent=recent,
-                 spark=dashboard.spark, room=dashboard.room(rx, p, *cached(store, "hrhist", rx.date, lambda: dist.hr_histogram(store, p))),
+                 spark=dashboard.spark, room=_room(store, p, rx, after),
                  st=st, hist=storymod.history_chart(st),
                  sleep_chart=sleepmod.chart(rx.sleep) if rx.sleep else "",
                  base_need=sleepmod._hm(rx.sleep.base) if rx.sleep else "",
@@ -404,6 +416,25 @@ def plan_goal_clear():
     return RedirectResponse("/plan", status_code=303)
 
 
+def _room(store, p, rx, after):
+    """The heart chart. In the morning: your zones against where you trained the last 4 weeks.
+    Once you've trained today: against where your heart actually was in today's workout."""
+    import numpy as np
+    from ..analysis.hr import clean
+    if after and after.get("done"):
+        hist = np.zeros(231)
+        for a in p.activities:
+            if a.date == rx.date and a.sport != "walk":
+                st = store.stream(a.id)
+                if st:
+                    h = clean(st[0], st[1])
+                    h = h[~np.isnan(h)].astype(int)
+                    hist += np.bincount(np.clip(h, 0, 230), minlength=231)
+        if hist.sum() > 300:
+            return dashboard.room(rx, p, hist, None, hist_label="where your heart was today")
+    return dashboard.room(rx, p, *cached(store, "hrhist", rx.date, lambda: dist.hr_histogram(store, p)))
+
+
 def _live_rx(store, ym: str) -> dict:
     """The prescriptions Ceiling actually gave each morning of a month (saved from today on)."""
     import json as _json
@@ -422,7 +453,7 @@ def history_page(request: Request, m: str | None = None):
     store = open_store()
     p, rx = today_rx(store)
     ym = m if (m and len(m) == 7) else rx.date[:7]
-    mon = cached(store, f"month:{ym}", rx.date, lambda: histmod.month(p, ym, rx.date, _live_rx(store, ym)))
+    mon = cached(store, f"month:{ym}", rx.date, lambda: histmod.month(p, ym, rx.date, _live_rx(store, ym), store))
     return _page(request, "history.html", mon=mon, active="calendar")
 
 
@@ -606,7 +637,7 @@ def workouts_page(request: Request):
     else:
         note = "A good balance: mostly easy, with a real slice of hard."
     scale = max([x[3] for x in agg] + [x[4] for x in agg]) * 1.1
-    return _page(request, "workouts.html", rows=rows, agg=agg, aggnote=note, scale=scale, date=date)
+    return _page(request, "workouts.html", rows=rows, agg=agg, aggnote=note, scale=scale, date=date, today_iso=rx.date)
 
 
 @app.get("/yesterday", response_class=HTMLResponse)

@@ -55,12 +55,14 @@ def _usual_hrv(p, before: str):
     return sum(vals) / len(vals) if len(vals) >= 14 else None
 
 
-def day_cell(p, d: str, today: str, live: dict | None = None) -> dict:
+def day_cell(p, d: str, today: str, live: dict | None = None, store=None) -> dict:
     cell = {"date": d, "day": int(d[-2:]), "future": d > today, "today": d == today}
-    if d >= today:
+    if d > today:
         return cell
+    extra = None
     if live and d in live:
-        v, lo, hi = live[d]
+        v, lo, hi = live[d][:3]
+        extra = live[d][3:]
         cell["replayed"] = False
     else:
         v, lo, hi = replay(p, d)
@@ -72,12 +74,29 @@ def day_cell(p, d: str, today: str, live: dict | None = None) -> dict:
         k = eng.SUBTYPE.get(a.raw_type or "", a.sport)
         h, m = divmod(round((a.moving_s or 0) / 60), 60)
         did.append(f"{SHORT.get(k, k.capitalize())} {h}h{m:02d}" if h else f"{SHORT.get(k, k.capitalize())} {m}m")
-    load = p.daily_load.get(d, 0.0)
+    if d == today and not train:
+        return cell                                   # today, nothing done yet: nothing to judge
     main = max(train, key=lambda a: a.moving_s or 0, default=None)
-    if v in (REST, LIGHT):
+    sc = None
+    if main and store is not None:
+        # the same score Today and Workouts give, so the three never disagree
+        from .review import review, LiteRx
+        mm, sp, op = (list(extra) + [None, None, None])[:3] if extra else (None, None, None)
+        lrx = LiteRx(d, v, lo, hi, mm, sp, [("", "", "", o[0], o[1]) for o in (op or [])])
+        try:
+            st = store.stream(main.id)
+            rv = review(p, lrx, main, st) if st else None
+        except Exception:
+            rv = None
+        if rv:
+            sc = rv.score
+    if sc is not None and v not in (REST, LIGHT):
+        status = (f"Nailed it, {sc}%", "good") if sc >= 90 else (f"Good, {sc}%", "good") if sc >= 75 else \
+                 (f"Close, {sc}%", "ok") if sc >= 60 else (f"Off plan, {sc}%", "bad")
+    elif v in (REST, LIGHT):
         status = ("Rested", "good") if not train else ("Trained on a rest day", "bad")
     elif not train:
-        status = ("Skipped", "muted")
+        status = ("Walked, no workout", "muted") if acts else ("Skipped", "muted")
     elif main and main.avg_hr and hi and main.avg_hr > hi + 3:
         status = ("Too hard", "bad")
     elif v in (STEADY, HARD) and main and main.avg_hr and lo and main.avg_hr < lo - 8:
@@ -91,15 +110,15 @@ def day_cell(p, d: str, today: str, live: dict | None = None) -> dict:
         u = _usual_hrv(p, nxt)
         if u:
             rec = "good" if w.hrv >= u * 0.95 else "bad" if w.hrv < u * 0.88 else "ok"
-    cell.update(verdict=v, kind=KIND[v], did=did, status=status[0], tone=status[1], rec=rec,
+    cell.update(verdict=v, kind=KIND[v], did=did, status=status[0], tone=status[1], rec=rec, score=sc,
                 both=status[1] == "good" and rec == "good")
     return cell
 
 
-def month(p, ym: str, today: str, live: dict | None = None) -> dict:
+def month(p, ym: str, today: str, live: dict | None = None, store=None) -> dict:
     y, m = map(int, ym.split("-"))
     weeks = calendar.Calendar(firstweekday=0).monthdatescalendar(y, m)
-    grid = [[(day_cell(p, d.isoformat(), today, live) if d.month == m else None) for d in wk] for wk in weeks]
+    grid = [[(day_cell(p, d.isoformat(), today, live, store) if d.month == m else None) for d in wk] for wk in weeks]
     cells = [c for wk in grid for c in wk if c and not c["future"] and not c["today"]]
     nailed = sum(1 for c in cells if c.get("tone") == "good")
     recov = [c for c in cells if c.get("rec")]

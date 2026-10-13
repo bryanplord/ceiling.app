@@ -157,17 +157,39 @@ def _sleep(p: Profile, end: date) -> Metric:
     prev7 = [h for h in hrs[:7] if h]
     avg = statistics.mean(last7) if last7 else statistics.mean(known)
     detail = f"Averaging {_fmt_hm(avg)} a night this week."
-    tone = "good" if avg >= 7.5 else "ok" if avg >= 6.75 else "bad"
-    state = "Enough" if tone == "good" else "A little short" if tone == "ok" else "Short"
-    if prev7 and last7:
-        d = (statistics.mean(last7) - statistics.mean(prev7)) * 60
-        if abs(d) >= 10:
-            detail += f" {abs(d):.0f} min {'more' if d > 0 else 'less'} than the week before."
-    short = max(0, round((7.5 - avg) * 60))
-    say = ("You're sleeping enough." if tone == "good" else
-           f"You're {short} minutes a night under 7½ hours." if tone == "ok" else
-           f"You're short on sleep: {short} minutes a night under 7½ hours. It caps everything else.")
-    return Metric("Sleep", _fmt_hm(avg), state, tone, detail, hrs, say=say)
+    # The tile is about LAST NIGHT, and about quality as much as length: 8½ hours of broken
+    # sleep is not a good night. Quality = Garmin's sleep score, cross-checked against what
+    # your overnight HRV did (a restful night shows up as normal-or-better HRV).
+    ws = sorted(p.wellness, key=lambda w: w.date)
+    last = next((w for w in reversed(ws) if w.date <= end.isoformat() and w.sleep_secs), None)
+    night = last.sleep_secs / 3600 if last else avg
+    hv = [w.hrv for w in ws if w.hrv and last and w.date < last.date][-60:]
+    hrv_ok = None
+    if last and last.hrv and len(hv) >= 14:
+        hrv_ok = last.hrv >= statistics.median(hv) * 0.93
+    sc = last.sleep_score if last else None
+    if sc:
+        q = "good" if sc >= 80 and hrv_ok is not False else "ok" if sc >= 60 else "bad"
+    elif hrv_ok is not None:
+        q = "good" if hrv_ok else "ok"
+    else:
+        q = "none"
+    qword = {"good": "Good quality", "ok": "Fair quality", "bad": "Poor quality", "none": "Quality unknown"}[q]
+    length = "good" if night >= 7.5 else "ok" if night >= 6.75 else "bad"
+    tone = "bad" if "bad" in (q, length) else "ok" if "ok" in (q, length) else "good"
+    state = qword + (f", score {sc:.0f}" if sc else "")
+    if length != "good":
+        state = ("Short, " if length == "bad" else "A little short, ") + qword.lower()
+    detail = f"Last night {_fmt_hm(night)}." + (f" Sleep score {sc:.0f}." if sc else "") + " " + detail
+    say = {("good", "good"): "A good night: long enough and restful.",
+           ("good", "ok"): "Long enough, but not your most restful night.",
+           ("good", "bad"): "Long enough in bed, but poor quality: count it as a shorter night.",
+           ("good", "none"): "Long enough. Quality unknown."}.get((length, q)) or (
+           f"Short: {_fmt_hm(night)}, against the 7½ hours that holds everything else up.")
+    if hrv_ok is False and sc and sc >= 80:
+        say += " Your HRV disagrees with the score, though: your body didn't recover as well as it looks."
+    return Metric("Sleep", _fmt_hm(night), state, tone, detail, hrs, say=say)
+
 
 
 def _vs_normal(p: Profile, attr: str, name: str, unit: str, higher_good: bool, end: date) -> Metric:
@@ -401,7 +423,8 @@ def _marks(mark, Y, lo, c, AX, L0, L1, SC, R0, R1, W, T, B, bands) -> str:
     return "".join(o)
 
 
-def room(rx: Rx, p: Profile, hist=None, usual: float | None = None, mode: str = "stretch", mark: str = "hairlines") -> str:
+def room(rx: Rx, p: Profile, hist=None, usual: float | None = None, mode: str = "stretch", mark: str = "hairlines",
+         hist_label: str = "where you trained, last 4 weeks") -> str:
     """Your heart today, built around a center spine of heart-rate numbers.
     Left: your zones, named and colored, reading out from the spine.
     Right: where you actually trained the last 4 weeks, one bar per 2 beats, colored by zone.
@@ -524,7 +547,7 @@ def room(rx: Rx, p: Profile, hist=None, usual: float | None = None, mode: str = 
                 o.append(f'<rect class="hc {band_of(v)}" x="{R0}" y="{y1:.1f}" width="{w_:.1f}" height="{y2 - y1:.1f}"/>')
             pts += [(R0 + w_, y2), (R0 + w_, y1)]
         o.append('<path class="hl" d="' + " ".join(f"{'M' if j == 0 else 'L'}{x:.1f},{y:.1f}" for j, (x, y) in enumerate(pts)) + '"/>')
-        o.append(f'<text class="small" x="{R0}" y="{B + 18}">where you trained, last 4 weeks</text>')
+        o.append(f'<text class="small" x="{R0}" y="{B + 18}">{hist_label}</text>')
         o.append(f'<text class="small" x="{L0}" y="{B + 18}">your zones</text>')
         if mark == "box":
             o.append(f'<text class="small" x="{SC}" y="{B + 18}" text-anchor="middle">today</text>')

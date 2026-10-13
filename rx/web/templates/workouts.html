@@ -15,7 +15,7 @@
   .z3 { background:#e3bd52; } .z4 { background:#ec9550; } .z5 { background:#de5f55; }
   .aggnote { color:var(--lichen); font-size:15px; margin:12px 0 0; max-width:70ch; }
   .list { margin-top:48px; border-top:2px solid var(--ink); }
-  .w { display:grid; grid-template-columns:90px 1fr; gap:24px; padding:22px 0; border-bottom:1px solid var(--rule); }
+  .w { display:grid; grid-template-columns:120px 1fr; gap:24px; padding:22px 0; border-bottom:1px solid var(--rule); }
   .g { font-size:56px; font-weight:600; font-stretch:125%; line-height:1; }
   .g.good { color:var(--good); } .g.ok { color:var(--warn); } .g.bad { color:var(--bad); } .g.none { color:var(--rule); }
   .wd { font-size:14px; color:var(--lichen); margin-top:6px; }
@@ -24,9 +24,20 @@
   .zbar { display:flex; height:14px; margin:4px 0 6px; max-width:560px; }
   .legend { font-size:13px; color:var(--lichen); display:flex; flex-wrap:wrap; gap:4px 14px; max-width:560px; }
   .legend i { display:inline-block; width:9px; height:9px; margin-right:5px; }
+  .g .pc { font-size:.45em; vertical-align:.8em; margin-left:2px; }
+  .gw { font-size:14px; font-weight:600; margin-top:6px; } .gw.good { color:var(--good); } .gw.ok { color:var(--warn); } .gw.bad { color:var(--bad); }
+  .hd { font-weight:600; margin-top:14px !important; }
+  .rfl { margin:4px 0 12px; padding:0; list-style:none; display:grid; gap:6px; max-width:62ch; }
+  .rfl li { padding-left:12px; border-left:3px solid var(--rule); font-size:16px; }
+  .rfl li.rg { border-left-color:var(--good); } .rfl li.rb { border-left-color:var(--ceiling); }
+  .cards { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:8px; margin:8px 0 12px; max-width:720px; }
+  .card { display:flex; flex-direction:column; gap:3px; padding:12px 14px; background:var(--frost); border-radius:10px; }
+  .cl { font-size:12px; color:var(--lichen); font-weight:600; }
+  .cv { font-size:24px; font-weight:600; font-stretch:115%; line-height:1.1; font-variant-numeric:tabular-nums; }
+  .cn { font-size:13px; line-height:1.35; color:#3c3c40; }
   .w .cost { color:var(--lichen); font-size:15px; }
   @media (max-width:700px) { .zrow { grid-template-columns:90px 1fr; } .znum { grid-column:2; }
-    .w { grid-template-columns:64px 1fr; gap:14px; } .g { font-size:40px; } }
+    .w { grid-template-columns:78px 1fr; gap:14px; } .g { font-size:34px; } }
 </style>
 {% endblock %}
 {% block body %}
@@ -48,15 +59,17 @@
 <div class="list">
 {% for r in rows %}{% set dd = date.fromisoformat(r.date) %}
   <div class="w">
-    <div><div class="g {{ r.tone or 'none' }}">{{ r.grade or '–' }}</div><div class="wd">{{ dd.strftime('%a %b %-d') }}</div></div>
+    <div><div class="g {{ r.tone or 'none' }}">{% if r.score is not none %}{{ r.score }}<span class="pc">%</span>{% else %}–{% endif %}</div>{% if r.word %}<div class="gw {{ r.tone }}">{{ r.word }}</div>{% endif %}<div class="wd">{{ 'Today' if r.date == today_iso else dd.strftime('%a %b %-d') }}</div></div>
     <div>
       <p class="lab">Prescribed</p><p>{{ r.rx }}. Range {{ r.range }}.</p>
       <p class="lab">You did</p><p>{{ r.name }}, {{ r.dur }}{% if r.avg %}, average {{ r.avg }}{% endif %}.</p>
       {% if r.zones %}
       <div class="zbar">{% for n, c, mm, sh in r.zones %}{% if sh > 0.5 %}<span class="{{ c }}" style="width:{{ sh }}%" title="{{ n }} {{ mm }} min"></span>{% endif %}{% endfor %}</div>
       <div class="legend">{% for n, c, mm, sh in r.zones %}{% if mm >= 1 %}<span><i class="{{ c }}"></i>{{ n }} {{ mm }} min</span>{% endif %}{% endfor %}</div>
-      <p style="margin-top:12px">{{ r.summary }} {{ r.pct }}% of the time in range.</p>
-      <p class="cost">{{ r.cost }}{% if r.rec %} {{ r.rec }}.{% endif %}</p>
+      {% if r.head %}<p class="hd">{{ r.head }}</p>{% endif %}
+      {% if r.right or r.fix %}<ul class="rfl">{% for x in r.right %}<li class="rg">{{ x }}</li>{% endfor %}{% for x in r.fix %}<li class="rb">{{ x }}</li>{% endfor %}</ul>{% endif %}
+      {% if r.stats %}<div class="cards">{% for v, l, n in r.stats %}<div class="card"><span class="cl">{{ l }}</span><span class="cv">{{ v }}</span>{% if n %}<span class="cn">{{ n }}</span>{% endif %}</div>{% endfor %}</div>{% endif %}
+      {% if r.rec %}<p class="cost">{{ r.rec }}.</p>{% endif %}
       {% else %}<p class="cost">No heart-rate data for this one, so no grade.</p>{% endif %}
     </div>
   </div>

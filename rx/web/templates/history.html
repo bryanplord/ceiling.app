@@ -29,6 +29,9 @@
   .rdot { width:9px; height:9px; border-radius:50%; display:inline-block; }
   .rdot.good { background:#2fae6b; } .rdot.ok { background:#e6c13d; } .rdot.bad { background:#d9433b; }
   .c.both { background:#f2faf5; }
+  .c.hit .vb { height:5px; }
+  .ck { display:inline-block; width:16px; height:16px; line-height:16px; text-align:center; border-radius:50%;
+        background:var(--good); color:#fff; font-size:11px; margin-right:5px; vertical-align:1px; }
   .v-rest { background:#c9c9cd; } .v-light { background:#b3a6dc; } .v-easy { background:#7fa7d9; }
   .v-steady { background:#46b07f; } .v-hard { background:#ec9550; }
   .key { display:flex; flex-wrap:wrap; gap:6px 18px; font-size:13px; color:var(--lichen); margin-top:16px; }
@@ -64,14 +67,14 @@
   {% for wk in mon.grid %}{% for c in wk %}
     {% if not c %}<div class="c out"></div>
     {% elif c.future %}<div class="c fut"><span class="n">{{ c.day }}</span></div>
-    {% elif c.today %}<div class="c tod"><span class="n">{{ c.day }}</span><span class="k">Today</span></div>
+    {% elif c.today and not c.status %}<div class="c tod"><span class="n">{{ c.day }}</span><span class="k">Today</span></div>
     {% else %}
-    <div class="c{{ ' both' if c.both }}" title="{{ c.kind }}: {{ c.status }}">
+    <div class="c{{ ' both' if c.both }}{{ ' tod' if c.today }}{{ ' hit' if c.tone == 'good' }}" title="{{ c.kind }}: {{ c.status }}">
       <span class="n">{{ c.day }}{% if c.rec %}<span class="rdot {{ c.rec }}" title="Next morning: {{ {'good':'recovered','ok':'mostly recovered','bad':'not recovered'}[c.rec] }}"></span>{% endif %}</span>
       <span class="vb v-{{ c.verdict }}"></span>
       <span class="k">{{ c.kind }}</span>
       <span class="did">{{ c.did|join(', ') if c.did else '' }}</span>
-      <span class="st t-{{ c.tone }}">{{ c.status }}</span>
+      <span class="st t-{{ c.tone }}">{% if c.tone == 'good' %}<span class="ck" aria-hidden="true">✓</span>{% endif %}{{ c.status }}</span>
     </div>
     {% endif %}
   {% endfor %}{% endfor %}
@@ -80,6 +83,6 @@
   <span><i class="v-easy"></i>Easy</span><span><i class="v-steady"></i>Steady</span><span><i class="v-hard"></i>Hard</span>
   <span><i class="v-light"></i>Walk</span><span><i class="v-rest"></i>Day off</span>
   <span><span class="rdot good"></span> recovered next morning</span><span><span class="rdot ok"></span> mostly</span><span><span class="rdot bad"></span> not recovered</span>
-  <span>Green day: nailed the workout and the recovery</span>
+  <span>✓ did what the morning called for</span><span>Green day: did it, and recovered</span>
 </div>
 {% endblock %}
