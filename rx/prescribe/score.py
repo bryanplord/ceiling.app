@@ -29,7 +29,14 @@ def score(rx: Rx, time: list, hr: list, sport: str | None = None) -> Score:
     if len(valid) == 0 or rx.hr_ceiling is None:
         return Score(0, minutes, 0, 0, 0, None, 0, "No heart-rate data to score.", "")
 
-    over = int(np.sum(valid > rx.hr_ceiling) / 60)
+    if sport in ("bike", "ski") and len(h) >= 60:
+        # Intermittent terrain sports: count sustained time over the ceiling (60-s average),
+        # so a 15-second spike on a steep pitch isn't scored like a minute of threshold work.
+        from ..analysis.hr import rolling_mean_full
+        sustained = rolling_mean_full(np.where(np.isnan(h), np.nanmean(valid), h), 60)
+        over = int(np.sum(sustained > rx.hr_ceiling) / 60)
+    else:
+        over = int(np.sum(valid > rx.hr_ceiling) / 60)
     lo = rx.hr_low if rx.hr_low is not None else 0
     in_rng = int(np.sum((valid >= lo) & (valid <= rx.hr_ceiling)) / 60)
     pct = round(100 * in_rng / max(1, len(valid) / 60))

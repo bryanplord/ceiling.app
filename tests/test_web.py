@@ -16,7 +16,7 @@ def test_pages_render(tmp_path, monkeypatch):
     for path in ("/", "/yesterday", "/recovery", "/progress", "/profile"):
         r = c.get(path)
         assert r.status_code == 200, path
-        assert "<h1>" in r.text
+        assert "<h1" in r.text
     j = c.get("/api/today").json()
     assert j["verdict"] and j["do"] and j["tonight"]
 
@@ -52,7 +52,7 @@ def test_password_login(tmp_path, monkeypatch):
     r = c.post("/login", content="email=Jack%40Example.com&password=battery+staple",
                headers=form, follow_redirects=False)
     assert r.status_code == 303 and auth.COOKIE in r.cookies
-    assert "Ideal" in c.get("/").text or "<h1>" in c.get("/").text
+    assert "Ideal" in c.get("/").text or "<h1" in c.get("/").text
     assert c.get("/profile").status_code == 200
 
     # removing an account locks it out even with a valid cookie

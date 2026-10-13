@@ -180,7 +180,7 @@ def today(request: Request, d: str | None = None):
         if len(recent) == 5:
             break
     return _page(request, "today.html", rx=rx, d=dash, p=p, recent=recent,
-                 spark=dashboard.spark, ceiling_band=dashboard.ceiling_band(rx, p),
+                 spark=dashboard.spark, room=dashboard.room(rx, p),
                  day_label=when.strftime("%A, %B %-d"))
 
 

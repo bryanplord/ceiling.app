@@ -74,7 +74,7 @@ def build(store: Store, as_of: str | None = None) -> Profile:
 
     mx = hra.estimate_max_hr(peaks)
     th = hra.estimate_threshold(efforts)
-    lt1 = aer.estimate_lt1(steady)
+    lt1 = aer.estimate_lt1(steady, th.bpm)
     zones = None
     if th.bpm and lt1.bpm and lt1.bpm < th.bpm - 4:
         zones = hra.zones_from_anchors(lt1.bpm, int(th.bpm), int(mx.bpm) if mx.bpm else None)

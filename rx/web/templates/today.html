@@ -1,48 +1,158 @@
 {% extends "base.html" %}
+{% block head %}
+<style>
+  .hero { display:grid; grid-template-columns:minmax(0, 7fr) minmax(0, 5fr); gap:56px; align-items:start;
+          padding:28px 0 72px; }
+  .date { color:var(--lichen); margin:0 0 18px; font-size:16px; }
+  .verdict { font-size:clamp(84px, 12.5vw, 176px); text-wrap:balance; }
+  .move { font-size:clamp(22px, 2.6vw, 30px); line-height:1.25; font-weight:560; letter-spacing:-0.01em;
+          margin:32px 0 0; max-width:30ch; text-wrap:pretty; }
+  .because { color:var(--lichen); font-size:18px; margin:16px 0 0; max-width:52ch; text-wrap:pretty; }
+  .steps { font-size:18px; margin-top:20px; max-width:52ch; }
+  .dont { margin:28px 0 0; padding-left:16px; border-left:4px solid var(--ceiling); font-size:18px;
+          font-weight:560; max-width:48ch; }
+  .flex { display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-top:36px; max-width:640px; }
+  .flex h3, .trade h3 { margin:0 0 6px; font-size:15px; font-weight:650; }
+  .flex p, .trade p { margin:0; color:var(--lichen); font-size:16px; line-height:1.45; }
+
+  .room { width:100%; max-width:420px; display:block; margin-left:auto; overflow:visible; font-family:var(--face); }
+  .room .z0 { fill:var(--frost); } .room .z1 { fill:var(--frost2); }
+  .room .zl { fill:var(--lichen); font-size:13px; }
+  .room .tick { fill:var(--lichen); font-size:14px; font-variant-numeric:tabular-nums; }
+  .room .band { fill:var(--ink); }
+  .room .avg { fill:var(--snow); opacity:.9; }
+  .room .side { fill:var(--lichen); font-size:16px; font-variant-numeric:tabular-nums; }
+  .room .side.strong { fill:var(--ink); font-weight:650; }
+  .room .lol { stroke:var(--lichen); stroke-width:1.5; }
+  .room .maxl { stroke:var(--lichen); stroke-width:1.5; stroke-dasharray:3 5; }
+  .room .ceil { fill:var(--ceiling); }
+  .room .cnum { fill:var(--ceiling); font-size:72px; font-weight:850; font-stretch:68%; font-variant-numeric:tabular-nums; }
+  .roomcap { text-align:right; color:var(--lichen); font-size:15px; margin:6px 0 0; }
+  .roomcap b { color:var(--ceiling); font-weight:650; }
+
+  section.band { border-top:1px solid var(--rule); padding:56px 0; }
+  .split { display:grid; grid-template-columns:1fr 1fr; gap:72px; }
+  .split h2 b { color:var(--ink); font-weight:650; margin-right:8px; }
+  .metric { padding:22px 0; border-bottom:1px solid var(--rule); }
+  .mdata { color:var(--lichen); font-weight:600; }
+  .say { font-size:22px; line-height:1.3; font-weight:620; letter-spacing:-0.01em; margin:4px 0 12px;
+         padding-left:14px; border-left:4px solid var(--rule); text-wrap:pretty; }
+  .say.good { color:var(--ink); border-left-color:var(--good); }
+  .say.ok { color:var(--ink); border-left-color:var(--warn); }
+  .say.bad { color:var(--ink); border-left-color:var(--bad); }
+  .say.none { color:var(--ink); }
+  .metric:last-child { border-bottom:0; }
+  .mtop { grid-column:1 / -1; display:flex; justify-content:space-between; gap:12px; margin-bottom:2px; }
+  .mname { font-weight:600; }
+  .state { font-weight:650; }
+  .good { color:var(--good); } .ok { color:var(--warn); } .bad { color:var(--bad); } .none { color:var(--lichen); }
+  .mval { font-size:52px; line-height:1; font-weight:800; font-stretch:68%; font-variant-numeric:tabular-nums;
+          white-space:nowrap; min-width:3.2ch; }
+  .mval small { font-size:22px; font-weight:600; color:var(--lichen); margin-left:3px; }
+  .chart { min-width:0; padding-bottom:4px; }
+  .mdetail { color:var(--lichen); margin:10px 0 0; font-size:15px; line-height:1.45; }
+  .lead .mval { font-size:clamp(48px, 6vw, 68px); white-space:normal; }
+  .spark .line { fill:none; stroke:var(--ink); stroke-width:2; vector-effect:non-scaling-stroke;
+                 stroke-linejoin:round; stroke-linecap:round; }
+  .spark .end { fill:var(--ceiling); }
+  .spark .band { fill:var(--frost2); }
+  .spark .bar { fill:var(--ink); opacity:.78; }
+  .mix { display:flex; height:16px; border-radius:3px; overflow:hidden; gap:3px; margin-top:6px; }
+  .mix .easy { background:var(--easy); } .mix .middle { background:var(--middle); } .mix .hard { background:var(--hard); }
+  .mixkey { display:flex; gap:20px; flex-wrap:wrap; }
+  .k { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:7px; vertical-align:-1px; }
+  .k.easy { background:var(--easy); } .k.middle { background:var(--middle); } .k.hard { background:var(--hard); }
+  .recent { margin-top:28px; font-size:15px; }
+  .recent div { display:grid; grid-template-columns:96px 1fr auto; gap:16px; padding:10px 0; border-bottom:1px solid var(--rule); }
+  .recent div:last-child { border-bottom:0; }
+  .recent span:first-child { color:var(--lichen); }
+
+  .call { font-size:clamp(44px, 6.4vw, 84px); font-weight:850; font-stretch:68%; line-height:.95; margin:0 0 20px;
+          max-width:16ch; text-wrap:balance; }
+  .callwhy { font-size:19px; color:var(--lichen); max-width:58ch; margin:0 0 8px; text-wrap:pretty; }
+  .todo { font-size:19px; max-width:58ch; }
+
+  .trade { display:grid; grid-template-columns:1fr 1fr; gap:40px; }
+  .trade > div { border-top:4px solid var(--rule); padding-top:18px; }
+  .trade > div.over { border-top-color:var(--ceiling); }
+  .trade p { font-size:17px; color:var(--ink); line-height:1.5; }
+
+  .next { display:grid; grid-template-columns:1fr 1fr; gap:40px; }
+  .next p { margin:0 0 10px; max-width:52ch; }
+  .note { color:var(--lichen); font-size:15px; margin-top:18px; }
+  .empty h2 { color:var(--ink); font-size:24px; }
+
+  @media (max-width: 900px) {
+    .hero { grid-template-columns:1fr; gap:36px; padding:12px 0 48px; }
+    .room { margin:0; max-width:380px; }
+    .roomcap { text-align:left; }
+    .split, .trade, .next { grid-template-columns:1fr; gap:40px; }
+    .flex { grid-template-columns:1fr; gap:18px; }
+    section.band { padding:40px 0; }
+    .mval { font-size:44px; }
+  }
+</style>
+{% endblock %}
+{% macro metric(m, band=False, bars=False) %}
+<div class="metric">
+  <div class="mtop"><span class="mname">{{ m.name }}</span><span class="mdata num">{{ m.value }}</span></div>
+  <p class="say {{ m.tone }}">{{ m.say or m.state }}</p>
+  <div class="chart">{{ spark(m.series, band=m.band if band else None, bars=bars) | safe }}</div>
+  <p class="mdetail">{{ m.detail }}</p>
+</div>
+{% endmacro %}
 {% block body %}
 <section class="hero">
-  <p class="date">{{ day_label }}</p>
-  <h1>{{ rx.headline }}</h1>
-  <p class="move">{{ rx.do }}</p>
-  {% if rx.steps %}
-  <ol class="steps">{% for s in rx.steps %}<li>{{ s }}</li>{% endfor %}</ol>
+  <div>
+    <p class="date">{{ day_label }}</p>
+    <h1 class="verdict">{{ rx.headline }}</h1>
+    <p class="move">{{ rx.do }}</p>
+    {% if rx.why %}<p class="because">{{ rx.why | join(' ') }}</p>{% endif %}
+    {% if rx.steps %}<ol class="steps">{% for s in rx.steps %}<li>{{ s }}</li>{% endfor %}</ol>{% endif %}
+    <p class="dont">{{ rx.dont }}</p>
+    {% if rx.compress %}
+    <div class="flex">
+      <div><h3>Short on time</h3><p>{{ rx.compress }}</p></div>
+      <div><h3>Feeling strong</h3><p>{{ rx.stretch }}</p></div>
+    </div>
+    {% endif %}
+  </div>
+  {% if room %}
+  <div>
+    {{ room | safe }}
+    <p class="roomcap">Today's range in black. <b>Never above {{ rx.hr_ceiling }}.</b>{% if rx.max_minutes %} {{ rx.max_minutes }} minutes max.{% endif %}</p>
+  </div>
   {% endif %}
-  {{ ceiling_band | safe }}
-  <p class="dont">{{ rx.dont }}</p>
 </section>
 
 {% if not d.has_data %}
-<section class="empty">
+<section class="band empty">
   <h2>Your history is loading.</h2>
-  <p>Ceiling is pulling your activities and nights from intervals.icu. Refresh in a few minutes.</p>
+  <p class="muted">Ceiling is pulling your activities and nights from intervals.icu. Refresh in a few minutes.</p>
 </section>
 {% else %}
 
-<section class="split">
-  <div class="col">
-    <h2>Activity <span>what you've done</span></h2>
-    {% for m in [d.load, d.fitness, d.freshness] %}
-    <div class="metric">
-      <div class="mhead">
-        <span class="mname">{{ m.name }}</span>
-        <span class="state {{ m.tone }}">{{ m.state }}</span>
-      </div>
-      <div class="mrow">
-        <span class="mval">{{ m.value }}</span>
-        <div class="chart">{{ spark(m.series) | safe }}</div>
-      </div>
-      <p class="mdetail">{{ m.detail }}</p>
-    </div>
-    {% endfor %}
+{% if rx.if_skip or rx.if_overdo %}
+<section class="band">
+  <h2>The trade</h2>
+  <div class="trade">
+    {% if rx.if_skip %}<div><h3>If you skip it</h3><p>{{ rx.if_skip }}</p></div>{% endif %}
+    {% if rx.if_overdo %}<div class="over"><h3>If you go over the ceiling</h3><p>{{ rx.if_overdo }}</p></div>{% endif %}
+  </div>
+</section>
+{% endif %}
 
+<section class="band split">
+  <div>
+    <h2><b>Activity</b>what you've put in</h2>
+    {% for m in [d.load, d.fitness, d.freshness] %}{{ metric(m) }}{% endfor %}
     {% if d.mix %}
     <div class="metric">
-      <div class="mhead"><span class="mname">Intensity, last 4 weeks</span>
-        <span class="state">{{ '%.1f' % d.weekly_hours }} h a week</span></div>
-      <div class="mix" role="img" aria-label="Easy {{ (d.mix.easy*100)|round|int }}%, middle {{ (d.mix.middle*100)|round|int }}%, hard {{ (d.mix.hard*100)|round|int }}%">
-        <span class="easy" style="flex: {{ d.mix.easy }}"></span>
-        <span class="middle" style="flex: {{ d.mix.middle }}"></span>
-        <span class="hard" style="flex: {{ d.mix.hard }}"></span>
+      <div class="mtop"><span class="mname">Intensity, last 4 weeks</span><span class="state none">{{ '%.1f' % d.weekly_hours }} h a week</span></div>
+      <div class="chart" style="grid-column:1 / -1">
+        <div class="mix" role="img" aria-label="Easy {{ (d.mix.easy*100)|round|int }}%, middle {{ (d.mix.middle*100)|round|int }}%, hard {{ (d.mix.hard*100)|round|int }}%">
+          <span class="easy" style="flex: {{ d.mix.easy }}"></span><span class="middle" style="flex: {{ d.mix.middle }}"></span><span class="hard" style="flex: {{ d.mix.hard }}"></span>
+        </div>
       </div>
       <p class="mdetail mixkey">
         <span><i class="k easy"></i>Easy {{ (d.mix.easy*100)|round|int }}%</span>
@@ -51,67 +161,42 @@
       </p>
     </div>
     {% endif %}
-
     {% if recent %}
     <div class="recent">
-      {% for a in recent %}
-      <div class="row"><span>{{ a.when }}</span><span>{{ a.what }}</span><span class="num">{{ a.stats }}</span></div>
-      {% endfor %}
+      {% for a in recent %}<div><span>{{ a.when }}</span><span>{{ a.what }}</span><span class="num">{{ a.stats }}</span></div>{% endfor %}
     </div>
     {% endif %}
   </div>
 
-  <div class="col">
-    <h2>Recovery <span>how you're absorbing it</span></h2>
+  <div>
+    <h2><b>Recovery</b>how you're absorbing it</h2>
     <div class="metric lead">
-      <div class="mhead"><span class="mname">Last night</span></div>
-      <div class="mrow"><span class="mval big {{ d.recovery.tone }}">{{ d.recovery.state }}</span></div>
+      <div class="mtop"><span class="mname">Last night</span></div>
+      <span class="mval {{ d.recovery.tone }}" style="grid-column:1 / -1">{{ d.recovery.state }}</span>
       <p class="mdetail">{{ d.recovery.detail }}</p>
     </div>
-    {% for m in [d.hrv, d.rhr] %}
-    <div class="metric">
-      <div class="mhead">
-        <span class="mname">{{ m.name }}</span>
-        <span class="state {{ m.tone }}">{{ m.state }}</span>
-      </div>
-      <div class="mrow">
-        <span class="mval">{{ m.value }}</span>
-        <div class="chart">{{ spark(m.series, band=m.band) | safe }}</div>
-      </div>
-      <p class="mdetail">{{ m.detail }}</p>
-    </div>
-    {% endfor %}
-    <div class="metric">
-      <div class="mhead"><span class="mname">Sleep, 14 nights</span>
-        <span class="state {{ d.sleep.tone }}">{{ d.sleep.state }}</span></div>
-      <div class="mrow">
-        <span class="mval">{{ d.sleep.value }}</span>
-        <div class="chart">{{ spark(d.sleep.series, bars=True) | safe }}</div>
-      </div>
-      <p class="mdetail">{{ d.sleep.detail }}</p>
-    </div>
+    {% for m in [d.hrv, d.rhr] %}{{ metric(m, band=True) }}{% endfor %}
+    {{ metric(d.sleep, bars=True) }}
   </div>
 </section>
 
-<section class="priority">
-  <h2>What matters most right now</h2>
-  <p class="pcall">{{ d.priority.headline }}</p>
-  <p class="pwhy">{{ d.priority.why }}</p>
-  <ul>{% for t in d.priority.this_week %}<li>{{ t }}</li>{% endfor %}</ul>
+<section class="band">
+  <h2>What matters most this week</h2>
+  <p class="call">{{ d.priority.headline }}</p>
+  <p class="callwhy">{{ d.priority.why }}</p>
+  <ul class="todo">{% for t in d.priority.this_week %}<li>{{ t }}</li>{% endfor %}</ul>
 </section>
 {% endif %}
 
-<section class="detail">
-  <h2>Today, in detail</h2>
-  <dl>
-    <dt>Why</dt><dd>{{ rx.why | join(' ') }}</dd>
-    {% if rx.compress %}<dt>Short on time</dt><dd>{{ rx.compress }}</dd>
-    <dt>Feeling strong</dt><dd>{{ rx.stretch }}</dd>{% endif %}
-    {% if rx.if_skip %}<dt>If you skip it</dt><dd>{{ rx.if_skip }}</dd>{% endif %}
-    {% if rx.if_overdo %}<dt>If you overdo it</dt><dd>{{ rx.if_overdo }}</dd>{% endif %}
-    <dt>Tonight</dt><dd>{{ rx.tonight }}</dd>
-    {% if rx.scenarios %}<dt>Tomorrow</dt><dd>{% for s in rx.scenarios %}<p>{{ s }}</p>{% endfor %}</dd>{% endif %}
-  </dl>
-  {% for n in rx.notes %}<p class="note">{{ n }}</p>{% endfor %}
+<section class="band next">
+  <div>
+    <h2>Tomorrow depends on today</h2>
+    {% for s in rx.scenarios %}<p>{{ s }}</p>{% endfor %}
+  </div>
+  <div>
+    <h2>Tonight</h2>
+    <p>{{ rx.tonight }}</p>
+    {% for n in rx.notes %}<p class="note">{{ n }}</p>{% endfor %}
+  </div>
 </section>
 {% endblock %}

@@ -23,10 +23,10 @@ HEADLINE = {
 }
 TOMORROW = {
     REST: "a rest day",
-    LIGHT: "a light day (walk only)",
+    LIGHT: "a walk-only day",
     EASY: "an easy day",
-    STEADY: "a steady day (no intervals)",
-    HARD: "a green day (long or hard)",
+    STEADY: "a steady day with no intervals",
+    HARD: "a green light for long or hard",
 }
 WALK_MPH = 3.3
 EARLY_BED = "In bed by 9:30 PM."
@@ -176,6 +176,11 @@ def build_rx(p: Profile, day: str | None = None) -> Rx:
         do = f"{LABEL[sport]}: 4 × 8 min hard at HR {z4lo}–{z4hi}, 75 minutes total."
         dont = f"Don't go above {ceiling}, even on the last rep. Don't add a fifth."
 
+    if sport in (BIKE, SKI) and verdict in (EASY, STEADY):
+        # Mountain riding and skinning are intermittent: climbs spike HR, descents drop it.
+        # The ceiling is about what you sustain, not a single beep on a punchy pitch.
+        dont += (f" On climbs, judge it on the last minute, not one beep: a spike past {ceiling} for under "
+                 f"30 seconds is fine. Stay above it for a minute and you're doing a harder day than this.")
     tonight = EARLY_BED if (rec.sleep.status in (RED, AMBER) or verdict in (REST, LIGHT, HARD)) \
         else "Normal bedtime. Aim for 8 hours in bed."
     rx = Rx(day, verdict, HEADLINE[verdict], why[:3], do, dont, tonight, sport,

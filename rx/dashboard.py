@@ -28,6 +28,7 @@ class Metric:
     detail: str
     series: list[float | None] = field(default_factory=list)
     band: tuple[float, float] | None = None   # your normal range, for the chart
+    say: str = ""        # what it means, in one sentence. Information, not data.
 
 
 @dataclass
@@ -103,9 +104,14 @@ def _load_metrics(p: Profile) -> tuple[Metric, Metric, Metric]:
         lstate, ltone = "Well below normal", "ok"
     else:
         lstate, ltone = "Normal", "good"
+    pct = f"{abs(ratio):.0f}%"
+    lsay = {"Well above normal": f"This week is {pct} over your usual load. Too much, too fast.",
+            "Above normal": f"You're carrying {pct} more load than usual this week.",
+            "Well below normal": f"You've trained {pct} less than usual this week.",
+            "Normal": "You're training at your usual load."}[lstate]
     load = Metric("Load", f"{y.atl:.0f}", lstate, ltone,
                   f"Last 7 days, {abs(ratio):.0f}% {'above' if ratio >= 0 else 'below'} your 6-week normal.",
-                  [d.atl for d in days])
+                  [d.atl for d in days], say=lsay)
 
     first = days[0].ctl
     ch = (y.ctl / first - 1) * 100 if first > 1 else 0.0
@@ -117,18 +123,23 @@ def _load_metrics(p: Profile) -> tuple[Metric, Metric, Metric]:
         fstate, ftone = "Holding", "ok"
     fitness = Metric("Fitness", f"{y.ctl:.0f}", fstate, ftone,
                      f"{'Up' if ch >= 0 else 'Down'} {abs(ch):.0f}% over the last 6 weeks.",
-                     [d.ctl for d in days])
+                     [d.ctl for d in days],
+                     say={"Building": f"Your fitness is climbing: up {abs(ch):.0f}% in 6 weeks.",
+                          "Slipping": f"You're losing fitness: down {abs(ch):.0f}% in 6 weeks.",
+                          "Holding": "Your fitness is flat over the last 6 weeks."}[fstate])
 
     r = y.tsb / y.ctl
     if r > 0.15:
-        sstate, stone, sd = "Fresh", "good", "Rested enough to go hard."
+        sstate, stone, ssay = "Fresh", "good", "You're fresh. A hard day would land well."
     elif r > -0.05:
-        sstate, stone, sd = "Neutral", "good", "Neither tired nor fresh."
+        sstate, stone, ssay = "Neutral", "good", "Not tired, not fresh. Good for steady work."
     elif r > -0.30:
-        sstate, stone, sd = "Training tired", "ok", "Productive fatigue. Fine for steady work, not for max efforts."
+        sstate, stone, ssay = "Training tired", "ok", "You're carrying productive fatigue. Steady work yes, max efforts no."
     else:
-        sstate, stone, sd = "Overreached", "bad", "More fatigue than your fitness can absorb. Back off."
-    fresh = Metric("Freshness", f"{y.tsb:+.0f}", sstate, stone, sd, [d.tsb for d in days])
+        sstate, stone, ssay = "Overreached", "bad", "You're overreached. Back off until this comes back."
+    fresh = Metric("Freshness", f"{y.tsb:+.0f}", sstate, stone,
+                   "Fitness minus fatigue. Below zero means you're carrying fatigue.",
+                   [d.tsb for d in days], say=ssay)
     return load, fitness, fresh
 
 
@@ -152,7 +163,11 @@ def _sleep(p: Profile, end: date) -> Metric:
         d = (statistics.mean(last7) - statistics.mean(prev7)) * 60
         if abs(d) >= 10:
             detail += f" {abs(d):.0f} min {'more' if d > 0 else 'less'} than the week before."
-    return Metric("Sleep", _fmt_hm(avg), state, tone, detail, hrs)
+    short = max(0, round((7.5 - avg) * 60))
+    say = ("You're sleeping enough." if tone == "good" else
+           f"You're {short} minutes a night under 7½ hours." if tone == "ok" else
+           f"You're short on sleep: {short} minutes a night under 7½ hours. It caps everything else.")
+    return Metric("Sleep", _fmt_hm(avg), state, tone, detail, hrs, say=say)
 
 
 def _vs_normal(p: Profile, attr: str, name: str, unit: str, higher_good: bool, end: date) -> Metric:
@@ -164,12 +179,21 @@ def _vs_normal(p: Profile, attr: str, name: str, unit: str, higher_good: bool, e
     mu, sd = statistics.mean(base), statistics.pstdev(base) or 1
     recent = statistics.mean([v for v in s[-7:] if v] or vals[-1:])
     z = (recent - mu) / sd * (1 if higher_good else -1)
-    tone = "good" if z > 0.3 else "bad" if z < -0.5 else "ok"
+    tone = "good" if z > 0.3 else "bad" if z < -0.5 else "none"
+    diff = abs(recent - mu)
+    if name == "HRV":
+        say = {"good": "HRV is above your normal. You're absorbing the training.",
+               "none": "HRV is in your normal range.",
+               "bad": f"HRV is {diff:.0f} ms below your normal. You're not fully absorbing the training."}[tone]
+    else:
+        say = {"good": "Resting HR is below your normal. A good sign.",
+               "none": "Resting HR is in your normal range.",
+               "bad": f"Resting HR is up {diff:.0f} bpm on your normal: fatigue, illness, heat or alcohol."}[tone]
     trend = "rising" if recent > mu + 0.3 * sd else "falling" if recent < mu - 0.3 * sd else "steady"
-    meaning = {"good": "a good sign", "ok": "normal", "bad": "a sign you're not absorbing training"}[tone]
     return Metric(name, f"{vals[-1]:.0f} {unit}", trend.capitalize(), tone,
-                  f"This week averages {recent:.0f} {unit} against your normal {mu:.0f}: {meaning}.",
-                  s, (mu - sd, mu + sd))
+                  f"Last night {vals[-1]:.0f} {unit}. This week averages {recent:.0f}; your normal is "
+                  f"{mu - sd:.0f}–{mu + sd:.0f} (shaded).",
+                  s, (mu - sd, mu + sd), say=say)
 
 
 def _mix(store: Store, p: Profile, end: date) -> tuple[dict[str, float], float]:
@@ -321,3 +345,51 @@ def ceiling_band(rx: Rx, p: Profile) -> str:
     parts.append(f'<text class="num muted" x="{w}" y="96" text-anchor="end">Max {int(p.max_bpm)}</text>')
     parts.append("</svg>")
     return "".join(parts)
+
+
+ZONE_SHORT = {"Z1 Recovery": "Recovery", "Z2 Aerobic": "Aerobic", "Z3 Tempo": "Tempo",
+              "Z4 Threshold": "Threshold", "Z5 Max": "Max"}
+
+
+def room(rx: Rx, p: Profile) -> str:
+    """Today's heart rate as a room: your zones as floors, today's band in ink,
+    and the ceiling drawn as the brand's orange line. Vertical, because a ceiling is above you."""
+    if rx.hr_ceiling is None or not p.zones:
+        return ""
+    c = rx.hr_ceiling
+    lo = rx.hr_low
+    top = int(p.max_bpm) + 4
+    floor = max(int(p.rest_hr) + 10, (lo if lo is not None else c - 30) - 22)
+    floor -= floor % 10
+    W, H, T, B = 400, 520, 34, 500          # T/B: y of top and bottom of the scale
+    X0, X1 = 58, 252                         # the column
+    Y = lambda v: B - (B - T) * (v - floor) / (top - floor)
+    o = [f'<svg class="room" viewBox="0 0 {W} {H}" role="img" '
+         f'aria-label="Heart rate {lo if lo is not None else floor} to {c}. Never above {c}. Your max is {int(p.max_bpm)}.">']
+    # zones as floors
+    for i, (name, zlo, zhi) in enumerate(p.zones.bounds):
+        a, b = max(zlo, floor), min(zhi + 1, top)
+        if b <= a:
+            continue
+        o.append(f'<rect class="z{i % 2}" x="{X0}" y="{Y(b):.1f}" width="{X1 - X0}" height="{Y(a) - Y(b):.1f}"/>')
+        o.append(f'<text class="zl" x="{X1 - 10}" y="{(Y(a) + Y(b)) / 2 + 5:.1f}" text-anchor="end">{ZONE_SHORT.get(name, name)}</text>')
+    # bpm ticks
+    for v in range(floor, top + 1, 10):
+        o.append(f'<text class="tick" x="{X0 - 12}" y="{Y(v) + 5:.1f}" text-anchor="end">{v}</text>')
+    # max
+    mx = int(p.max_bpm)
+    o.append(f'<line class="maxl" x1="{X0}" x2="{W}" y1="{Y(mx):.1f}" y2="{Y(mx):.1f}"/>')
+    o.append(f'<text class="side" x="{X1 + 14}" y="{Y(mx) - 8:.1f}">your max {mx}</text>')
+    # today's band
+    if lo is not None:
+        o.append(f'<rect class="band" x="{X0}" y="{Y(c):.1f}" width="{X1 - X0}" height="{Y(lo) - Y(c):.1f}"/>')
+        avg = round((lo + c) / 2)
+        o.append(f'<rect class="avg" x="{X0}" y="{Y(avg) - 1.5:.1f}" width="{X1 - X0}" height="3"/>')
+        o.append(f'<text class="side strong" x="{X1 + 14}" y="{Y(avg) + 6:.1f}">avg {avg}</text>')
+        o.append(f'<text class="side" x="{X1 + 14}" y="{Y(lo) + 6:.1f}">{lo}</text>')
+        o.append(f'<line class="lol" x1="{X1}" x2="{X1 + 8}" y1="{Y(lo):.1f}" y2="{Y(lo):.1f}"/>')
+    # the ceiling
+    o.append(f'<rect class="ceil" x="{X0 - 6}" y="{Y(c) - 3.5:.1f}" width="{W - X0 + 6}" height="7" rx="3.5"/>')
+    o.append(f'<text class="cnum" x="{W}" y="{Y(c) - 16:.1f}" text-anchor="end">{c}</text>')
+    o.append("</svg>")
+    return "".join(o)
