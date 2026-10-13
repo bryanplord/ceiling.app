@@ -419,9 +419,6 @@ def room(rx: Rx, p: Profile, hist=None, usual: float | None = None, mode: str = 
         y1, y2 = Y(zb), Y(za)
         o.append(f'<rect class="zf z{i + 1}" x="{L0}" y="{y1:.1f}" width="{L1 - L0}" height="{y2 - y1:.1f}"/>')
         o.append(f'<rect class="zs z{i + 1}" x="{L1 - 4}" y="{y1:.1f}" width="4" height="{max(1, y2 - y1 - 1):.1f}"/>')
-        la_, lb = max(za, band_lo), min(zb, c + 1)
-        if lb > la_:
-            o.append(f'<rect class="zon z{i + 1}" x="{L0}" y="{Y(lb):.1f}" width="{L1 - L0}" height="{Y(la_) - Y(lb):.1f}"/>')
         ya, yb2 = Y(max(za, knee)), Y(zb)
         if ya - yb2 >= 16:
             o.append(f'<text class="zn" x="{L0 + 14}" y="{(ya + yb2) / 2 + 5:.1f}">{ZONE_SHORT.get(name, name)}</text>')
@@ -467,6 +464,9 @@ def room(rx: Rx, p: Profile, hist=None, usual: float | None = None, mode: str = 
         o.append(f'<path class="hl" d="{line}"/>')
         o.append(f'<text class="small" x="{R0}" y="{B + 18}">where you trained, last 4 weeks</text>')
         o.append(f'<text class="small" x="{L0}" y="{B + 18}">your zones</text>')
+
+    # today's range: one outline across both sides, so a zone never looks like two
+    o.append(f'<rect class="xout" x="0.75" y="{yt:.1f}" width="{W - 1.5}" height="{yb - yt:.1f}" rx="8"/>')
 
     # today's label, right side of the band
     mid = (yt + yb) / 2
