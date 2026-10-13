@@ -90,6 +90,7 @@
   <a href="/" aria-label="Today">{% include "_wordmark.html" %}</a>
   <nav>
     <a href="/" class="{{ 'on' if active=='today' }}">Today</a>
+    <a href="/plan" class="{{ 'on' if active=='plan' }}">Plan</a>
     <a href="/calendar" class="{{ 'on' if active=='calendar' }}">Calendar</a>
     <a href="/workouts" class="{{ 'on' if active=='workouts' }}">Workouts</a>
     <a href="/trends" class="{{ 'on' if active=='trends' }}">Trends</a>
@@ -103,6 +104,6 @@
   </nav>
 </header>
 {% endblock %}
-<main class="{{ 'narrow' if active not in ('today', 'login', 'calendar', 'workouts') }}">{% block body %}{% endblock %}</main>
+<main class="{{ 'narrow' if active not in ('today', 'login', 'calendar', 'workouts', 'plan') }}">{% block body %}{% endblock %}</main>
 </body>
 </html>

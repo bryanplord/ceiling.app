@@ -34,6 +34,7 @@ class PlanDay:
     was: str = ""       # the verdict yesterday's plan had for this day, if it changed
     was_title: str = ""
     options: str = ""   # other ways to do it
+    phase: str = ""     # the goal programme's phase that week
     because: str = ""
 
 
@@ -75,9 +76,9 @@ def _runs30(p: Profile, d: str) -> int:
 
 
 def _pick(p: Profile, v: str, d: str, planned: dict, avoid: str | None,
-          ban: set | None = None) -> tuple[str, str | None, str]:
+          ban: set | None = None, prefer: str | None = None) -> tuple[str, str | None, str]:
     try:
-        sport, kind, _, _ = eng.choose_activity(v, p, d, planned, avoid, ban)
+        sport, kind, _, _ = eng.choose_activity(v, p, d, planned, avoid, ban, prefer)
     except Exception:
         return eng.BIKE, None, "session"
     noun = eng.NOUN.get(kind or "", None) or {eng.BIKE: "ride", eng.RUN: "run", eng.SKI: "ski tour", WALK: "walk"}.get(sport, "session")
@@ -122,21 +123,40 @@ def build(p: Profile, rx: Rx) -> Plan:
     new_runner = _runs30(p, rx.date) < 6
     last_run = rx.date if rx.sport == eng.RUN and rx.verdict not in (REST, LIGHT) else None
     d0 = date.fromisoformat(rx.date)
+    from .. import goals as gl
+    prog = getattr(p, "program", None)
+    days[0].phase = (gl.daily(prog, d0) or {}).get("phase", "")
     for k in range(1, n):
         d = (d0 + timedelta(days=k)).isoformat()
+        dd = d0 + timedelta(days=k)
         v, _ = eng.decide(eng.Inputs(good, state, loads[-2:]))
         reason = ""
+        gday = gl.daily(prog, dd)
         recent_hard = [h for h in hard_days if (date.fromisoformat(d) - date.fromisoformat(h)).days < 7]
         if v == HARD and len(recent_hard) >= 2:
             v, reason = STEADY, "Two hard days already this week."
-        if (d0 + timedelta(days=k)).weekday() in rest_wd and v != REST:
+        if gday and v == HARD:
+            mon = (dd - timedelta(days=dd.weekday())).isoformat()
+            if sum(1 for h in hard_days if h >= mon) >= gday["hard_days"]:
+                v, reason = STEADY, f"{gday['phase']} week: {gday['hard_days']} hard day{'s' if gday['hard_days'] != 1 else ''}."
+        if (d0 + timedelta(days=k)).weekday() in rest_wd and v != REST and not (gday and gday.get("long_minutes")):
             v, reason = REST, f"You almost never train on {(d0 + timedelta(days=k)).strftime('%A')}s."
+        gsport = (gday or {}).get("sport") or None
+        if gday and gday.get("long_minutes") and v in (HARD,):
+            v = STEADY
         ban = set()
         if new_runner and (v in (STEADY, HARD) or (last_run and (date.fromisoformat(d) - date.fromisoformat(last_run)).days < 2)):
             ban = set(RUNS)
         if last_kind in RUNS:
             ban |= RUNS
-        sport, kind, noun = _pick(p, v, d, planned, last_kind, ban) if v not in (REST, LIGHT) else (WALK, "walk", "walk")
+        if gsport == eng.RUN and v == EASY and last_kind not in RUNS:
+            ban -= RUNS                                  # the goal is a run: easy runs are the plan
+        long_m = (gday or {}).get("long_minutes") if v in (EASY, STEADY) else None
+        if long_m and gsport:
+            ban -= RUNS if gsport == eng.RUN else set()
+        sport, kind, noun = _pick(p, v, d, planned, last_kind, ban, gsport) if v not in (REST, LIGHT) else (WALK, "walk", "walk")
+        if long_m and gsport and sport != gsport:
+            sport, kind, noun = gsport, None, {eng.RUN: "run", eng.BIKE: "ride", eng.SKI: "ski tour"}.get(gsport, "session")
         if sport == eng.RUN:
             last_run = d
         detail, load = eng._session(p, v, d, noun)
@@ -147,7 +167,21 @@ def build(p: Profile, rx: Rx) -> Plan:
             hard_days.append(d)
         conf = "Likely" if k == 1 else "Probable" if k <= 3 else "Sketch"
         detail = detail[:1].upper() + detail[1:] + "."
-        pd = PlanDay(d, v, _title(p, v, d, n=noun), detail, conf, reason, load)
+        if long_m:
+            lo_e, hi_e = eng.easy_band(p.zones)
+            load = eng._est_load(p, long_m, (lo_e + hi_e) / 2)
+            title = f"Long {noun}, {long_m} minutes easy at {round((lo_e + hi_e) / 2)} ({lo_e}–{hi_e})"
+            detail = (f"The week's long {noun}: {long_m} minutes, easy the whole way, {lo_e}–{hi_e}. "
+                      f"Fuel every 45 minutes. This is the session that builds you for the goal.")
+            reason = reason or f"{gday['phase']} week: long {noun}."
+        elif gday and gday.get("race_day"):
+            title, detail = "Race day", "Race day. Easy warm-up, start slower than you want to, and enjoy it."
+        else:
+            title = _title(p, v, d, n=noun)
+        if gday and gday["phase"] == "Taper" and not long_m:
+            reason = reason or "Taper: same intensity, less volume."
+        pd = PlanDay(d, v, title, detail, conf, reason, load)
+        pd.phase = (gday or {}).get("phase", "")
         if v not in (REST, LIGHT):
             from types import SimpleNamespace
             if v == HARD:

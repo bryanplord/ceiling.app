@@ -336,6 +336,53 @@ def today(request: Request, d: str | None = None):
                  day_label=when.strftime("%A, %B %-d"))
 
 
+@app.get("/plan", response_class=HTMLResponse)
+def plan_goal(request: Request):
+    from .. import goals as gl
+    store = open_store()
+    p, rx = today_rx(store)
+    prog = getattr(p, "program", None)
+    mon = (local_today() - timedelta(days=local_today().weekday())).isoformat()
+    done = sum((a.moving_s or 0) for a in p.activities if a.date >= mon and a.sport != "walk") / 3600
+    return _page(request, "plan.html", prog=prog, canned=gl.CANNED, date=date, done_h=round(done, 1))
+
+
+@app.post("/plan")
+async def plan_goal_save(request: Request):
+    from .. import goals as gl
+    form = parse_qs((await request.body()).decode())
+    f = {k: (v[0] if v else "").strip() for k, v in form.items()}
+    today = local_today()
+    def num(x):
+        try:
+            return float(x)
+        except (TypeError, ValueError):
+            return None
+    if f.get("text"):
+        g = gl.parse_text(f["text"], today, num(f.get("w_now")))
+    else:
+        c = next((c for c in gl.CANNED if c["id"] == f.get("canned")), gl.CANNED[0])
+        g = gl.Goal(c["kind"], event=c.get("event", ""), sport=gl.EVENT_SPORT.get(c.get("event", ""), ""),
+                    target=f.get("target", ""), created=today.isoformat(),
+                    target_date=(today + timedelta(weeks=c["weeks"])).isoformat() if c.get("weeks") else None)
+    if f.get("date"):
+        g.target_date = f["date"]
+    if f.get("target"):
+        g.target = f["target"]
+    if g.kind == "weight":
+        g.start_weight = num(f.get("w_now")) or g.start_weight
+        g.target_weight = num(f.get("w_target")) or g.target_weight
+    gl.save(open_store(), g)
+    return RedirectResponse("/plan", status_code=303)
+
+
+@app.post("/plan/clear")
+def plan_goal_clear():
+    from .. import goals as gl
+    gl.clear(open_store())
+    return RedirectResponse("/plan", status_code=303)
+
+
 @app.get("/calendar/history", response_class=HTMLResponse)
 def history_page(request: Request, m: str | None = None):
     from .. import history as histmod

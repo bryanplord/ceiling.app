@@ -158,3 +158,22 @@ def test_brochure_is_public(tmp_path, monkeypatch):
                headers={"Content-Type": "application/x-www-form-urlencoded"}, follow_redirects=False)
     assert r.status_code == 303
     assert c.get("/calendar", follow_redirects=False).status_code == 303   # app pages stay private
+
+
+def test_goal_builder(tmp_path, monkeypatch):
+    monkeypatch.setenv("RX_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("RX_OPEN", "1")
+    monkeypatch.delenv("INTERVALS_API_KEY", raising=False)
+    demo.seed(Store(tmp_path / "rx.db"), days=90, end=date.today())
+    from rx.web.app import app
+    c = TestClient(app)
+    form = {"Content-Type": "application/x-www-form-urlencoded"}
+    assert "What are you training for?" in c.get("/plan").text
+    c.post("/plan", content="text=run+a+marathon+in+May", headers=form)
+    page = c.get("/plan").text
+    assert "Marathon on May" in page and "Base" in page and "days to go" in page
+    assert c.get("/calendar").status_code == 200 and c.get("/").status_code == 200
+    c.post("/plan/clear", headers=form)
+    c.post("/plan", content="canned=weight&w_now=181&w_target=170&date=" + (date.today().replace(year=date.today().year + 1)).isoformat(), headers=form)
+    page = c.get("/plan").text
+    assert "181 lb to 170 lb" in page and "Protein" in page

@@ -33,7 +33,8 @@ class Profile:
     response: resp.Response
     progress: prog.Progress
     typical_minutes: dict[str, float] = field(default_factory=dict)
-    hr_hist: dict = field(default_factory=dict)   # activity id -> seconds at each bpm (30-s smoothed), last 150 days
+    hr_hist: dict = field(default_factory=dict)
+    program: object = None                   # the goal programme, attached by the service   # activity id -> seconds at each bpm (30-s smoothed), last 150 days
     sport_mix: list[str] = field(default_factory=list)  # most → least common, last 28 days
 
     @property

@@ -63,6 +63,7 @@ class Rx:
     options: list = field(default_factory=list)     # other ways to do today: (title, note, tone)
     options_short: str = ""
     tomorrow_short: str = ""
+    goal_note: str = ""
     why_need: str = ""
     why_story: str = ""
     how_short: str = ""
@@ -184,10 +185,35 @@ def build_rx(p: Profile, day: str | None = None) -> Rx:
     ran_yday = any(a.sport == RUN and a.date == (date.fromisoformat(day) - timedelta(days=1)).isoformat() for a in p.activities)
     # Not a regular runner: running only on easy days, never two days running.
     ban = {"run", "trail run"} if runs30 < 6 and (verdict in (STEADY, HARD) or ran_yday) else None
-    sport, chosen_kind, sport_reason, cap_mins = choose_activity(verdict, p, day, ban=ban)
+    # The programme (your goal): phase, hard days allowed this week, the long session, the goal sport.
+    from .. import goals as gl
+    gday = gl.daily(getattr(p, "program", None), date.fromisoformat(day))
+    goal_note = ""
+    if gday:
+        z_ = p.zones
+        if verdict == HARD and z_:
+            mon = (date.fromisoformat(day) - timedelta(days=date.fromisoformat(day).weekday())).isoformat()
+            hard_done = sum(1 for a in p.activities if mon <= a.date < day and a.avg_hr
+                            and a.avg_hr >= z_.bottom("Z3 Tempo") and (a.moving_s or 0) >= 30 * 60)
+            if hard_done >= gday["hard_days"]:
+                verdict = STEADY
+                goal_note = (f"{gday['phase']} week: {gday['hard_days']} hard "
+                             f"day{'s' if gday['hard_days'] != 1 else ''} a week, and you've had it.")
+        if gday["phase"] == "Taper" and verdict == HARD:
+            goal_note = "Taper: keep the intensity, cut the volume."
+    goal_sport = gday.get("sport") if gday else ""
+    if goal_sport == RUN and ban and verdict != HARD and not ran_yday:
+        ban = None                                   # the goal is a run: easy and steady runs are the plan
+    sport, chosen_kind, sport_reason, cap_mins = choose_activity(verdict, p, day, ban=ban,
+                                                                 prefer=goal_sport or None)
     mins = _round5(_minutes(verdict, sport, p) * (sb.volume if verdict not in (REST, LIGHT) else 1.0))
     if cap_mins:
         mins = min(mins, cap_mins)
+    if gday and gday.get("long_minutes") and verdict in (EASY, STEADY) and (not goal_sport or sport == goal_sport):
+        mins = gday["long_minutes"]
+        goal_note = f"Long {LABEL[sport].lower()} day: {mins} minutes, easy the whole way. This is the session that builds you for the {getattr(p.program.goal, 'event', '') or 'goal'}."
+    if gday and gday["phase"] == "Taper":
+        mins = _round5(mins * 0.6)
     diag = diagnosis(verdict, p, day, reading, sb)
 
     if not p.ready:
@@ -266,6 +292,7 @@ def build_rx(p: Profile, day: str | None = None) -> Rx:
     rx.why_title, rx.why_tone, rx.why_says = why_lead(verdict, p, day, reading)
     rx.why_need, rx.why_story = why_story(verdict, p, day, sb, reading)
     rx.what, rx.how = what_how(rx, kind, mins, low, ceiling, steps)
+    rx.goal_note = goal_note
     rx.minimum = minimum_dose(p, rx, kind)
     rx.options = alternatives(p, rx, kind)
     try:
@@ -799,7 +826,8 @@ CONTROLLED = {"road ride", "gravel ride", "trainer ride", "run", "hike"}   # eas
 
 
 def choose_activity(verdict: str, p: Profile, day: str, planned: dict | None = None,
-                    avoid: str | None = None, ban: set | None = None) -> tuple[str, str | None, str, int | None]:
+                    avoid: str | None = None, ban: set | None = None,
+                    prefer: str | None = None) -> tuple[str, str | None, str, int | None]:
     """Which activity, and why that one. Returns (sport, kind, reason, max minutes or None).
 
     First rule: it has to actually put YOUR heart in today's range. That's judged from your own
@@ -847,7 +875,8 @@ def choose_activity(verdict: str, p: Profile, day: str, planned: dict | None = N
         hot = ov is not None and ov > (0.3 if verdict == EASY else 0.4)
         score = ((4 if fits else 1.5 if reach else -10) + 3 * habit + 1 * (1 - share) - (6 if hot else 0)
                  + (1 if k in CONTROLLED and verdict == EASY else 0)
-                 - (1.5 if k == avoid else 0) - (1.5 if new_run else 0))
+                 - (1.5 if k == avoid else 0) - (1.5 if new_run and prefer != RUN else 0)
+                 + (3 if prefer and SPORT_OF.get(k) == prefer else 0))
         notes[k] = (fits, reach, hr, st, share)
         if score > best_score:
             best, best_score = k, score

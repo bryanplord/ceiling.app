@@ -62,7 +62,7 @@ def data_version(store: Store) -> tuple:
     # pull runs every 10 minutes and must not throw away every cached page when nothing changed.
     since = (local_today() - timedelta(days=3)).isoformat()
     recent = tuple((w.date, w.hrv, w.rhr, w.sleep_score, w.sleep_secs) for w in store.wellness(since))
-    return (store.owner, c["activities"], c["streams"], c["wellness"], hash(recent))
+    return (store.owner, c["activities"], c["streams"], c["wellness"], hash(recent), store.get_meta("goal") or "")
 
 
 def today_rx(store: Store, day: str | None = None):
@@ -74,6 +74,13 @@ def today_rx(store: Store, day: str | None = None):
         hit = _built.get(key)
         if hit is None:
             p = prof.build(store, day)
+            try:
+                from . import goals as _gl
+                from datetime import date as _date
+                g = _gl.load(store)
+                p.program = _gl.build(p, g, _date.fromisoformat(day)) if g else None
+            except Exception as e:
+                print(f"goal failed: {e}")
             hit = (p, build_rx(p, day))
             while len(_built) > 120:                 # drop the oldest, never everything at once
                 _built.pop(next(iter(_built)))
