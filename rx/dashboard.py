@@ -444,18 +444,30 @@ def room(rx: Rx, p: Profile, hist=None, usual: float | None = None, mode: str = 
     o.append(f'<line class="ref" x1="0" x2="{W}" y1="{Y(rest):.1f}" y2="{Y(rest):.1f}"/>')
     o.append(f'<text class="reft" x="{W}" y="{Y(rest) - 6:.1f}" text-anchor="end">resting {rest}</text>')
 
-    # RIGHT: where you trained, bars per 2 bpm, colored by zone
+    # RIGHT: where you trained, a smooth curve colored by zone, full color inside today's band
     if hist is not None and hist.sum() > 0:
-        bins = [(v, float(hist[v:v + 2].sum())) for v in range(max(floor, knee), top, 2) if v < len(hist)]
-        peak = max(x for _, x in bins) or 1.0
+        import numpy as _np
+        v0, v1 = max(floor, knee), min(mx + 1, len(hist))
+        k = _np.exp(-0.5 * (_np.arange(-8, 9) / 2.5) ** 2)
+        dens = _np.convolve(_np.asarray(hist, float), k / k.sum(), mode="same")
         span = (R1 - R0) * 0.62
-        for v, x in bins:
-            if x <= 0:
-                continue
-            y1, y2 = Y(v + 2), Y(v)
-            inside = band_lo <= v + 1 <= c
-            o.append(f'<rect class="hb z{zone_of(v + 1)}{" in" if inside else ""}" x="{R0}" y="{y1 + 0.6:.1f}" '
-                     f'width="{max(1.5, span * x / peak):.1f}" height="{max(1.0, y2 - y1 - 1.2):.1f}" rx="1"/>')
+        peak = float(dens[v0:v1].max()) or 1.0
+        X = lambda v: R0 + span * float(dens[min(max(int(v), 0), len(dens) - 1)]) / peak
+
+        def area(a_, b_, cls):
+            if b_ <= a_:
+                return
+            pts = [(X(v), Y(v)) for v in range(a_, b_ + 1)]
+            d = f"M{R0},{Y(a_):.1f} " + " ".join(f"L{x:.1f},{y:.1f}" for x, y in pts) + f" L{R0},{Y(b_):.1f}Z"
+            o.append(f'<path class="{cls}" d="{d}"/>')
+
+        for i, (_, zlo, zhi) in enumerate(p.zones.bounds):
+            za = v0 if i == 0 else max(zlo, v0)
+            zb = (v1 - 1) if i == len(p.zones.bounds) - 1 else min(zhi + 1, v1 - 1)
+            area(za, zb, f"hc z{i + 1}")
+            area(max(za, band_lo), min(zb, c + 1), f"hc in z{i + 1}")
+        line = " ".join(f"{'M' if v == v0 else 'L'}{X(v):.1f},{Y(v):.1f}" for v in range(v0, v1))
+        o.append(f'<path class="hl" d="{line}"/>')
         o.append(f'<text class="small" x="{R0}" y="{B + 18}">where you trained, last 4 weeks</text>')
         o.append(f'<text class="small" x="{L0}" y="{B + 18}">your zones</text>')
 
