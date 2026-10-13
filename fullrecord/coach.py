@@ -32,7 +32,8 @@ FORMAT = """Reply with one JSON object and nothing else, in a ```json block, wit
   "tests": a list of {"assumption", "test": the session that tests it, "when"}
   "sources": a list of {"claim", "basis": "record" or "general", "evidence": dates and numbers from the record, or the general principle}
 Every sentence is a full English sentence. Use US units throughout: miles, feet, minutes per mile,
-miles per hour and feet climbed per hour, never kilometres or metres."""
+miles per hour and feet climbed per hour, never kilometres or metres. Write times of day in
+12-hour form, such as 10:30 PM."""
 
 
 def configured() -> str | None:
