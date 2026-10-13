@@ -32,6 +32,8 @@ class PlanDay:
     reason: str = ""
     load: float = 0.0
     was: str = ""       # the verdict yesterday's plan had for this day, if it changed
+    was_title: str = ""
+    options: str = ""   # other ways to do it
     because: str = ""
 
 
@@ -64,9 +66,18 @@ def _horizon(rx: Rx) -> tuple[int, str]:
     return 8, "You're recovered, so we can see about a week ahead."
 
 
-def _pick(p: Profile, v: str, d: str, planned: dict, avoid: str | None) -> tuple[str, str | None, str]:
+RUNS = {"run", "trail run"}
+
+
+def _runs30(p: Profile, d: str) -> int:
+    cut = (date.fromisoformat(d) - timedelta(days=30)).isoformat()
+    return sum(1 for a in p.activities if a.sport == eng.RUN and cut <= a.date < d)
+
+
+def _pick(p: Profile, v: str, d: str, planned: dict, avoid: str | None,
+          ban: set | None = None) -> tuple[str, str | None, str]:
     try:
-        sport, kind, _, _ = eng.choose_activity(v, p, d, planned, avoid)
+        sport, kind, _, _ = eng.choose_activity(v, p, d, planned, avoid, ban)
     except Exception:
         return eng.BIKE, None, "session"
     noun = eng.NOUN.get(kind or "", None) or {eng.BIKE: "ride", eng.RUN: "run", eng.SKI: "ski tour", WALK: "walk"}.get(sport, "session")
@@ -105,7 +116,11 @@ def build(p: Profile, rx: Rx) -> Plan:
     loads = [p.yesterday.load, today_load]
     hard_days = [rx.date] if rx.verdict == HARD else []
     planned = {rx.sport: (rx.max_minutes or 60) / 60} if rx.verdict not in (REST, LIGHT) else {}
-    last_kind = None
+    last_kind = rx.sport if rx.sport == eng.RUN else None
+    # Running is the one sport that punishes a jump in volume (bones and tendons adapt slower than
+    # heart and lungs). If you haven't been running, at most one run every other day, short and easy.
+    new_runner = _runs30(p, rx.date) < 6
+    last_run = rx.date if rx.sport == eng.RUN and rx.verdict not in (REST, LIGHT) else None
     d0 = date.fromisoformat(rx.date)
     for k in range(1, n):
         d = (d0 + timedelta(days=k)).isoformat()
@@ -116,16 +131,38 @@ def build(p: Profile, rx: Rx) -> Plan:
             v, reason = STEADY, "Two hard days already this week."
         if (d0 + timedelta(days=k)).weekday() in rest_wd and v != REST:
             v, reason = REST, f"You rarely train on {(d0 + timedelta(days=k)).strftime('%A')}s."
-        sport, kind, noun = _pick(p, v, d, planned, last_kind) if v not in (REST, LIGHT) else (WALK, "walk", "walk")
+        ban = set()
+        if new_runner and (v in (STEADY, HARD) or (last_run and (date.fromisoformat(d) - date.fromisoformat(last_run)).days < 2)):
+            ban = set(RUNS)
+        if last_kind in RUNS:
+            ban |= RUNS
+        sport, kind, noun = _pick(p, v, d, planned, last_kind, ban) if v not in (REST, LIGHT) else (WALK, "walk", "walk")
+        if sport == eng.RUN:
+            last_run = d
         detail, load = eng._session(p, v, d, noun)
         if v not in (REST, LIGHT):
             planned[sport] = planned.get(sport, 0.0) + {HARD: 1.25, STEADY: 1.5, EASY: 1.0}[v]
-        last_kind = kind
+        last_kind = kind if kind else (sport if sport == eng.RUN else None)
         if v == HARD:
             hard_days.append(d)
         conf = "Likely" if k == 1 else "Probable" if k <= 3 else "Sketch"
         detail = detail[:1].upper() + detail[1:] + "."
-        days.append(PlanDay(d, v, _title(p, v, d, n=noun), detail, conf, reason, load))
+        pd = PlanDay(d, v, _title(p, v, d, n=noun), detail, conf, reason, load)
+        if v not in (REST, LIGHT):
+            from types import SimpleNamespace
+            if v == HARD:
+                lo_, hi_ = p.zones.bottom("Z4 Threshold"), p.zones.top("Z4 Threshold") + 3
+            elif v == STEADY:
+                lo_, hi_ = p.zones.bottom("Z2 Aerobic"), p.zones.top("Z2 Aerobic")
+            else:
+                lo_, hi_ = eng.easy_band(p.zones)
+            shim = SimpleNamespace(verdict=v, hr_low=lo_, hr_ceiling=hi_, date=d,
+                                   max_minutes={HARD: 75, STEADY: 90, EASY: 60}[v])
+            alts = [o for o in eng.alternatives(p, shim, kind) if not (o[3].endswith("run") and ban & RUNS)]
+            if alts:
+                names = [o[3] for o in alts[:2]]
+                pd.options = "Or " + " or ".join(names) + "."
+        days.append(pd)
         state = la.step(state, load, d)
         loads.append(load)
     note = (f"Planned {n} days out. {why} It assumes you sleep normally and do what's planned; "
@@ -199,11 +236,13 @@ def adjust(p: Profile, rx: Rx, plan: Plan, prev: Plan) -> list[PlanDay]:
     """Mark every day whose plan changed since yesterday, and say why."""
     from .engine import ORDER
     was = {d.date: d.verdict for d in prev.days if not d.reason.startswith("You rarely")}
+    was_t = {d.date: d.title for d in prev.days}
     why = causes(p, rx, prev)
     changed, first = [], True
     for d in plan.days:
         if d.date in was and was[d.date] != d.verdict:
             d.was = was[d.date]
+            d.was_title = was_t.get(d.date, "")
             up = 1 if ORDER.index(d.verdict) > ORDER.index(d.was) else -1
             d.because = explain(up, why, rx) if first else "Knock-on from the change above."
             first = False

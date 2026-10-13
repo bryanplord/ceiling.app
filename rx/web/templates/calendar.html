@@ -25,6 +25,13 @@
   .v-steady { background:#46b07f; } .v-hard { background:#ec9550; }
   .day .kind s.was { color:var(--lichen); font-weight:500; margin-left:6px; }
   .day .why.chg { color:var(--ink); }
+  .was-card { margin-top:16px; padding-top:12px; border-top:1px dashed var(--rule); filter:grayscale(1); color:var(--lichen); }
+  .was-card .wl { display:block; font-size:12px; font-weight:600; }
+  .was-card .vbar { opacity:.5; margin:8px 0 8px; height:4px; }
+  .was-card .kind { color:var(--lichen); }
+  .was-card .ttl { color:var(--lichen); font-size:14px; }
+  .was-card .why { color:var(--lichen); }
+  .opts { font-size:13px; color:var(--lichen); margin:6px 0 0; }
   .rowh { color:var(--ink); font-size:20px; margin:56px 0 4px; }
   .rowsub { color:var(--lichen); margin:0; }
   .week.past .day { min-height:0; }
@@ -73,13 +80,15 @@
     <div class="dh"><span class="wd">{{ hd.strftime('%a') }}</span><span class="dn">{{ hd.day }}</span>
       <span class="vbar v-{{ h.now }}"></span></div>
     <div class="db">
-      <span class="kind">{{ K[h.now] }}{% if h.changed %} <s class="was">{{ K[h.was] }}</s>{% endif %}</span>
+      <span class="kind">{{ K[h.now] }}</span>
       <p class="ttl">{{ h.what }}</p>
-      {% if h.changed %}<p class="why chg">Changed: {{ h.why }}</p>{% endif %}
       <p class="did">{% if h.did %}{% for x in h.did %}{{ x }}<br>{% endfor %}{% else %}Nothing recorded{% endif %}</p>
       <span class="chip t-{{ h.work_tone }}">{{ h.work }}</span>
       {% if h.rec %}<p class="rec t-{{ h.rec_tone }}">{{ h.rec }}</p>{% endif %}
       {% if h.head %}<p class="head">{{ h.head }}</p>{% endif %}
+      {% if h.changed %}<div class="was-card"><span class="wl">Planned the day before</span>
+        <span class="vbar v-{{ h.was }}"></span><span class="kind">{{ K[h.was] }}</span>
+        {% if h.was_title %}<p class="ttl">{{ h.was_title }}</p>{% endif %}<p class="why">{{ h.why }}</p></div>{% endif %}
     </div>
   </div>
 {% endfor %}
@@ -94,11 +103,16 @@
     <div class="dh"><span class="wd">{{ 'Today' if d.confidence == 'Today' else dd.strftime('%a') }}</span>
       <span class="dn">{{ dd.day }}</span><span class="vbar v-{{ d.verdict }}"></span></div>
     <div class="db">{% set kind = {'rest':'Day off','light':'Walk','easy':'Easy','steady':'Steady','hard':'Hard'}[d.verdict] %}
-      <span class="kind">{{ kind }}{% if d.was %} <s class="was">{{ {'rest':'Day off','light':'Walk','easy':'Easy','steady':'Steady','hard':'Hard'}[d.was] }}</s>{% endif %}</span>
+      <span class="kind">{{ kind }}</span>
       {% if d.title != kind %}<p class="ttl">{{ d.title }}</p>{% endif %}
-      {% if d.because %}<p class="why chg">Changed: {{ d.because }}</p>
-      {% elif d.reason and d.confidence != 'Today' %}<p class="why">{{ d.reason }}</p>{% endif %}
+      {% if d.options %}<p class="opts">{{ d.options }}</p>{% endif %}
+      {% if d.reason and not d.because and d.confidence != 'Today' %}<p class="why">{{ d.reason }}</p>{% endif %}
       {% if d.verdict != 'rest' %}<details><summary>Details</summary><p>{{ d.detail }}</p></details>{% endif %}
+      {% if d.was %}<div class="was-card"><span class="wl">Yesterday's plan</span>
+        <span class="vbar v-{{ d.was }}"></span>
+        <span class="kind">{{ {'rest':'Day off','light':'Walk','easy':'Easy','steady':'Steady','hard':'Hard'}[d.was] }}</span>
+        {% if d.was_title and d.was_title != {'rest':'Day off','light':'Walk','easy':'Easy','steady':'Steady','hard':'Hard'}[d.was] %}<p class="ttl">{{ d.was_title }}</p>{% endif %}
+        <p class="why">{{ d.because }}</p></div>{% endif %}
       <span class="conf">{{ d.confidence }}</span></div>
   </div>
 {% endfor %}

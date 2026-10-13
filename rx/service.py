@@ -132,14 +132,14 @@ def plan_history(store: Store, days: int = 7):
         except Exception:
             continue
         row = {"date": d, "now": rx.verdict, "what": (rx.what or rx.headline).rstrip("."), "changed": False,
-               "was": None, "why": ""}
+               "was": None, "was_title": "", "why": ""}
         try:
             py, rxy = today_rx(store, y)
             prev = planmod.build(py, rxy)
             planned = next((x for x in prev.days if x.date == d), None)
             if planned and not planned.reason.startswith("You rarely") and planned.verdict != rx.verdict:
                 up = 1 if ORDER.index(rx.verdict) > ORDER.index(planned.verdict) else -1
-                row.update(changed=True, was=planned.verdict, why=planmod.explain(up, planmod.causes(p, rx, prev), rx))
+                row.update(changed=True, was=planned.verdict, was_title=planned.title, why=planmod.explain(up, planmod.causes(p, rx, prev), rx))
         except Exception:
             pass
         # what you did

@@ -168,7 +168,12 @@ def build_rx(p: Profile, day: str | None = None) -> Rx:
     verdict = cap_verdict(verdict, sb.cap)
     if sb.state in ("owed", "debt", "deep_debt") or verdict != before or sb.no_technical:
         why.insert(1, sb.says)
-    sport, chosen_kind, sport_reason, cap_mins = choose_activity(verdict, p, day)
+    cut30 = (date.fromisoformat(day) - timedelta(days=30)).isoformat()
+    runs30 = sum(1 for a in p.activities if a.sport == RUN and cut30 <= a.date < day)
+    ran_yday = any(a.sport == RUN and a.date == (date.fromisoformat(day) - timedelta(days=1)).isoformat() for a in p.activities)
+    # Not a regular runner: running only on easy days, never two days running.
+    ban = {"run", "trail run"} if runs30 < 6 and (verdict in (STEADY, HARD) or ran_yday) else None
+    sport, chosen_kind, sport_reason, cap_mins = choose_activity(verdict, p, day, ban=ban)
     mins = _round5(_minutes(verdict, sport, p) * (sb.volume if verdict not in (REST, LIGHT) else 1.0))
     if cap_mins:
         mins = min(mins, cap_mins)
@@ -723,7 +728,7 @@ CONTROLLED = {"road ride", "gravel ride", "trainer ride", "run", "hike"}   # eas
 
 
 def choose_activity(verdict: str, p: Profile, day: str, planned: dict | None = None,
-                    avoid: str | None = None) -> tuple[str, str | None, str, int | None]:
+                    avoid: str | None = None, ban: set | None = None) -> tuple[str, str | None, str, int | None]:
     """Which activity, and why that one. Returns (sport, kind, reason, max minutes or None).
 
     First rule: it has to actually put YOUR heart in today's range. That's judged from your own
@@ -740,7 +745,7 @@ def choose_activity(verdict: str, p: Profile, day: str, planned: dict | None = N
     for k_, h_ in (planned or {}).items():          # days already planned count toward the mix
         mix14[k_] = mix14.get(k_, 0.0) + h_
     tot = sum(v for k, v in mix14.items() if k != WALK) or 0.0
-    stats = kind_stats(p, day)
+    stats = {k: v for k, v in kind_stats(p, day).items() if k not in (ban or set())} or kind_stats(p, day)
     skied14 = mix14.get(SKI, 0.0) > 0
     band = _band(verdict, p)
 
