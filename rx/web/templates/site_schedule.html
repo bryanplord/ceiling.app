@@ -1,0 +1,106 @@
+{% extends "_site.html" %}
+{% block sitehead %}
+<style>
+  .cal { border-top:2px solid var(--ink); }
+  .wk { display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); }
+  .dow { font-size:14px; font-weight:600; color:var(--lichen); padding:12px 10px; border-bottom:1px solid var(--rule); }
+  .c { position:relative; min-height:132px; padding:12px 10px; border-bottom:1px solid var(--rule); border-right:1px solid var(--rule);
+       display:flex; flex-direction:column; gap:6px; min-width:0; }
+  .c:nth-child(7n) { border-right:0; }
+  .c .n { font-size:16px; font-weight:600; }
+  .c .vb { height:5px; border-radius:3px; }
+  .c .k { font-size:16px; font-weight:650; }
+  .c .m { font-size:14px; color:var(--lichen); }
+  .c.past > * { opacity:.35; }
+  .c.tod { box-shadow:inset 0 0 0 2px var(--ink); }
+  .c.pen > * { opacity:.5; }
+  .c.pen::after { content:""; position:absolute; inset:6px; border:1.5px dashed #c4c4c8; border-radius:8px; pointer-events:none; }
+  .key { display:flex; flex-wrap:wrap; gap:10px 28px; margin-top:18px; font-size:15px; color:var(--lichen); align-items:center; }
+  .key span { display:inline-flex; align-items:center; gap:8px; }
+  .key i { display:inline-block; width:22px; height:16px; border-radius:4px; border:1.5px solid var(--ink); }
+  .key i.pen { border:1.5px dashed #a9a9ae; }
+
+  .facts { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:40px; margin-top:64px; }
+  .facts b { display:block; font-size:clamp(40px, 4.6vw, 60px); font-weight:600; font-stretch:125%; line-height:1; }
+  .facts p { margin:12px 0 0; font-size:17px; line-height:1.45; color:#2a2a2d; max-width:30ch; }
+
+  .ask { display:flex; align-items:center; gap:14px; border:2px solid var(--ink); border-radius:16px; padding:20px 22px;
+         font-size:clamp(20px, 2.4vw, 30px); font-weight:600; letter-spacing:-0.01em; }
+  .ask .caret { width:3px; height:1.1em; background:var(--ceiling); flex:none; animation:blink 1.1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity:0; } }
+  @media (prefers-reduced-motion: reduce) { .ask .caret { animation:none; } }
+  .built { margin-top:36px; }
+  .built .t { font-size:clamp(26px, 3vw, 38px); font-weight:600; letter-spacing:-0.02em; margin:0; }
+  .built .s { color:var(--lichen); font-size:17px; margin:6px 0 0; }
+  .phases { display:flex; height:46px; margin-top:22px; gap:3px; }
+  .phases span { display:flex; align-items:flex-end; padding:0 0 6px 8px; font-size:13px; font-weight:650; color:#fff; overflow:hidden; white-space:nowrap; }
+  .ph-base { background:#7fa7d9; flex:6; } .ph-build { background:#46b07f; flex:5; } .ph-peak { background:#ec9550; flex:3; }
+  .ph-taper { background:#e3bd52; flex:2; color:var(--ink) !important; } .ph-race { background:var(--s-max); flex:.6; }
+  .weeks { display:flex; justify-content:space-between; font-size:14px; color:var(--lichen); margin-top:8px; }
+  .verbs { margin:48px 0 0; padding:0; list-style:none; border-top:2px solid var(--ink); }
+  .verbs li { display:grid; grid-template-columns:minmax(0, 4fr) minmax(0, 7fr); gap:24px; padding:20px 0; border-bottom:1px solid var(--rule); }
+  .verbs b { font-size:20px; font-weight:650; }
+  .verbs span { font-size:17px; line-height:1.45; color:#2a2a2d; }
+
+  @media (max-width: 860px) {
+    .c { min-height:88px; padding:8px 5px; gap:4px; }
+    .c .m { display:none; }
+    .c .k { font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .c .n { font-size:14px; }
+    .c.pen::after { inset:3px; border-radius:5px; }
+    .dow { padding:10px 5px; font-size:12px; }
+    .facts { grid-template-columns:1fr; gap:32px; margin-top:48px; }
+    .verbs li { grid-template-columns:1fr; gap:4px; }
+    .phases span { font-size:0; }
+  }
+</style>
+{% endblock %}
+{% block page %}
+{% set W1 = [(12,'easy','Easy','58 min','past'), (13,'easy','Easy','60 min','tod'), (14,'hard','Hard','4 × 8 min',''), (15,'easy','Easy','45 min',''), (16,'rest','Rest','',''), (17,'long','Long','3 hours',''), (18,'steady','Steady','90 min','')] %}
+{% set W2 = [(19,'easy','Easy','45 min','pen'), (20,'hard','Hard','5 × 6 min','pen'), (21,'easy','Easy','60 min','pen'), (22,'steady','Steady','75 min','pen'), (23,'rest','Rest','','pen'), (24,'long','Long','3½ hours','pen'), (25,'easy','Easy','45 min','pen')] %}
+<section class="hero">
+  <h1>Calendar and plans.</h1>
+  <p class="lede">Planned only as far as can honestly be seen. Firmer as each day comes into view.</p>
+</section>
+
+<section class="ch">
+  <h2>Firm, then pencilled in.</h2>
+  <p class="say">Nobody knows how you'll sleep next Thursday. So Ceiling commits to the days it can see and sketches the rest.</p>
+  <div class="show">
+    <div class="cal" role="img" aria-label="Two weeks: six firm days from today, then pencilled-in days">
+      <div class="wk">{% for d in ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}<div class="dow">{{ d }}</div>{% endfor %}</div>
+      {% for W in [W1, W2] %}<div class="wk">{% for n, v, k, m, s in W %}
+        <div class="c {{ s }}"><span class="n">{{ n }}</span><span class="vb v-{{ v }}"></span><span class="k">{{ k }}</span>{% if m %}<span class="m">{{ m }}</span>{% endif %}</div>{% endfor %}</div>{% endfor %}
+    </div>
+    <div class="key"><span><i></i>Firm</span><span><i class="pen"></i>Pencilled in</span></div>
+  </div>
+  <div class="facts">
+    <div><b>4 to 8</b><p>Firm days, depending on how recovered you are. Tired means fewer.</p></div>
+    <div><b>Daily</b><p>Every morning the next day firms up from how you actually trained and slept.</p></div>
+    <div><b>Anywhere</b><p>Subscribe once in Apple, Google or Outlook Calendar. It stays current.</p></div>
+  </div>
+</section>
+
+<section class="ch">
+  <h2>Goals in your own words.</h2>
+  <p class="say">Pick one, or type it the way you'd say it. Ceiling builds the plan around your life.</p>
+  <div class="show">
+    <div class="ask" aria-label="Example goal">A 4:20 marathon on Feb 1, no Wednesdays<span class="caret" aria-hidden="true"></span></div>
+    <div class="built">
+      <p class="t">Marathon in 4:20. 16 weeks.</p>
+      <p class="s">Five days a week. Wednesdays off. Long runs on Saturday.</p>
+      <div class="phases" aria-label="Base 6 weeks, Build 5, Peak 3, Taper 2, then race day">
+        <span class="ph-base">Base</span><span class="ph-build">Build</span><span class="ph-peak">Peak</span><span class="ph-taper">Taper</span><span class="ph-race"></span></div>
+      <div class="weeks"><span>October 13</span><span>February 1</span></div>
+    </div>
+    <ul class="verbs">
+      <li><b>Commit when it looks right</b><span>Nothing changes your days until you say so.</span></li>
+      <li><b>Edit it in plain words</b><span>“Move long runs to Sunday.” “I’m away the week of December 7.”</span></li>
+      <li><b>Run several at once</b><span>A marathon in February and a ski tour in March share one week.</span></li>
+      <li><b>Stop anytime</b><span>The plan goes. Your history stays.</span></li>
+    </ul>
+  </div>
+</section>
+
+<a class="pager" href="/learns"><small>Next</small><span>How it learns you</span></a>
+{% endblock %}

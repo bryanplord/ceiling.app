@@ -107,7 +107,38 @@
   .nut { margin-top:28px; } .nut li { font-size:17px; margin:6px 0; }
   .fine { text-wrap:pretty; font-size:15px; color:var(--lichen); max-width:62ch; margin-top:48px; }
   .end { margin-top:40px; padding-top:28px; border-top:1px solid var(--rule); }
+  /* change it in words */
+  .adjust { margin-top:72px; scroll-margin-top:24px; }
+  .adjust h2 { font-size:clamp(28px, 4vw, 40px); font-weight:700; letter-spacing:-0.025em; line-height:1.1; margin:0; color:var(--ink); text-wrap:balance; }
+  .adjust .sub { margin:10px 0 0; font-size:17px; color:var(--lichen); max-width:56ch; text-wrap:pretty; }
+  .sayf { margin-top:24px; display:grid; gap:14px; max-width:720px; }
+  .sayf textarea { font:inherit; font-size:19px; line-height:1.45; padding:18px 20px; border:1px solid #d4d4d8; border-radius:18px;
+                   background:#fff; color:var(--ink); width:100%; min-width:0; resize:vertical; min-height:120px; box-sizing:border-box; }
+  .sayf textarea::placeholder { color:#9a9aa0; }
+  .sayf textarea:focus { outline:none; border-color:var(--ink); box-shadow:0 0 0 3px rgba(0,0,0,0.06); }
+  .heard { margin-top:4px; max-width:720px; padding:16px 18px; border-radius:14px; background:#fbf3e4; font-size:16px; }
+  .heard p { margin:0; text-wrap:pretty; } .heard p + p { margin-top:8px; }
+  details.more { margin-top:28px; max-width:720px; }
+  details.more > summary { cursor:pointer; list-style:none; display:inline-flex; align-items:center; gap:8px; font-size:16px; font-weight:600; color:var(--ink); }
+  details.more > summary::-webkit-details-marker { display:none; }
+  details.more > summary::after { content:""; width:7px; height:7px; border-right:1.6px solid currentColor; border-bottom:1.6px solid currentColor;
+                                  transform:rotate(45deg) translate(-2px, -2px); transition:transform .15s; }
+  details.more[open] > summary::after { transform:rotate(225deg) translate(-2px, -2px); }
+  .commitrow { margin-top:40px; }
+  .changed { margin-top:24px; padding:22px 24px; border-radius:18px; background:#eef7f2; max-width:720px; }
+  .changed .h { margin:0; font-size:18px; font-weight:700; color:var(--ink); text-wrap:pretty; }
+  .changed ul { list-style:none; margin:12px 0 0; padding:0; display:grid; gap:6px; }
+  .changed li { font-size:17px; padding-left:26px; position:relative; text-wrap:pretty; }
+  .changed li::before { content:""; position:absolute; left:3px; top:6px; width:6px; height:11px; border-right:2px solid var(--good);
+                        border-bottom:2px solid var(--good); transform:rotate(45deg); }
+  .changed .n { margin:12px 0 0; font-size:15px; color:#6b5a2e; text-wrap:pretty; }
+  .askstop { margin-top:24px; max-width:720px; }
+  .askstop .cfbox { margin:0; padding:22px 24px; border-radius:18px; }
+  .askstop .cfbox p { font-size:17px; }
   @media (max-width:700px) {
+    .adjust { margin-top:56px; }
+    .sayf textarea { font-size:17px; padding:16px; }
+    .changed { padding:18px 18px; }
     .ph { margin-top:16px; }
     .row2 { grid-template-columns:1fr; }
     table.wk td.note, table.wk th.note { display:none; }
@@ -145,7 +176,7 @@
   </div>
   <p class="or">Or say it your way</p>
   <div style="display:grid; gap:18px; max-width:640px">
-    <label>Your goal<input type="text" name="text" placeholder="A 4:20 marathon in May"></label>
+    <label>Your goal<input type="text" name="text" placeholder="A 4:20 marathon on May 2. No Wednesdays."></label>
     <div class="row2">
       <label>By when<input type="date" name="date"></label>
       <label><span>Target <small>Optional</small></span><input type="text" name="target" placeholder="4:20, or finish strong"></label>
@@ -211,13 +242,29 @@
 <a class="back" href="/plan">&larr; Your plans</a>
 <h1 class="ph">{{ prog.title }}</h1>
 {% if just == 'committed' %}<p class="flash">Committed. Today and your calendar now follow this plan.</p>
-{% elif just == 'saved' %}<p class="flash">Saved.</p>{% endif %}
+{% elif just == 'said' and changed %}
+<div class="changed" role="status">
+  <p class="h">{{ 'Updated. Today and the calendar follow the new plan.' if live else 'Preview updated.' }}</p>
+  <ul>{% for c in changed %}<li>{{ c }}</li>{% endfor %}</ul>
+  {% for n in notes %}<p class="n">{{ n }}</p>{% endfor %}
+</div>
+{% elif just == 'saved' %}<p class="flash">{{ 'Updated. Today and the calendar follow the new plan.' if live else 'Preview updated.' }}</p>{% endif %}
+{% if ask == 'stop' and g.status != 'stopped' %}
+<div class="askstop" role="alert"><div class="cfbox">
+  {% if g.status == 'draft' %}<p>You said “{{ said }}”. Delete this draft? It never touched your calendar.</p>
+  <form method="post" action="/plan/{{ g.id }}/delete" class="acts"><button class="btn sm danger" type="submit">Delete draft</button>
+  {% else %}<p>You said “{{ said }}”. Stop this plan from today? Its workouts come off your calendar from today on. Everything you have already done stays in your history.</p>
+  <form method="post" action="/plan/{{ g.id }}/stop" class="acts"><button class="btn sm danger" type="submit">Stop plan</button>
+  {% endif %}
+  <a class="btn sm ghost" href="/plan/{{ g.id }}">Keep it</a></form>
+</div></div>
+{% endif %}
 
 {% if g.status == 'draft' %}
 <div class="commitbox">
   <span class="pill draft">Draft</span>
   <h2 style="margin-top:14px">This is a preview. Nothing changes until you commit.</h2>
-  <p>Adjust anything below, then commit. From then on, every morning's prescription and your calendar follow it.</p>
+  <p>Change anything below, in your own words or field by field, then commit. From then on, every morning's prescription and your calendar follow it.</p>
 </div>
 {% elif live %}
 <div class="commitbox on">
@@ -259,6 +306,14 @@
       {% for v, l in [('run','Running'),('bike','Riding'),('ski','Skiing')] %}<option value="{{ v }}" {{ 'selected' if g.sport == v }}>{{ l }}</option>{% endfor %}
     </select></label>
   </div>
+  {% if g.kind == 'event' %}
+  <div class="row2">
+    <label>Long session<select name="long_day">
+      <option value="" {{ 'selected' if g.long_day is none }}>Sunday, or the latest free day</option>
+      {% for d in days %}<option value="{{ loop.index0 }}" {{ 'selected' if g.long_day == loop.index0 }}>{{ d }}</option>{% endfor %}
+    </select></label>
+  </div>
+  {% endif %}
   <div class="fl">Days you can't train
     <div class="days">{% for d in days %}<label><input type="checkbox" name="no" value="{{ loop.index0 }}" {{ 'checked' if loop.index0 in g.no_days }}><span>{{ d[:3] }}</span></label>{% endfor %}</div>
   </div>
@@ -269,23 +324,30 @@
   </div>
   {% endif %}
 {% endset %}
-{% if g.status == 'draft' %}
-<h2 class="sec">Adjust the plan</h2>
-<form method="post" action="/plan/{{ g.id }}/commit" class="gform">
-  {{ fields }}
-  <div class="acts" style="margin-top:10px">
-    <button class="btn go" type="submit">Commit to this plan</button>
-    <button class="btn ghost" type="submit" formaction="/plan/{{ g.id }}/edit">Update preview</button>
-  </div>
-</form>
-{% else %}
-<details class="adjd" style="margin-top:40px"><summary class="btn ghost">Edit plan</summary>
-<form method="post" action="/plan/{{ g.id }}/edit" class="gform">
-  {{ fields }}
-  <div class="acts" style="margin-top:10px"><button class="btn" type="submit">Save changes</button>
-    <button class="btn ghost" type="button" onclick="this.closest('details').open=false">Cancel</button></div>
-</form></details>
-{% endif %}
+<section class="adjust" id="adjust">
+  <h2><label for="say">Change anything in your own words</label></h2>
+  <p class="sub">Say it the way you'd tell a coach.{{ ' It applies right away.' if g.status != 'draft' }}</p>
+  <form method="post" action="/plan/{{ g.id }}/say" class="sayf" id="sayf">
+    <textarea id="say" name="say" rows="3" maxlength="400" enterkeyhint="done"
+      placeholder="Make it a 4:20 marathon. I can't train Wednesdays. Max 6 hours a week. Move the race to February 8.">{{ said if not changed and ask != 'stop' }}</textarea>
+    {% if notes and not changed and ask != 'stop' %}<div class="heard" role="status">{% for n in notes %}<p>{{ n }}</p>{% endfor %}</div>{% endif %}
+    <div class="acts"><button class="btn" type="submit">{{ 'Update preview' if g.status == 'draft' else 'Apply' }}</button></div>
+  </form>
+  <details class="more"><summary>Or adjust the details</summary>
+    <form method="post" action="/plan/{{ g.id }}/edit" class="gform" id="fx">
+      {{ fields }}
+      <div class="acts" style="margin-top:10px"><button class="btn ghost" type="submit">{{ 'Update preview' if g.status == 'draft' else 'Save changes' }}</button></div>
+    </form>
+  </details>
+  {% if g.status == 'draft' %}
+  <div class="acts commitrow"><button class="btn go" type="submit" form="fx" formaction="/plan/{{ g.id }}/commit">Commit to this plan</button></div>
+  {% endif %}
+</section>
+<script>
+(() => { const t = document.getElementById('say'); if (!t) return;
+  t.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); if (t.value.trim()) t.form.requestSubmit(); } });
+  if (location.hash === '#adjust') t.focus({preventScroll: true}); })();
+</script>
 {% endif %}
 
 {% if prog.nutrition %}<h2 class="sec">Eating for it</h2><ul class="nut">{% for n in prog.nutrition %}<li>{{ n }}</li>{% endfor %}</ul>{% endif %}

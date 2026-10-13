@@ -51,7 +51,7 @@ async def sign_in_gate(request: Request, call_next):
     path = request.url.path
     email = auth.verify("session", request.cookies.get(auth.COOKIE)) if auth.enabled() else None
     current_owner.set(owner_of(email))
-    if path in ("/favicon.ico", "/apple-touch-icon.png", "/apple-touch-icon-precomposed.png", "/healthz", "/login", "/logout", "/plan.ics", "/how", "/science", "/join") or path.startswith("/static/"):
+    if path in ("/favicon.ico", "/apple-touch-icon.png", "/apple-touch-icon-precomposed.png", "/healthz", "/login", "/logout", "/plan.ics", "/how", "/science", "/join", "/morning", "/after", "/schedule", "/learns") or path.startswith("/static/"):
         return await call_next(request)
     if _signed_in(request):
         # A new athlete has no data yet: every page sends them to Data to connect it.
@@ -119,6 +119,26 @@ def site_how(request: Request):
 @app.get("/science", response_class=HTMLResponse)
 def site_science(request: Request):
     return _site(request, "site_science.html")
+
+
+@app.get("/morning", response_class=HTMLResponse)
+def site_morning(request: Request):
+    return _site(request, "site_morning.html")
+
+
+@app.get("/after", response_class=HTMLResponse)
+def site_after(request: Request):
+    return _site(request, "site_after.html")
+
+
+@app.get("/schedule", response_class=HTMLResponse)
+def site_schedule(request: Request):
+    return _site(request, "site_schedule.html")
+
+
+@app.get("/learns", response_class=HTMLResponse)
+def site_learns(request: Request):
+    return _site(request, "site_learns.html")
 
 
 @app.get("/join", response_class=HTMLResponse)
@@ -392,6 +412,8 @@ def _plan_apply(g, form: dict, f: dict) -> None:
         g.sport = f["sport"] or (gl.EVENT_SPORT.get((g.event or "").lower(), "") if g.kind == "event" else "")
     if f.get("edit"):
         g.no_days = sorted({int(x) for x in form.get("no", []) if x.isdigit() and 0 <= int(x) <= 6})
+    if "long_day" in f:
+        g.long_day = int(f["long_day"]) if f["long_day"].isdigit() and 0 <= int(f["long_day"]) <= 6 else None
     if g.kind == "weight":
         g.start_weight = _plan_num(f.get("w_now")) or g.start_weight
         g.target_weight = _plan_num(f.get("w_target")) or g.target_weight
@@ -434,8 +456,8 @@ async def plan_create(request: Request):
     form = parse_qs((await request.body()).decode())
     f = _plan_form(form)
     today = local_today()
-    if f.get("text"):
-        g = gl.parse_text(f["text"], today, _plan_num(f.get("w_now")))
+    if f.get("text"):                                # the same path as changing a plan in words
+        g, _ = gl.from_text(f["text"], today, _plan_num(f.get("w_now")))
     else:
         c = next((c for c in gl.CANNED if c["id"] == f.get("canned")), gl.CANNED[0])
         g = gl.Goal(c["kind"], event=c.get("event", ""), sport=gl.EVENT_SPORT.get(c.get("event", ""), ""),
@@ -471,9 +493,36 @@ def plan_detail(request: Request, pid: str):
     mon = (today - timedelta(days=today.weekday())).isoformat()
     done = sum((a.moving_s or 0) for a in p.activities if a.date >= mon and a.sport != "walk") / 3600
     others = [x for x in gl.active(store, today) if x.id != g.id]
+    q = request.query_params
     return _page(request, "plan.html", mode="detail", r=row, prog=row["prog"], g=g, date=date, today=today,
                  done_h=round(done, 1), live=gl.is_live(g, today), others=others, days=gl.DAY_NAMES,
-                 just=request.query_params.get("ok", ""))
+                 just=q.get("ok", ""), changed=q.getlist("c")[:12], notes=q.getlist("n")[:6],
+                 said=q.get("said", "")[:400], ask=q.get("ask", ""), example=gl.EXAMPLE)
+
+
+@app.post("/plan/{pid}/say")
+async def plan_say(request: Request, pid: str):
+    """Change a plan in your own words: the same parser that builds one from words."""
+    from urllib.parse import urlencode
+    from .. import goals as gl
+    store = open_store()
+    g = gl.get(store, pid)
+    if not g:
+        return RedirectResponse("/plan", status_code=303)
+    text = _plan_form(parse_qs((await request.body()).decode())).get("say", "")[:400]
+    if not text:
+        return RedirectResponse(f"/plan/{pid}", status_code=303)
+    new, ch = gl.apply_text(g, text, local_today())
+    if ch.stop:                                      # never stop silently: the page asks first
+        return RedirectResponse(f"/plan/{pid}?" + urlencode({"ask": "stop", "said": text}), status_code=303)
+    q = [("n", n) for n in ch.notes]
+    if ch:
+        gl.save_plan(store, new)                     # same id, commit date and status: history stays
+        bust(store)
+        q = [("ok", "said")] + [("c", c) for c in ch] + q
+        return RedirectResponse(f"/plan/{pid}?" + urlencode(q), status_code=303)
+    q.append(("said", text))                         # nothing changed: keep the words, say why
+    return RedirectResponse(f"/plan/{pid}?" + urlencode(q) + "#adjust", status_code=303)
 
 
 async def _plan_edit(request: Request, pid: str):

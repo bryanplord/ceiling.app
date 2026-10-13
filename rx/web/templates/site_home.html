@@ -1,98 +1,113 @@
 {% extends "_site.html" %}
 {% block sitehead %}
 <style>
-  .heroGrid { display:grid; grid-template-columns:minmax(0, 6fr) minmax(0, 5fr); gap:56px; align-items:end; }
-  .card { border-top:2px solid var(--ink); }
-  .card .top { padding:18px 0 6px; }
-  .card .verdict { font-weight:600; font-stretch:125%; text-transform:uppercase; letter-spacing:.04em; font-size:44px; line-height:1; margin:0; }
-  .card .dx { font-size:19px; line-height:1.35; font-weight:600; margin:14px 0 6px; }
-  .row { display:grid; grid-template-columns:96px 1fr; gap:16px; padding:13px 0; border-bottom:1px solid var(--rule); font-size:17px; line-height:1.4; }
-  .row b { font-size:14px; color:var(--lichen); font-weight:700; padding-top:2px; }
-  .cap { font-size:13px; color:var(--lichen); margin-top:10px; }
-  .trio { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:40px; padding:80px 0; border-top:1px solid var(--rule); }
-  .trio h3 { font-size:22px; margin:0 0 10px; font-weight:600; }
-  .trio p { font-size:17px; line-height:1.5; color:#2a2a2d; margin:0; }
-  .big { font-size:clamp(40px, 7vw, 96px); font-weight:600; font-stretch:125%; letter-spacing:-0.01em; line-height:1; }
-  .zones { display:flex; height:22px; margin:22px 0 10px; }
-  .zones span:nth-child(1){flex:9;background:var(--s-rec)} .zones span:nth-child(2){flex:13;background:var(--s-end)}
-  .zones span:nth-child(3){flex:9;background:var(--s-aer)} .zones span:nth-child(4){flex:9;background:var(--s-tem)}
-  .zones span:nth-child(5){flex:9;background:var(--s-thr)} .zones span:nth-child(6){flex:24;background:var(--s-max)}
-  .zl { display:flex; justify-content:space-between; font-size:13px; color:var(--lichen); }
-  .closing { padding:120px 0 96px; border-top:1px solid var(--rule); text-align:left; }
-  .closing.dark { background:var(--ink); border-top:0; position:relative; }
-  .closing.dark::before { content:""; position:absolute; left:0; right:0; top:0; height:6px; background:var(--spectrum); }
-  .closing.dark h2 { color:#fff !important; }
-  .closing.dark .btn.light { color:#fff; border-color:#fff; }
-  .closing.dark .btn.dark { background:#fff; color:var(--ink); border-color:#fff; }
-  .closing.dark .btn.dark:hover { background:var(--ceiling); color:#fff; border-color:var(--ceiling); }
-  .herospec { display:flex; height:10px; margin:28px 0 0; max-width:520px; }
-  .herospec span { flex:1; } .herospec span:nth-child(1){background:var(--s-rec)} .herospec span:nth-child(2){background:var(--s-end)}
-  .herospec span:nth-child(3){background:var(--s-aer)} .herospec span:nth-child(4){background:var(--s-tem)}
-  .herospec span:nth-child(5){background:var(--s-thr)} .herospec span:nth-child(6){background:var(--s-max)}
-  .tint-end { background:#eef3fb; border-top:0; }
-  .tint-aer { background:#edf7f1; border-top:0; }
-  .trio h3::before { content:""; display:block; width:28px; height:4px; margin-bottom:14px; }
-  .trio div:nth-child(1) h3::before { background:var(--s-end); } .trio div:nth-child(2) h3::before { background:var(--s-thr); }
-  .trio div:nth-child(3) h3::before { background:var(--s-aer); }
-  .closing h2 { font-size:clamp(44px, 8vw, 112px); margin:0; color:var(--ink); font-weight:600; font-stretch:125%; text-transform:uppercase; letter-spacing:.04em; line-height:1; }
-  @media (max-width: 860px) { .heroGrid, .trio { grid-template-columns:1fr; } .trio { padding:56px 0; gap:32px; } }
+  .hero h1 { max-width:14ch; }
+  .heart .rail-zn { display:none; }
+  .stage { padding:72px 0 96px; }
+  .today { display:grid; grid-template-columns:minmax(0, 7fr) minmax(0, 5fr); gap:64px; align-items:start; }
+  .today .verdict { font-size:clamp(56px, 8.4vw, 116px); }
+  .heart h3 { font-size:20px; font-weight:700; margin:0; }
+  .heart p.s { color:var(--lichen); font-size:15px; margin:4px 0 0; }
+  .heart .rail { margin-top:28px; }
+  .rail.go .rail-win { animation:win 1.1s cubic-bezier(.2,.8,.2,1) .35s backwards; }
+  .rail.go .rail-aim { animation:aim 1.1s cubic-bezier(.2,.8,.2,1) .35s backwards; }
+  @keyframes win { from { left:0; width:0; opacity:0; } }
+  @keyframes aim { from { left:0; opacity:0; } }
+  @media (prefers-reduced-motion: reduce) { .rail.go .rail-win, .rail.go .rail-aim { animation:none; } }
+
+  .vs { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); gap:72px; margin-top:64px; align-items:start; }
+  .vs .who { font-size:15px; font-weight:700; color:var(--lichen); margin:0 0 18px; }
+  .watch { list-style:none; padding:0; margin:0; }
+  .watch li { display:flex; justify-content:space-between; gap:16px; padding:14px 0; border-bottom:1px solid var(--rule); font-size:18px; color:var(--lichen); }
+  .watch li b { color:#9a9a9e; font-weight:600; font-variant-numeric:tabular-nums; }
+  .rx { border-top:2px solid var(--ink); padding-top:20px; }
+  .rx .verdict { font-size:clamp(36px, 4.4vw, 56px); }
+  .rx p { font-size:clamp(22px, 2.2vw, 28px); line-height:1.3; font-weight:600; letter-spacing:-0.01em; margin:18px 0 0; max-width:22ch; }
+
+  .chaps { margin-top:48px; border-top:2px solid var(--ink); }
+  .chap { display:grid; grid-template-columns:minmax(0, 6fr) minmax(0, 5fr); gap:48px; align-items:baseline; text-decoration:none;
+          padding:30px 0 30px 28px; border-bottom:1px solid var(--rule); position:relative; }
+  .chap::before { content:""; position:absolute; left:0; top:34px; bottom:34px; width:6px; }
+  .chap:nth-child(1)::before { background:var(--s-end); } .chap:nth-child(2)::before { background:var(--s-aer); }
+  .chap:nth-child(3)::before { background:var(--s-tem); } .chap:nth-child(4)::before { background:var(--s-thr); }
+  .chap span { font-size:clamp(28px, 3.6vw, 46px); font-weight:600; letter-spacing:-0.02em; line-height:1.05; }
+  .chap p { margin:0; font-size:18px; line-height:1.45; color:var(--lichen); max-width:40ch; }
+  .chap:hover span { color:var(--ceiling); }
+
+  @media (max-width: 860px) {
+    .stage { padding:40px 0 56px; }
+    .today, .vs { grid-template-columns:1fr; gap:48px; }
+    .chap { grid-template-columns:1fr; gap:8px; padding:24px 0 24px 22px; }
+    .chap::before { top:28px; bottom:28px; width:5px; }
+  }
 </style>
 {% endblock %}
 {% block page %}
-<section class="hero heroGrid">
-  <div>
-    <h1>This is how you train.</h1>
-    <div class="herospec" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span></div>
-    <p class="lede">Your daily workout prescription, written from your own heart rate, HRV, sleep and training load. Every morning.</p>
-    <div class="ctas"><a class="btn dark" href="/join">Join the waitlist</a><a class="btn light" href="/how">How it works</a></div>
+<section class="hero">
+  <h1>This is how you train.</h1>
+  <p class="lede">One prescription every morning, written from your sleep, HRV, resting heart rate and training.</p>
+  <div class="ctas"><a class="btn dark" href="/join">Join the waitlist</a><a class="btn light" href="/morning">See a morning</a></div>
+</section>
+
+<section class="stage frost bleed" aria-label="An example morning">
+  <div class="sheet today">
+    <div>
+      <p class="meta">Tuesday, October 13. Updated 6:12 AM.</p>
+      <p class="verdict">Easy day.</p>
+      <span class="vrule v-easy" aria-hidden="true"></span>
+      <p class="diag">Two short nights and HRV under your normal. You're carrying fatigue.</p>
+      <div class="rows">
+        <div class="rw"><b>What</b><span>A road ride, 60 minutes.</span></div>
+        <div class="rw"><b>Minimum</b><span>30 minutes in range. That holds your fitness.</span></div>
+        <div class="rw"><b>Maximum</b><span>75 minutes. Past that, tomorrow turns steady.</span></div>
+        <div class="rw"><b>Tomorrow</b><span>A hard day: 4 × 8 minutes at 152–160.</span></div>
+        <div class="rw"><b>Tonight</b><span>In bed by 9:30 PM.</span></div>
+      </div>
+    </div>
+    <div class="heart">
+      <h3>Your heart today</h3>
+      <p class="s">Your zones, resting to max, and where to be.</p>
+      {% set rail_go = True %}{% include "_site_rail.html" %}
+      <p class="rail-say">Aim for <b>128</b>. Stay <b>123–133</b>.</p>
+    </div>
   </div>
-  <div class="card" aria-label="An example prescription">
-    <div class="top"><p class="verdict">Easy day.</p>
-      <p class="dx">Sleep debt is stacking up and HRV has been low all week. You're carrying fatigue.</p></div>
-    <div class="row"><b>What</b><span>An easy ride, 60 minutes at 128 (123–133).</span></div>
-    <div class="row"><b>Why</b><span>Easy work keeps the fitness. Anything harder digs the hole deeper.</span></div>
-    <div class="row"><b>Minimum</b><span>A 30-minute ride at 123–133. That holds your fitness.</span></div>
-    <div class="row"><b>Maximum</b><span>75 minutes. Past that, tomorrow drops from hard to steady.</span></div>
-    <div class="row"><b>Tomorrow</b><span>A hard day: 4 × 8 minutes at 152–160.</span></div>
-    <div class="row"><b>Tonight</b><span>In bed by 9:30 PM.</span></div>
-    <p class="cap">An example. Yours is written from your data.</p>
+  <p class="cap">An example. Yours is written from your data.</p>
+</section>
+
+<section class="ch">
+  <h2>Not data. Information.</h2>
+  <p class="say">Your watch measures everything, then leaves the hard part to you. Ceiling makes the call.</p>
+  <div class="vs">
+    <div><p class="who">Your watch says</p>
+      <ul class="watch">
+        <li>HRV <b>41 ms</b></li><li>Sleep score <b>62</b></li><li>Resting heart rate <b>52</b></li>
+        <li>Training status <b>Productive</b></li><li>Recovery time <b>19 hours</b></li></ul></div>
+    <div class="rx"><p class="who">Ceiling says</p>
+      <p class="verdict">Easy day.</p>
+      <p>Ride 60 minutes at 128. Not a minute past 75.</p></div>
   </div>
 </section>
 
-<section class="sec">
-  <h2>Not data. A prescription.</h2>
-  <div>
-    <p>Your watch already measures everything. Then it hands you a score and leaves the hard part to you: deciding what to do today.</p>
-    <p>Ceiling decides. What to do, how hard, how long, and why. What it costs to skip it, and what happens if you overdo it. Like a doctor writes a prescription, in plain words.</p>
-  </div>
+<section class="ch">
+  <h2>Every part of the day.</h2>
+  <nav class="chaps" aria-label="Chapters">
+    <a class="chap" href="/morning"><span>The morning</span><p>One call before you're out of bed, with the exact heart rate to hold.</p></a>
+    <a class="chap" href="/after"><span>After you train</span><p>A score out of 100 against what was prescribed. Tomorrow re-planned.</p></a>
+    <a class="chap" href="/schedule"><span>Calendar and plans</span><p>Firm only as far as can honestly be seen. Goals in your own words.</p></a>
+    <a class="chap" href="/learns"><span>How it learns you</span><p>What drinks, late nights and stress do to you. And whether its calls work.</p></a>
+  </nav>
 </section>
 
-<section class="sec tint-end bleed">
-  <h2>Built on you. Not averages.</h2>
-  <div>
-    <p>Your zones come from your own threshold and aerobic threshold, measured in your own sessions. Not 220 minus your age.</p>
-    <div class="zones" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span></div>
-    <div class="zl"><span>Recovery</span><span>Endurance</span><span>Aerobic</span><span>Tempo</span><span>Threshold</span><span>Max</span></div>
-    <p style="margin-top:22px">Your normal HRV, resting heart rate and sleep are yours too. A 6% drop means something different for you than for anyone else, so Ceiling reads you against yourself.</p>
-  </div>
-</section>
-
-<section class="trio">
-  <div><h3>Every morning</h3><p>Last night's sleep, HRV and resting heart rate, read against your normal. The call is made before you're out of bed.</p></div>
-  <div><h3>After you train</h3><p>Your session is graded against what was prescribed, and tomorrow is re-planned from what you actually did.</p></div>
-  <div><h3>On your calendar</h3><p>The next few days, planned only as far as can honestly be seen, and rewritten every morning as things change.</p></div>
-</section>
-
-<section class="sec tint-aer bleed">
+<section class="ch split">
   <h2>For people who train 1 to 3 hours a day.</h2>
-  <div>
-    <p>Riders, runners, skiers and everyone in between who already wears the watch and wants it to finally tell them something.</p>
-    <p>Works with Garmin today. Apple Health and Android are next.</p>
+  <div class="show">
+    <p class="say">Riders, runners and skiers who already wear the watch and want it to finally tell them something.</p>
+    <p class="say">Works with Garmin today. Apple Health and Android are next.</p>
   </div>
 </section>
 
-<section class="closing dark bleed">
-  <h2>Train like you mean it.</h2>
+<section class="closing bleed">
+  <p class="verdict">Train like you mean it.</p>
   <div class="ctas"><a class="btn dark" href="/join">Join the waitlist</a><a class="btn light" href="/login">Sign in</a></div>
 </section>
 {% endblock %}

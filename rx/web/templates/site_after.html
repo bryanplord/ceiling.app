@@ -1,0 +1,130 @@
+{% extends "_site.html" %}
+{% block sitehead %}
+<style>
+  .review { display:grid; grid-template-columns:minmax(0, 6fr) minmax(0, 5fr); gap:64px; }
+  .score { font-size:clamp(112px, 15vw, 200px); line-height:.85; font-weight:600; font-stretch:125%; color:var(--good);
+           font-variant-numeric:tabular-nums; margin:6px 0 0; letter-spacing:-0.01em; }
+  .score small { font-size:.36em; vertical-align:.95em; margin-left:.04em; }
+  .word { font-size:clamp(24px, 2.6vw, 32px); font-weight:620; color:var(--good); margin:14px 0 0; }
+  .zbar { display:flex; height:28px; margin:28px 0 0; }
+  .zbar span { display:flex; align-items:center; overflow:hidden; white-space:nowrap; font-size:12px; font-weight:600; color:rgba(0,0,0,.62); padding-left:7px; }
+  .rf h3 { font-size:15px; font-weight:700; color:var(--lichen); margin:0 0 12px; }
+  .rf ul { list-style:none; margin:0 0 30px; padding:0; display:grid; gap:10px; }
+  .rf li { padding-left:14px; border-left:3px solid var(--good); font-size:17px; line-height:1.4; }
+  .rf ul.fix li { border-left-color:var(--ceiling); }
+
+  .parts { border-top:2px solid var(--ink); }
+  .part { display:grid; grid-template-columns:minmax(0, 4fr) minmax(0, 7fr) 88px; gap:24px; align-items:center; padding:22px 0; border-bottom:1px solid var(--rule); }
+  .part b { font-size:20px; font-weight:650; display:block; }
+  .part p { margin:4px 0 0; font-size:16px; color:var(--lichen); line-height:1.4; }
+  .part .m { height:14px; background:var(--frost2); }
+  .part .m i { display:block; height:100%; background:var(--ink); }
+  .part .pt { text-align:right; font-size:28px; font-weight:600; font-stretch:115%; font-variant-numeric:tabular-nums; }
+  .part .pt small { font-size:15px; color:var(--lichen); font-weight:500; }
+  .part.tot b, .part.tot .pt { color:var(--good); }
+
+  .nums { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:40px; border-top:2px solid var(--ink); padding-top:28px; }
+  .nums b { display:block; font-size:clamp(44px, 5vw, 64px); font-weight:600; font-stretch:125%; line-height:1; font-variant-numeric:tabular-nums; }
+  .nums b small { font-size:.4em; font-weight:600; color:var(--lichen); margin-left:4px; }
+  .nums span { display:block; font-size:16px; font-weight:700; margin:14px 0 4px; }
+  .nums p { margin:0; font-size:16px; line-height:1.45; color:var(--lichen); max-width:30ch; }
+
+  .batt { display:grid; grid-template-columns:auto minmax(0, 1fr); gap:28px; align-items:center; }
+  .batt .n { font-size:clamp(88px, 11vw, 144px); font-weight:600; font-stretch:125%; line-height:.85; font-variant-numeric:tabular-nums; }
+  .cell { position:relative; height:56px; border:2px solid var(--ink); border-radius:10px; padding:5px; max-width:360px; }
+  .cell::after { content:""; position:absolute; right:-10px; top:16px; width:6px; height:20px; background:var(--ink); border-radius:0 3px 3px 0; }
+  .cell i { display:block; height:100%; width:39%; background:var(--s-tem); border-radius:5px; }
+  .batt p { grid-column:1 / -1; margin:0; font-size:18px; color:var(--lichen); }
+  .ledger { margin-top:36px; border-top:2px solid var(--ink); font-variant-numeric:tabular-nums; }
+  .ledger div { display:flex; justify-content:space-between; gap:16px; padding:12px 0; border-bottom:1px solid var(--rule); font-size:18px; }
+  .ledger div span:last-child { font-weight:600; }
+  .ledger .sub { font-weight:700; border-bottom:2px solid var(--ink); }
+  .ledger .dr span:last-child { color:var(--bad); }
+  .ledger .end { font-weight:700; font-size:22px; border-bottom:0; }
+
+  @media (max-width: 860px) {
+    .review, .nums { grid-template-columns:1fr; gap:36px; }
+    .part { grid-template-columns:minmax(0, 1fr) 72px; gap:10px 16px; }
+    .part .m { grid-column:1 / -1; grid-row:2; }
+    .part .pt { font-size:24px; }
+    .part.tot > div:nth-child(2) { display:none; }
+  }
+</style>
+{% endblock %}
+{% block page %}
+<section class="hero">
+  <h1>After you train.</h1>
+  <p class="lede">The morning's page turns into a review. Scored against what was prescribed, not against anyone else.</p>
+</section>
+
+<section class="frost bleed" style="padding:72px 0 96px" aria-label="An example review">
+  <div class="sheet review">
+    <div>
+      <p class="meta">Road ride, 64 minutes, average 129.</p>
+      <p class="score">88<small>%</small></p>
+      <p class="word">Nailed it.</p>
+      <p class="diag">Held your range for 52 minutes and never went over your ceiling.</p>
+      <div class="zbar" aria-label="Time in each zone">
+        <span style="width:9%;background:#b3a6dc"></span><span style="width:81%;background:#7fa7d9">Endurance 52m</span><span style="width:10%;background:#46b07f"></span></div>
+    </div>
+    <div class="rf">
+      <h3>What's good</h3>
+      <ul><li>52 of 64 minutes at 123–133.</li><li>No climb pushed you over 133.</li><li>Stopped inside the 75-minute maximum.</li></ul>
+      <h3>What needs work</h3>
+      <ul class="fix"><li>The first 10 minutes ran 6 beats high. Start slower.</li></ul>
+    </div>
+  </div>
+</section>
+
+<section class="ch split">
+  <div><h2>Out of 100. Not a letter grade.</h2>
+    <p class="say">Each point is shown. A 15-second spike on a pitch doesn't count like a minute of threshold work.</p></div>
+  <div class="show parts">
+    <div class="part"><div><b>Ceiling</b><p>Time held under the day's ceiling.</p></div><div class="m"><i style="width:96%"></i></div><span class="pt">48<small>/50</small></span></div>
+    <div class="part"><div><b>Range</b><p>Time in the day's range.</p></div><div class="m"><i style="width:80%"></i></div><span class="pt">24<small>/30</small></span></div>
+    <div class="part"><div><b>Length</b><p>Close to the planned length.</p></div><div class="m"><i style="width:80%"></i></div><span class="pt">16<small>/20</small></span></div>
+    <div class="part tot"><div><b>Score</b></div><div></div><span class="pt">88</span></div>
+  </div>
+</section>
+
+<section class="ch">
+  <h2>Numbers worth knowing.</h2>
+  <p class="say">A few, each against your own history. Never against a chart of people your age.</p>
+  <div class="show nums">
+    <div><b>18.2<small>mph</small></b><span>Speed at 128</span><p>Up from 17.4 in August. Same heart, more speed.</p></div>
+    <div><b>3<small>%</small></b><span>Heart rate drift</span><p>How far your heart rose at the same effort. Your best is 2.</p></div>
+    <div><b>−4<small>bpm</small></b><span>Average heart rate</span><p>Under your usual road ride at this pace.</p></div>
+  </div>
+</section>
+
+<section class="ch split">
+  <div><h2>What more, and what it costs.</h2>
+    <p class="say">Tomorrow is re-planned from what you actually did, not what you were told to do.</p></div>
+  <dl class="show paths">
+    <div class="good"><dt>If you want more</dt><dd>20 more minutes at 125 is free. Tomorrow stays hard.</dd></div>
+    <div><dt>If you stop here</dt><dd>You did the job. Tomorrow: 4 × 8 minutes at 152–160.</dd></div>
+    <div class="bad"><dt>If you go out again tonight</dt><dd>Anything over 133 and tomorrow becomes a steady day.</dd></div>
+  </dl>
+</section>
+
+<section class="ch split">
+  <div><h2>Energy you can check.</h2>
+    <p class="say">It charges overnight and drains through the day. Ceiling's own formula, every point shown, so you can do the math yourself.</p></div>
+  <div class="show">
+    <div class="batt"><span class="n">39</span><div class="cell" role="img" aria-label="Energy 39 of 100"><i></i></div>
+      <p>Now. You woke at 77.</p></div>
+    <div class="ledger">
+      <div><span>Sleep</span><span>31 of 40</span></div>
+      <div><span>HRV</span><span>26 of 35</span></div>
+      <div><span>Resting heart rate</span><span>13 of 15</span></div>
+      <div><span>Freshness</span><span>7 of 10</span></div>
+      <div class="sub"><span>At 6:12 AM</span><span>77</span></div>
+      <div class="dr"><span>Eight hours awake</span><span>−20</span></div>
+      <div class="dr"><span>Road ride</span><span>−18</span></div>
+      <div class="end"><span>Now</span><span>39</span></div>
+    </div>
+  </div>
+</section>
+
+<a class="pager" href="/schedule"><small>Next</small><span>Calendar and plans</span></a>
+{% endblock %}

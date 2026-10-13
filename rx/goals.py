@@ -54,6 +54,7 @@ class Goal:
     stopped_on: str | None = None   # from this day on the plan contributes nothing; what you did stays
     max_hours: float | None = None  # weekly hours cap
     no_days: list = field(default_factory=list)   # weekdays you can't train, 0 = Monday
+    long_day: int | None = None     # weekday for the long session; None picks Sunday, or the latest free day
 
 
 @dataclass
@@ -240,6 +241,8 @@ def pace_per_mile(g: Goal) -> str:
 
 
 def long_weekday(g: Goal) -> int:
+    if g.long_day is not None and 0 <= int(g.long_day) <= 6 and g.long_day not in (g.no_days or []):
+        return int(g.long_day)
     for wd in (6, 5, 4, 3, 2, 1, 0):
         if wd not in (g.no_days or []):
             return wd
@@ -271,8 +274,10 @@ def build(p, g: Goal, today: date) -> Program:
     prog.long_day = long_weekday(g)
     if g.no_days:
         prog.summary += f" No training on {_days_text(g.no_days)}."
-        if prog.long_day != 6 and any(w.long_minutes for w in prog.weeks):
+        if prog.long_day != 6 and g.long_day is None and any(w.long_minutes for w in prog.weeks):
             prog.summary += f" The long session moves to {DAY_NAMES[prog.long_day]}."
+    if g.long_day is not None and prog.long_day == g.long_day and any(w.long_minutes for w in prog.weeks):
+        prog.summary += f" Long sessions on {DAY_NAMES[prog.long_day]}s."
     return prog
 
 
@@ -548,3 +553,409 @@ def parse_text(text: str, today: date, weight_now: float | None = None) -> Goal:
     if any(w in t for w in ("longevity", "for life", "healthy", "live long")):
         return Goal("longevity", iso, target=text.strip()[:120], created=today.isoformat())
     return Goal("best_shape", iso, target=text.strip()[:120], created=today.isoformat())
+
+
+# ---------------------------------------------------------------------------------------------
+# Changing a plan in your own words. Rule-based and private: the same sentence always does the
+# same thing, nothing leaves the server, and anything it doesn't follow is said back plainly.
+# ---------------------------------------------------------------------------------------------
+
+class Changes(list):
+    """The plain-English list of what changed, plus what didn't apply and whether you asked to stop."""
+
+    def __init__(self, *a):
+        super().__init__(*a)
+        self.stop = False           # "I want to quit": the page asks before stopping anything
+        self.notes: list[str] = []  # what it couldn't apply, and why
+        self.missed: list[str] = []  # the words it didn't follow
+        self.understood = False     # it followed something, even if that was already the plan
+
+
+EXAMPLE = "Try “Make it a 4:20 marathon”, “No Wednesdays”, “Max 6 hours a week” or “Move the race to Feb 8”."
+
+_N = {"a": 1, "an": 1, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8,
+      "nine": 9, "ten": 10, "a couple of": 2, "couple of": 2, "a couple": 2, "a few": 3}
+_NUM = r"(\d+|a couple of|couple of|a couple|a few|an|a|one|two|three|four|five|six|seven|eight|nine|ten)"
+_MON = r"(january|february|march|april|may|june|july|august|september|sept|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)"
+_WDN = r"(?:mon|tues|wednes|thurs|fri|satur|sun)day"
+_WD = r"\b(mon(?:day)?|tue(?:s(?:day)?)?|wed(?:s|nesday)?|thu(?:r(?:s(?:day)?)?)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?)s?\b"
+_WD_IDX = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6}
+_SUB = r"(?:\b(sub|under|below|faster than|less than|break(?:ing)?)\s*-?\s*)?"
+
+_STOP = re.compile(r"\b(quit|give up|giving up|abandon|i'?m done|i am done|"
+                   r"stop\s+(?:the\s+|this\s+|my\s+)?(?:plan|it|training(?!\s+on)(?!\s+\w+days?))|"
+                   r"(?:cancel|end|scrap|drop|delete|kill)\s+(?:the\s+|this\s+|my\s+)?(?:plan|it|this)\b)")
+_EVENTS = [
+    (r"\bhalf[\s-]*marathon\b|\b1/2\s*marathon\b|\bhalf\b(?!\s+(?:an?\s+)?(?:hour|hr|day|week|mile|the))", "half marathon"),
+    (r"\b(?:full\s+)?marathon\b", "marathon"),
+    (r"\b(?:50|100)\s*k\b|\b(?:50|100)[\s-]*mil(?:e|er)s?\b|\bultra(?:[\s-]*marathon)?\b", "ultra"),
+    (r"\b10\s*k\b", "10k"),
+    (r"\btrail\s+(?:race|run)\b", "trail race"),
+    (r"\bgran\s*fondo\b|\bfondo\b", "gran fondo"),
+    (r"\bcentury(?:\s+ride)?\b", "century ride"),
+    (r"\b(?:mtb|mountain[\s-]*bike)\s+race\b", "mtb race"),
+    (r"\bski[\s-]*tour(?:ing)?\b", "ski tour"),
+    (r"\bski\s+race\b", "ski race"),
+    (r"\btri(?:athlon)?\b", "triathlon"),
+]
+_EVENT_SAY = {"ultra": "50k ultra"}
+_SPORT_W = {"run": "run", "running": "run", "ride": "bike", "riding": "bike", "bike": "bike", "biking": "bike",
+            "cycling": "bike", "ski": "ski", "skiing": "ski"}
+_SPORT_SAY = {"run": "running", "bike": "riding", "ski": "skiing"}
+_FILLER = {"please", "thanks", "thank", "you", "ok", "okay", "also", "and", "actually", "hey", "hi", "so", "then",
+           "cool", "great", "the", "a", "plan", "it"}
+
+
+def _n(word: str) -> int:
+    return int(word) if word.isdigit() else _N.get(word, 1)
+
+
+def _blank(s: str, m) -> str:
+    return s[:m.start()] + " " * (m.end() - m.start()) + s[m.end():]
+
+
+def _day_say(d: date, today: date) -> str:
+    out = d.strftime("%A, %b %-d")
+    return out + (f", {d.year}" if d.year != today.year and (d - today).days > 300 else "")
+
+
+def _mkdate(y, mo, d, today: date) -> date | None:
+    try:
+        x = date(int(y), mo, d) if y else date(today.year, mo, d)
+    except ValueError:
+        return None
+    if not y and x < today:
+        try:
+            x = date(today.year + 1, mo, d)
+        except ValueError:
+            return None
+    return x
+
+
+def _find_date(s: str, today: date):
+    """An absolute date in the clause: (date or None if invalid, match, month_only)."""
+    y = lambda g: (int(g) + 2000 if g and len(g) == 2 else int(g)) if g else None
+    m = re.search(r"(?:\b" + _WDN + r",?\s+)?\b" + _MON + r"\.?\s+(\d{1,2})(?:st|nd|rd|th)?\b(?:,?\s*(\d{4}))?", s)
+    if m:
+        return _mkdate(y(m.group(3)), MONTHS[m.group(1)[:3]], int(m.group(2)), today), m, False
+    m = re.search(r"(?:\b" + _WDN + r",?\s+)?\b(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?" + _MON + r"\b(?:,?\s*(\d{4}))?", s)
+    if m:
+        return _mkdate(y(m.group(3)), MONTHS[m.group(2)[:3]], int(m.group(1)), today), m, False
+    m = re.search(r"(?:\b" + _WDN + r",?\s+)?\b(\d{1,2})/(\d{1,2})(?:/(\d{4}|\d{2}))?\b", s)
+    if m and 1 <= int(m.group(1)) <= 12:
+        return _mkdate(y(m.group(3)), int(m.group(1)), int(m.group(2)), today), m, False
+    m = re.search(r"\b(?:in|by|to|until|till|for|on|around|mid|early|late|end of)\s+(?:mid[\s-]*)?" + _MON +
+                  r"\b(?:,?\s*(\d{4}))?", s)
+    if m:
+        return _mkdate(y(m.group(2)), MONTHS[m.group(1)[:3]], 15, today), m, True
+    m = re.search(r"\b(?:by\s+|at\s+|for\s+|on\s+|to\s+)?christmas\b", s)
+    if m:
+        return _mkdate(None, 12, 25, today), m, False
+    return None, None, False
+
+
+def _finish(s: str, ev: str):
+    """A finish time in the clause: (seconds, sub, match)."""
+    no_clock = r"(?!\s*[ap]\.?m\b)"
+    m = re.search(_SUB + r"\b(\d{1,2}):(\d{2})(?::(\d{2}))?\b" + no_clock, s)
+    if m:
+        a, b, c = int(m.group(2)), int(m.group(3)), m.group(4)
+        secs = a * 3600 + b * 60 + int(c) if c else (a * 60 + b if ev == "10k" and a >= 20 else a * 3600 + b * 60)
+        return secs, bool(m.group(1)), m
+    m = re.search(_SUB + r"\b(\d{1,2}(?:\.\d+)?)\s*(?:hours?|hrs?|h)(?![a-z])(?:\s*(?:and\s*)?(\d{1,2})\s*(?:minutes?|mins?|m)?(?![a-z\d]))?", s)
+    if m:
+        return round(float(m.group(2)) * 3600) + int(m.group(3) or 0) * 60, bool(m.group(1)), m
+    m = re.search(_SUB + r"\b(\d{2,3})\s*(?:minutes?|mins?)\b", s)
+    if m:
+        return int(m.group(2)) * 60, bool(m.group(1)), m
+    m = re.search(r"\b(sub|under|below|break(?:ing)?)\s*-?\s*(\d{1,3})\b(?!\s*(?:lbs?|pounds?|%|weeks?|days?|months?|k\b))", s)
+    if m:
+        n = int(m.group(2))
+        return (n * 3600 if n <= 7 else n * 60), True, m
+    return None, False, None
+
+
+def apply_text(goal: Goal, text: str, today: date) -> tuple[Goal, Changes]:
+    """Change a plan the way you'd say it: 'Make it a 4:20 marathon. I can't train Wednesdays.
+    Max 6 hours a week. Move the race to February 8.' Returns a changed copy and what changed.
+    Asking to quit sets changes.stop and changes nothing: the page asks before it stops a plan."""
+    from dataclasses import replace
+    g = replace(goal, no_days=list(goal.no_days or []))
+    ch = Changes()
+    raw = (text or "").replace("\u2019", "'").strip()
+    if not raw:
+        return g, ch
+    if _STOP.search(raw.lower()):
+        ch.stop = ch.understood = True
+        return g, ch
+
+    # clauses: sentences, commas, "but"; a comma before a year or a month stays inside its date
+    parts = re.split(r"\.(?=\s+[A-Za-z]|\s*$)|[;!?\n]+|,(?!\s*(?:\d{4}\b|" + _MON.replace("(", "(?:", 1) + r"\b))|\s+(?:but|also|plus)\s+", raw, flags=re.I)
+    clauses = [p.strip().lower() for p in parts if p and p.strip()]
+    hit = [False] * len(clauses)
+    old_event, set_target, same = (goal.event or "").lower(), False, False
+
+    def say(x: str):
+        if x not in ch:
+            ch.append(x)
+
+    # 1. the event first, so a finish time in the same sentence is read for the right distance
+    for i, c in enumerate(clauses):
+        for pat, ev in _EVENTS:
+            m = re.search(pat, c)
+            if not m:
+                continue
+            clauses[i], hit[i] = _blank(c, m), True
+            if g.kind != "event" or (g.event or "").lower() != ev:
+                g.kind, g.event, g.sport = "event", ev, EVENT_SPORT[ev]
+                say(f"Event: {_EVENT_SAY.get(ev, ev)}")
+            else:
+                same = True
+            break
+    ev = (g.event or "").lower()
+
+    last_pol = None
+    for i, c in enumerate(clauses):
+        # weekly hours cap
+        m = re.search(r"\b(?:no|remove\s+the|drop\s+the|lift\s+the|take\s+off\s+the)\s+(?:hours?\s+|weekly\s+)?(?:cap|limit)\b|\bno\s+max\b", c)
+        if m:
+            c, hit[i] = _blank(c, m), True
+            if g.max_hours:
+                g.max_hours = None
+                say("No weekly hours cap")
+            else:
+                same = True
+        week = r"(?:\s*(?:a|per|/|each|every|in\s+a)\s*week|\s*weekly)"
+        m = (re.search(r"\b(?:max(?:imum)?(?:\s+of)?|at\s+most|no\s+more\s+than|not\s+more\s+than|up\s+to|cap(?:\s+it)?(?:\s+at)?|"
+                       r"limit(?:\s+it)?(?:\s+to)?|only(?:\s+have)?|just|less\s+than|under)\s*(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|h)(?![a-z])" + week, c)
+             or re.search(r"\b(?:max(?:imum)?(?:\s+of)?|at\s+most|no\s+more\s+than|not\s+more\s+than|up\s+to|cap(?:\s+it)?(?:\s+at)?|"
+                          r"limit(?:\s+it)?(?:\s+to)?)\s*(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|h)(?![a-z])(?:" + week + r")?", c)
+             or re.search(r"\b(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|h)(?![a-z])" + week + r"(?:\s*(?:max|tops|at\s+most))?", c))
+        if m:
+            c, hit[i] = _blank(c, m), True
+            h = float(m.group(1))
+            if not 1 <= h <= 40:
+                ch.notes.append(f"{h:g} hours a week is outside what the plan can use (1 to 40), so the cap stays as it was.")
+            elif g.max_hours != h:
+                g.max_hours = h
+                say(f"At most {h:g} hours a week")
+            else:
+                same = True
+
+        # weight
+        lb = r"\s*(?:lbs?|pounds?)\b"
+        wm = [(k, re.search(p, c)) for k, p in (
+            ("lose", r"\b(?:lose|drop|shed|cut)\s+(?:another\s+)?(\d{1,3}(?:\.\d)?)\s*(?:more\s+)?(?:lbs?|pounds?)\b"),
+            ("now", r"\b(?:i\s+weigh|weigh(?:ing)?|weight\s+(?:is\s+)?now|i'?m\s+now|i\s+am\s+now)\s+(?:about\s+|at\s+)?(\d{2,3}(?:\.\d)?)(?:" + lb + r")?|\bi'?m\s+(\d{2,3}(?:\.\d)?)" + lb + r"(?:\s+now)?"),
+            ("to", r"\b(?:target(?:\s+weight)?(?:\s+(?:of|to|is|at))?|goal(?:\s+weight)?(?:\s+(?:of|is))?|get\s+(?:down\s+)?to|down\s+to|reach|"
+                   r"weigh\s+in\s+at|aim\s+for)\s*:?\s*(\d{2,3}(?:\.\d)?)" + ("(?:" + lb + ")?" if g.kind == "weight" else lb)))]
+        for k, m in wm:
+            if not m:
+                continue
+            v = float(next(x for x in m.groups() if x))
+            c, hit[i] = _blank(c, m), True
+            if g.kind != "weight":
+                ch.notes.append("Weight goals have their own plan. Start one from New plan, then Lose weight.")
+                continue
+            if k == "now":
+                if 80 <= v <= 500 and g.start_weight != v:
+                    g.start_weight = v
+                    say(f"Weight now: {v:g} lb")
+                continue
+            if k == "lose":
+                if not g.start_weight:
+                    ch.notes.append("Add your weight now first, like “I weigh 182”.")
+                    continue
+                v = g.start_weight - v
+            if not 80 <= v <= 500:
+                ch.notes.append(f"{v:g} lb doesn't look like a target weight, so it stays as it was.")
+            elif g.target_weight != v:
+                g.target_weight = v
+                say(f"Target weight: {v:g} lb" + (f", {g.start_weight - v:g} lb to lose" if g.start_weight and g.start_weight > v else ""))
+            else:
+                same = True
+
+        # the date: absolute, "in 10 weeks", or moved by an amount
+        noun = "Race" if g.kind == "event" else "Goal date"
+        d, m, month_only = _find_date(c, today)
+        if not m:
+            m = re.search(r"\bin\s+" + _NUM + r"\s+(day|week|month)s?\b", c)
+            if m:
+                k, unit = _n(m.group(1)), m.group(2)
+                d = today + (timedelta(days=k) if unit == "day" else timedelta(weeks=k) if unit == "week" else timedelta(days=30 * k))
+                month_only = unit != "day"
+        if m:
+            c, hit[i] = _blank(c, m), True
+            if d and g.kind == "event" and month_only:
+                d = d + timedelta(days=6 - d.weekday())       # a month alone: the Sunday of mid-month
+            if d is None:
+                ch.notes.append("That date doesn't exist, so the date stays as it was.")
+            elif d <= today:
+                ch.notes.append(f"{_day_say(d, today)} has passed, so the date stays as it was.")
+            elif g.target_date != d.isoformat():
+                g.target_date = d.isoformat()
+                say(f"{noun} moved to {_day_say(d, today)}" if goal.target_date else f"{noun}: {_day_say(d, today)}")
+            else:
+                same = True
+        else:
+            m = re.search(r"\b" + _NUM + r"\s+(day|week|month)s?\b", c)
+            later = re.search(r"\b(back|later|out|delay|postpone|push)", c)
+            sooner = re.search(r"\b(earlier|sooner|forward|ahead|pull|bring)", c)
+            if m and (later or sooner):
+                c, hit[i] = _blank(c, m), True
+                k, unit = _n(m.group(1)), m.group(2)
+                delta = timedelta(days=k) if unit == "day" else timedelta(weeks=k) if unit == "week" else timedelta(days=30 * k)
+                if not g.target_date:
+                    ch.notes.append("There's no date to move yet. Say the date, like “Race is March 1”.")
+                else:
+                    d = date.fromisoformat(g.target_date) + (-delta if sooner and not later else delta)
+                    if d <= today:
+                        ch.notes.append(f"That would put it on {_day_say(d, today)}, which has passed. The date stays as it was.")
+                    else:
+                        g.target_date = d.isoformat()
+                        say(f"{noun} moved to {_day_say(d, today)}")
+        m = re.search(r"\b(?:no|remove\s+the|drop\s+the)\s+(?:end\s+)?date\b|\bongoing\b|\bopen[\s-]*ended\b", c)
+        if m and g.kind != "event":
+            c, hit[i] = _blank(c, m), True
+            if g.target_date:
+                g.target_date = None
+                say("No end date")
+
+        # the finish time
+        m = re.search(r"\b(?:just\s+(?:want\s+to\s+|to\s+)?finish|finish\s+strong|no\s+time\s+(?:goal|target)|"
+                      r"(?:drop|forget|lose)\s+the\s+time(?:\s+goal)?|don'?t\s+care\s+about\s+(?:the\s+)?time)\b", c)
+        if m:
+            c, hit[i], set_target = _blank(c, m), True, True
+            if g.target != "Finish strong":
+                g.target = "Finish strong"
+                say("Target: finish strong, no time goal")
+        secs, sub, m = _finish(c, ev)
+        if m:
+            c, hit[i] = _blank(c, m), True
+            if g.kind != "event":
+                ch.notes.append("A finish time needs a race. Say which, like “Make it a 4:20 marathon”.")
+            elif ev in DIST_MI:
+                lo, hi = _SANE[ev]
+                if not lo <= secs <= hi:
+                    ch.notes.append(f"{fmt_time(secs)} doesn't fit a {ev}, so the target stays as it was.")
+                else:
+                    new = ("sub " if sub else "") + fmt_time(secs)
+                    set_target = True
+                    if g.target != new:
+                        g.target = new
+                        say(f"Target: {new} ({pace_per_mile(g)} a mile)")
+                    else:
+                        same = True
+            else:
+                new = ("sub " if sub else "") + fmt_time(secs)
+                set_target = True
+                if g.target != new:
+                    g.target = new
+                    say(f"Target: {new}")
+
+        # the long day
+        m = re.search(r"\blong\b[^.]*?" + _WD + r"|" + _WD + r"[^.]*?\blong\b", c)
+        if m:
+            wd = _WD_IDX[(m.group(1) or m.group(2))[:3]]
+            c, hit[i] = _blank(c, m), True
+            word = {"run": "Long runs", "bike": "Long rides"}.get(g.sport or EVENT_SPORT.get(ev, ""), "Long sessions")
+            if wd in g.no_days:
+                g.no_days.remove(wd)
+                say(f"{DAY_NAMES[wd]}s are back on")
+            if g.long_day != wd:
+                g.long_day = wd
+                say(f"{word} on {DAY_NAMES[wd]}s")
+            else:
+                same = True
+
+        # main sport
+        m = (re.search(r"\b(running|run|riding|ride|biking|bike|cycling|skiing|ski)\s+instead\b", c)
+             or re.search(r"\b(?:switch|change|make\s+it|focus|mostly|main\s+sport|prefer|more)\b[^.]*?\b(running|run|riding|ride|biking|bike|cycling|skiing|ski)\b", c))
+        if m:
+            sp = _SPORT_W[m.group(1)]
+            c, hit[i] = _blank(c, m), True
+            if g.sport != sp:
+                g.sport = sp
+                say(f"Main sport: {_SPORT_SAY[sp]}")
+            else:
+                same = True
+
+        # days you can't train, and days you can again
+        days = [_WD_IDX[x.group(1)[:3]] for x in re.finditer(_WD, c)]
+        if re.search(r"\bweekends?\b", c):
+            days += [5, 6]
+        if re.search(r"\bweekdays?\b", c):
+            days += [0, 1, 2, 3, 4]
+        anyday = re.search(r"\b(?:any|every)\s*day\b|\ball\s+week\b", c)
+        if days or anyday:
+            rest = re.sub(_WD + r"|\bweekends?\b|\bweekdays?\b|\b(?:and|or|&|nor)\b|[\s,/]", "", c)
+            neg = re.search(r"\b(can'?t|cannot|can\s+not|won'?t|unable|no|not|never|off|unavailable|busy|skip|rest|away|stop|drop|"
+                            r"without|except|nothing\s+on)\b", c)
+            pos = re.search(r"\b(can|could|able|available|free|open|back|add|again|fine|ok|okay|works?)\b", c)
+            pol = "off" if neg else "on" if pos else (last_pol if not rest else None)
+            if anyday and pol == "on" and not days:
+                hit[i] = True
+                if g.no_days:
+                    g.no_days = []
+                    say("Every day is open again")
+                else:
+                    same = True
+            elif pol and days:
+                hit[i], last_pol = True, pol
+                days = sorted(set(days))
+                if pol == "off":
+                    add = [x for x in days if x not in g.no_days]
+                    if len(set(g.no_days) | set(add)) >= 7:
+                        ch.notes.append("That leaves no days to train, so the days stay as they were.")
+                    elif add:
+                        g.no_days = sorted(set(g.no_days) | set(add))
+                        if g.long_day in add:
+                            g.long_day = None
+                        say(f"No training on {_days_text(add).replace(' and ', ' or ')}")
+                    else:
+                        same = True
+                else:
+                    back = [x for x in days if x in g.no_days]
+                    if back:
+                        g.no_days = [x for x in g.no_days if x not in back]
+                        say(f"{_days_text(back)} are back on")
+                    else:
+                        same = True
+            c = re.sub(_WD, " ", c) if hit[i] else c
+
+        if not hit[i]:
+            words = [w for w in re.findall(r"[a-z']+", c) if w not in _FILLER]
+            if words:
+                ch.missed.append(parts_text(raw, clauses[i]))
+
+    if g.kind == "event" and ev != old_event and old_event and not set_target:
+        old = replace(goal)
+        if target_seconds(old):
+            g.target = ""
+            say(f"Target time cleared (it was for the {old_event})")
+    ch.understood = bool(ch) or same or bool(ch.notes) or any(hit)
+    if ch.missed:
+        if ch.understood:
+            ch.notes.append("I didn't follow " + " or ".join(f"“{x}”" for x in ch.missed) + ", so I left that alone.")
+        else:
+            ch.notes.append("I didn't understand that, so nothing changed. " + EXAMPLE)
+    elif not ch and same and not ch.notes:
+        ch.notes.append("That's already the plan, so nothing changed.")
+    return g, ch
+
+
+def parts_text(raw: str, clause: str) -> str:
+    """The clause as you wrote it (original case), trimmed for quoting back."""
+    i = raw.lower().find(clause.strip())
+    s = raw[i:i + len(clause.strip())] if i >= 0 else clause.strip()
+    return (s[:80] + "…") if len(s) > 80 else s
+
+
+def from_text(text: str, today: date, weight_now: float | None = None) -> tuple[Goal, Changes]:
+    """Building from words and changing with words are one path: parse the goal, then apply the
+    rest of the sentence ('Run a 4:20 marathon on Feb 1, no Wednesdays')."""
+    g = parse_text(text, today, weight_now)
+    g, ch = apply_text(g, text, today)
+    if g.target == text.strip()[:120]:
+        g.target = ""
+    return g, ch
