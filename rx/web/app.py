@@ -51,7 +51,7 @@ async def sign_in_gate(request: Request, call_next):
     path = request.url.path
     email = auth.verify("session", request.cookies.get(auth.COOKIE)) if auth.enabled() else None
     current_owner.set(owner_of(email))
-    if path in ("/healthz", "/login", "/logout", "/plan.ics", "/how", "/science", "/join") or path.startswith("/static/"):
+    if path in ("/favicon.ico", "/apple-touch-icon.png", "/apple-touch-icon-precomposed.png", "/healthz", "/login", "/logout", "/plan.ics", "/how", "/science", "/join") or path.startswith("/static/"):
         return await call_next(request)
     if _signed_in(request):
         # A new athlete has no data yet: every page sends them to Data to connect it.
@@ -95,6 +95,20 @@ def login_get(request: Request):
 
 def _site(request: Request, name: str, **ctx):
     return templates.TemplateResponse(request, name, {"active": name[5:].split(".")[0], **ctx})
+
+
+@app.get("/favicon.ico")
+def favicon():
+    from fastapi.responses import FileResponse
+    return FileResponse(Path(__file__).parent / "static" / "favicon.ico", media_type="image/x-icon",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/apple-touch-icon.png")
+@app.get("/apple-touch-icon-precomposed.png")
+def touch_icon():
+    from fastapi.responses import FileResponse
+    return FileResponse(Path(__file__).parent / "static" / "apple-touch-icon.png", media_type="image/png")
 
 
 @app.get("/how", response_class=HTMLResponse)
