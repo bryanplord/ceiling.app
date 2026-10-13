@@ -58,6 +58,7 @@ class Rx:
     reading: Reading | None = None
     skip_short: str = ""
     example: str = ""
+    minimum: str = ""
     why_title: str = ""
     why_tone: str = "none"
     why_says: str = ""
@@ -241,6 +242,7 @@ def build_rx(p: Profile, day: str | None = None) -> Rx:
     rx.diagnosis, rx.activity_why = diag, sport_reason
     rx.why_title, rx.why_tone, rx.why_says = why_lead(verdict, p, day, reading)
     rx.what, rx.how = what_how(rx, kind, mins, low, ceiling, steps)
+    rx.minimum = minimum_dose(p, day)
     rx.scenarios = scenarios(p, rx)
     rx.if_skip, rx.if_overdo = consequences(p, rx)
     rx.compress, rx.stretch = flex(p, rx)
@@ -705,3 +707,26 @@ def diagnosis(verdict: str, p: Profile, day: str, reading, sb) -> str:
     causes = causes[:3]
     because = causes[0] if len(causes) == 1 else ", ".join(causes[:-1]) + " and " + causes[-1]
     return f"{need}. {because[:1].upper()}{because[1:]}."
+
+
+def minimum_dose(p: Profile, day: str) -> str:
+    """The least you can do this week and keep the fitness you have.
+
+    Evidence: aerobic fitness holds for weeks to months with frequency cut to ~2 sessions a week
+    and volume cut by up to two thirds, provided intensity is kept (Hickson 1981, 1985;
+    Spiering 2021). Stop entirely and VO2max falls ~4–14% within 2–4 weeks (Mujika & Padilla 2000)."""
+    if not p.zones:
+        return ""
+    cut = (date.fromisoformat(day) - timedelta(days=28)).isoformat()
+    hours = sum((a.moving_s or 0) for a in p.activities if cut <= a.date < day and a.sport != WALK) / 3600 / 4
+    if hours < 1.5:
+        return ""
+    floor_h = max(1.0, hours / 3)
+    h, m = int(floor_h), int(round((floor_h - int(floor_h)) * 60 / 15) * 15)
+    if m == 60:
+        h, m = h + 1, 0
+    amount = f"{h}h {m:02d}m" if m else f"{h} hours"
+    z = p.zones
+    return (f"Minimum to keep what you have: 2 sessions this week, about {amount} total "
+            f"(a third of your usual {hours:.0f}), one with 2 × 10 minutes at {z.bottom('Z4 Threshold')}–"
+            f"{z.top('Z4 Threshold')}. When time is short, intensity is what holds fitness.")

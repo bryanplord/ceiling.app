@@ -199,7 +199,7 @@
         <div class="rxv"><p class="whyhead"><b class="{{ rx.why_tone }}">{{ rx.why_title }}.</b> {{ rx.why_says }}</p>
           <ul class="rxlist facts">{% for e in rx.reading.evidence[:4] %}<li><b>{{ e.name }}</b> {{ e.line.split('. ')[0].rstrip('.') }}.</li>{% endfor %}
           {% if rx.sleep and rx.sleep.state not in ('even', 'unknown', 'surplus') %}{% set sd = rx.sleep.says.split('. ')[0].rstrip('.') %}<li><b>Sleep debt</b> {{ sd[:1] | upper }}{{ sd[1:] }}.</li>{% endif %}</ul></div></div>{% endif %}
-      {% if rx.skip_short %}<div class="rxl"><span class="rxk">Skip it</span><p class="rxv">{{ rx.skip_short }}</p></div>{% endif %}
+      {% if rx.skip_short %}<div class="rxl"><span class="rxk">Skip it</span><div class="rxv"><p class="rxv">{{ rx.skip_short }}</p>{% if rx.minimum %}<p class="actwhy">{{ rx.minimum }}</p>{% endif %}</div></div>{% endif %}
       {% if rx.overdo_short %}<div class="rxl over"><span class="rxk">Overdo it</span><p class="rxv">{{ rx.overdo_short }}</p></div>{% endif %}
       {% if rx.sleep and rx.sleep.lights_out %}<div class="rxl"><span class="rxk">Tonight</span><p class="rxv">In bed by <b>{{ rx.sleep.lights_out }}</b> for {{ rx.sleep_if[0][0][9:] if rx.sleep_if else '' }} of sleep. Do that, and {{ rx.sleep_if[0][2] if rx.sleep_if }}.</p></div>{% endif %}
     </div>
