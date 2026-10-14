@@ -165,7 +165,7 @@ def build(p: Profile, rx: Rx) -> Plan:
         last_kind = kind if kind else (sport if sport == eng.RUN else None)
         if v == HARD:
             hard_days.append(d)
-        conf = "Likely" if k == 1 else "Probable" if k <= 3 else "Sketch"
+        conf = "Likely" if k == 1 else "Probable"     # past the horizon, outlook() calls it a Sketch
         detail = detail[:1].upper() + detail[1:] + "."
         if long_m:
             lo_e, hi_e = eng.easy_band(p.zones)
@@ -318,13 +318,19 @@ def ics(plan: Plan, url: str = "https://www.ceiling.app/calendar") -> str:
 
 
 # ---------------------------------------------------------------------------------------------
-# The whole plan: everything from today to the end of the programme. The honest horizon (above)
-# is firm; the days past it are pencilled in from the programme's week and how you usually train,
-# and firm up as they come into view.
+# The whole plan: everything from today to the end of the programme. One confidence scale for every
+# day: Today (set), Likely (tomorrow), Probable (the rest of the honest horizon, above), then Sketch:
+# drawn from the programme's week and how you usually train. Every day after today depends on how you
+# follow the plan and how you recover, so each one firms up as it comes closer.
 
 LONG, RACE = "long", "race"
 LABEL = {REST: "Rest", LIGHT: "Walk", EASY: "Easy", STEADY: "Steady", HARD: "Hard", LONG: "Long", RACE: "Race"}
 WEIGHT = {HARD: 1.0, STEADY: 1.2, EASY: 0.8}
+# A session shorter than this isn't worth the drive: a hard day needs warm-up, intervals and cool-down.
+FLOOR = {EASY: 40, STEADY: 45, HARD: 60}
+CAP = {EASY: 90, STEADY: 150, HARD: 90}
+EXTRA = {HARD: 0.5, STEADY: 1.2, EASY: 0.8}   # how the minutes above the floors are shared: volume goes to aerobic days
+CONF = ("Today", "Likely", "Probable", "Sketch")
 NO_PLAN_DAYS = 42
 
 
@@ -399,13 +405,53 @@ def _firm(p: Profile, rx: Rx, plan: Plan) -> dict[str, dict]:
         if kind in (REST, RACE):
             mins = None
         out[d.date] = dict(date=d.date, kind=kind, label=LABEL[kind], minutes=mins, phase=d.phase,
-                           firm=True, title=d.title)
+                           firm=True, title=d.title, conf=d.confidence, verdict=d.verdict, detail=d.detail,
+                           options=d.options, reason=d.reason, because=d.because, was=d.was, was_title=d.was_title)
     return out
+
+
+def _aim(p: Profile, kind: str) -> str:
+    """The heart-rate aim for a sketched session, the same bands the daily Rx uses."""
+    z = getattr(p, "zones", None)
+    if z is None or kind in (REST, RACE, LIGHT):
+        return ""
+    try:
+        if kind == HARD:
+            lo, hi = z.bottom("Z4 Threshold"), z.top("Z4 Threshold") + 3
+            return f"Intervals at {lo}–{hi}, with a warm-up and cool-down"
+        if kind == STEADY:
+            return f"Steady at {z.bottom('Z2 Aerobic')}–{z.top('Z2 Aerobic')}"
+        lo, hi = eng.easy_band(z)
+        return f"Easy the whole way, {lo}–{hi}"
+    except Exception:
+        return ""
+
+
+def _share_minutes(budget: float, kinds: list[str]) -> list[int]:
+    """Split a week's minutes across sessions: every session gets its floor, the rest by weight, up to a cap."""
+    m = [float(FLOOR[k]) for k in kinds]
+    extra = budget - sum(m)
+    live = [i for i in range(len(kinds))]
+    while extra > 1 and live:
+        w = sum(EXTRA[kinds[i]] for i in live)
+        nxt = []
+        spent = 0.0
+        for i in live:
+            add = min(extra * EXTRA[kinds[i]] / w, CAP[kinds[i]] - m[i])
+            m[i] += add
+            spent += add
+            if m[i] < CAP[kinds[i]] - 0.5:
+                nxt.append(i)
+        extra -= spent
+        if len(nxt) == len(live):
+            break
+        live = nxt
+    return [int(max(FLOOR[k], round(x / 5) * 5)) for k, x in zip(kinds, m)]
 
 
 def outlook(p: Profile, rx: Rx, start: date | None = None, end: date | None = None,
             plan: Plan | None = None) -> list[dict]:
-    """Every day from start to end: firm inside the honest horizon, pencilled in past it.
+    """Every day from start to end: the honest horizon as planned, then a sketch from the programme.
 
     A pencilled-in day comes from the programme's week (phase, hours, hard days, the long session
     on the long day) and your habits: rest only on weekdays you train less than 10% of the time,
@@ -421,6 +467,9 @@ def outlook(p: Profile, rx: Rx, start: date | None = None, end: date | None = No
     from .. import goals as gl
     base_h = max(3.0, gl._recent_hours(p, date.fromisoformat(rx.date)))
     has_plan = bool(_programs(p))
+    today = date.fromisoformat(rx.date)
+    done_today = sum((a.moving_s or 0) / 60 for a in p.activities
+                     if a.date == rx.date and a.sport != WALK and (a.moving_s or 0) >= 10 * 60)
 
     out: list[dict] = []
     kinds: dict[date, str] = {}            # kept across weeks so Sunday's hard day is seen by Monday
@@ -434,6 +483,10 @@ def outlook(p: Profile, rx: Rx, start: date | None = None, end: date | None = No
         hours = _week_hours(gw) if gw else None
         hours = hours if hours is not None else (None if has_plan and gw else round(base_h, 1))
         hard_n = gw.get("hard_days", 0) if gw else 0
+        wobj = gw.get("week") if gw else None
+        long_w = getattr(wobj, "long_minutes", None) if wobj is not None else None
+        sport_w = gw.get("sport") if gw else None
+        wnoun = {eng.RUN: "run", eng.BIKE: "ride", eng.SKI: "ski tour"}.get(sport_w, "session")
         for d in week:
             f = firm.get(d.isoformat())
             if f:
@@ -481,12 +534,21 @@ def outlook(p: Profile, rx: Rx, start: date | None = None, end: date | None = No
             used = sum(v for d, v in mins.items() if v and d in week)
             past = {d.isoformat() for d in week if d < start}       # what you already did this week counts
             used += sum((a.moving_s or 0) / 60 for a in p.activities if a.date in past and a.sport != WALK)
+            if today in week and done_today:                        # today counts as what you did, not the plan
+                used += done_today - (mins.get(today) or 0)
             todo = [d for d in open_ if kinds[d] in WEIGHT and d not in mins]
             left = hours * 60 - used
-            wsum = sum(WEIGHT[kinds[d]] for d in todo) or 1.0
-            for d in todo:
-                m = left * WEIGHT[kinds[d]] / wsum
-                mins[d] = int(min(120, max(20, round(m / 5) * 5)))
+            # too many sessions for the hours: drop the least useful (easy, then steady, on the days you
+            # train least) to rest, rather than shrink everything into 20-minute sessions
+            while todo and sum(FLOOR[kinds[d]] for d in todo) > max(0.0, left) * 1.1:
+                cand = [d for d in todo if kinds[d] == EASY] or [d for d in todo if kinds[d] == STEADY]
+                if not cand:
+                    break
+                d = min(cand, key=lambda d: (share[d.weekday()], -d.toordinal()))
+                kinds[d], mins[d] = REST, None
+                todo.remove(d)
+            for d, m in zip(todo, _share_minutes(left, [kinds[d] for d in todo])):
+                mins[d] = m
         else:
             for d in open_:
                 if kinds[d] in WEIGHT and d not in mins:
@@ -501,8 +563,9 @@ def outlook(p: Profile, rx: Rx, start: date | None = None, end: date | None = No
             else:
                 k = kinds[d]
                 row = dict(date=d.isoformat(), kind=k, label=LABEL[k], minutes=mins.get(d), phase=phase,
-                           firm=False, title="")
-            row.update(week_hours=hours, week_phase=phase, today=d.isoformat() == rx.date)
+                           firm=False, title="", conf="Sketch", aim=_aim(p, k), noun=wnoun if k == LONG else "")
+            row.update(week_hours=hours, week_phase=phase, week_hard=hard_n, week_long=long_w, week_noun=wnoun,
+                       today=d.isoformat() == rx.date)
             out.append(row)
         mon += timedelta(days=7)
     return out
@@ -537,8 +600,9 @@ def months(days: list[dict]) -> list[dict]:
                 row = by.get(d.isoformat()) if d.month == m else None
                 if row is not None:
                     info = info or row
-                    row = dict(row, day=d.day, dur=duration(row.get("minutes")))
-                cells.append(row if row is not None else ({"day": d.day, "past": True} if d.month == m else None))
+                    row = dict(row, day=d.day, dur=duration(row.get("minutes")), wlong=duration(int(round(row["week_long"] / 5) * 5) if row.get("week_long") else None))
+                cells.append(row if row is not None else
+                             ({"day": d.day, "date": d.isoformat(), "past": True} if d.month == m else None))
             any_day = next((by.get((mon + timedelta(days=i)).isoformat()) for i in range(7)
                             if by.get((mon + timedelta(days=i)).isoformat())), None)
             weeks.append(dict(cells=cells, phase=(any_day or {}).get("week_phase", ""),

@@ -97,3 +97,66 @@ def test_month_grids(built):
         assert all(len(w["cells"]) == 7 for w in m["weeks"])
     oct_ = ms[0]
     assert any(c and c.get("past") for w in oct_["weeks"] for c in w["cells"])
+
+
+def _check_weeks(rows, prog):
+    """Every fully sketched week sums to its target hours (within 15%) and no session is below its floor."""
+    weeks = {w.start: w for w in prog.weeks}
+    checked = 0
+    for mon, rs in _weeks(rows).items():
+        w = weeks.get(mon.isoformat())
+        if not w or len(rs) < 7 or any(r["firm"] for r in rs) or any(r["kind"] == "race" for r in rs):
+            continue
+        tot = sum(r["minutes"] or 0 for r in rs)
+        assert abs(tot - w.hours * 60) <= 0.15 * w.hours * 60, (mon, tot, w.hours)
+        for r in rs:
+            if r["kind"] in pm.FLOOR:
+                assert r["minutes"] >= pm.FLOOR[r["kind"]], (r["date"], r["kind"], r["minutes"])
+            if r["kind"] == "long":
+                assert abs(r["minutes"] - w.long_minutes) <= 5
+        checked += 1
+    assert checked >= 5
+
+
+def test_week_hours_add_up(built):
+    p, rx = built
+    p.program = prog = gl.build(p, gl.parse_text("Run a marathon on February 1 2027", TODAY), TODAY)
+    p.programs = [prog]
+    _check_weeks(pm.outlook(p, rx), prog)
+
+
+def test_low_hours_drop_sessions_not_minutes(built, monkeypatch):
+    """3.4 hours in a week you train six days: fewer, real sessions, never four 20-minute ones."""
+    p, rx = built
+    p.program = prog = gl.build(p, gl.parse_text("Run a marathon on February 1 2027", TODAY), TODAY)
+    p.programs = [prog]
+    for w in prog.weeks:
+        w.hours = max(3.4, round(w.hours * 0.55, 1))
+        if w.long_minutes:
+            w.long_minutes = int(round(w.long_minutes * 0.55 / 5) * 5)
+    monkeypatch.setattr(pm, "_weekday_share", lambda p, d: [0.6] * 7)   # trains every day
+    rows = pm.outlook(p, rx)
+    _check_weeks(rows, prog)
+    for r in rows:
+        if not r["firm"] and r["kind"] in ("easy", "steady", "hard"):
+            nxt = next((x for x in rows if x["date"] == (date.fromisoformat(r["date"]) + timedelta(days=1)).isoformat()), None)
+            if not (nxt and nxt["kind"] == "race"):
+                assert r["minutes"] >= pm.FLOOR[r["kind"]]
+
+
+def test_one_confidence_scale(built):
+    p, rx = built
+    p.program = gl.build(p, gl.parse_text("Run a marathon on February 1 2027", TODAY), TODAY)
+    p.programs = [p.program]
+    plan = pm.build(p, rx)
+    assert [d.confidence for d in plan.days][:2] == ["Today", "Likely"]
+    assert all(d.confidence == "Probable" for d in plan.days[2:])
+    rows = pm.outlook(p, rx, plan=plan)
+    assert {r["conf"] for r in rows} <= set(pm.CONF)
+    order = [pm.CONF.index(r["conf"]) for r in rows]
+    assert order == sorted(order)                      # confidence only ever drops with distance
+    for r in rows:
+        if r["conf"] == "Sketch" and r["kind"] in ("easy", "steady", "hard", "long"):
+            assert r["aim"] and r["week_phase"]
+        if r["conf"] != "Sketch":
+            assert r["title"]

@@ -630,7 +630,7 @@ def plan_page(request: Request, m: str | None = None):
     p, rx = today_rx(store)
     pl, changed = cached(store, "planx", rx.date, lambda: plan_with_changes(store))
     try:                                              # the whole plan: firm days, then pencilled in
-        cal = cached(store, "outlook", rx.date, lambda: planmod.months(planmod.outlook(p, rx, plan=pl)))
+        cal = cached(store, "outlook2", rx.date, lambda: planmod.months(planmod.outlook(p, rx, plan=pl)))
     except Exception as e:
         print(f"outlook failed: {e}")
         cal = []
@@ -650,12 +650,21 @@ def plan_page(request: Request, m: str | None = None):
         if not s.get("walk"):
             k = SUBTYPE.get(a.raw_type or "", a.sport)
             done.append(dict(s, sport=SHORT.get(k, k.capitalize())))
+    past = {}                                         # this week's days already behind you, scored like History
+    if cal and cal[mi]["ym"] == rx.date[:7]:
+        from .. import history as histmod
+        gone = [c["date"] for w in cal[mi]["weeks"] if w["shown"] for c in w["cells"] if c and c.get("past") and c.get("date")]
+        try:
+            past = cached(store, "cal_past", rx.date, lambda: {
+                d: histmod.day_cell(p, d, rx.date, _live_rx(store, rx.date[:7]), store) for d in gone})
+        except Exception as e:
+            print(f"cal past failed: {e}")
     email = auth.verify("session", request.cookies.get(auth.COOKIE)) if auth.enabled() else None
     feed = None
     if email:
         tok = auth.sign("cal", email, 10 * 365 * 24 * 3600)
         feed = f"{request.url.netloc}/plan.ics?k={tok}"
-    return _page(request, "calendar.html", plan=pl, changed=changed, hist=hist, feed=feed, date=date, done=done,
+    return _page(request, "calendar.html", plan=pl, changed=changed, hist=hist, feed=feed, date=date, done=done, past=past,
                  cal=cal[mi] if cal else None, cal_prev=yms[mi - 1] if mi > 0 else None,
                  cal_next=yms[mi + 1] if mi + 1 < len(yms) else None, cal_end=date.fromisoformat(cal[-1]["end"]).strftime("%B %-d, %Y") if cal else "",
                  has_plan=bool(getattr(p, "programs", None) or getattr(p, "program", None)))

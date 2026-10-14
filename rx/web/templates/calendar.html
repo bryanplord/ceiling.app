@@ -20,7 +20,6 @@
   .day .why { font-size:13px; color:var(--lichen); margin:8px 0 0; line-height:1.4; }
   .day .conf { margin-top:auto; padding-top:16px; font-size:12px; color:var(--lichen); }
   .day.today .wd { color:var(--ink); }
-  .day.sketch { opacity:.55; }
   .day details { margin-top:8px; }
   .day summary { cursor:pointer; font-size:13px; color:var(--lichen); list-style:none; }
   .day summary::-webkit-details-marker { display:none; }
@@ -98,33 +97,73 @@
   .wcal { border-top:2px solid var(--ink); }
   .wrow { display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)) 120px; }
   .wrow .dow { font-size:13px; font-weight:600; color:var(--lichen); padding:10px 8px; border-bottom:1px solid var(--rule); }
-  .c { position:relative; min-height:112px; padding:8px; border-bottom:1px solid var(--rule); border-right:1px solid var(--rule);
-       display:flex; flex-direction:column; gap:4px; min-width:0; }
+  .c { position:relative; min-height:112px; padding:8px; border:0; border-bottom:1px solid var(--rule); border-right:1px solid var(--rule);
+       display:flex; flex-direction:column; gap:4px; min-width:0; background:none; font:inherit; color:inherit; text-align:left; }
+  button.c { cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  button.c:hover { background:#f7f7f8; }
+  button.c:focus-visible { outline:2px solid var(--ink); outline-offset:-2px; }
+  button.c.sel { background:var(--frost); }
   .c.out { background:#fafafa; }
   .c.past .n { color:var(--rule); }
   .c .n { font-size:15px; font-weight:600; }
   .c .vb { height:4px; border-radius:2px; }
-  .c .k { font-size:14px; font-weight:600; }
+  .c .k { font-size:14px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .c .m { font-size:13px; color:var(--lichen); }
-  .c.pen > * { opacity:.55; }
-  .c.pen::after { content:""; position:absolute; inset:5px; border:1px dashed #c4c4c8; border-radius:6px; pointer-events:none; }
+  /* one confidence scale: the border loosens and the day fades as it gets further away */
+  .c.cf-Likely::after, .c.cf-Probable::after, .c.cf-Sketch::after { content:""; position:absolute; inset:5px; border-radius:6px; pointer-events:none; }
+  .c.cf-Likely::after { border:1.5px solid #8e8e93; }
+  .c.cf-Probable::after { border:1.5px dashed #b0b0b5; }
+  .c.cf-Probable > * { opacity:.8; }
+  .c.cf-Sketch::after { border:1.5px dotted #c4c4c8; }
+  .c.cf-Sketch > * { opacity:.5; }
   .c.tod { box-shadow:inset 0 0 0 2px var(--ink); }
   .c.race { background:#fdeceb; }
   .c.race > * { opacity:1; }
   .c.race .k { color:#a8321f; }
+  /* days behind you: what you did, tinted like History */
+  .c.t-good.done { background:#e6f4ec; } .c.t-ok.done { background:#fbf1dc; } .c.t-bad.done { background:#fde8e5; }
+  .c.past.done .n { color:var(--ink); }
+  .c .st { margin-top:auto; font-size:12px; font-weight:700; display:flex; align-items:center; gap:5px; }
+  .st.t-good { color:#1d6b45; } .st.t-bad { color:#a8321f; } .st.t-ok { color:#8a5a10; } .st.t-muted { color:var(--lichen); font-weight:500; }
+  .c .ck, .dd .ck { flex:none; display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:50%;
+         background:#2fae6b; color:#fff; font-size:10px; font-weight:700; }
   .wk { padding:8px 10px; border-bottom:1px solid var(--rule); display:flex; flex-direction:column; gap:4px; font-size:13px; color:var(--lichen); }
   .wk b { color:var(--ink); font-weight:600; font-size:14px; display:flex; align-items:center; gap:6px; }
   .wk i { display:inline-block; width:10px; height:10px; border-radius:50%; flex:none; }
   .v-long { background:#2b7a8c; } .v-race { background:#de5f55; }
   .ph-Base { background:#7fa7d9; } .ph-Build { background:#46b07f; } .ph-Peak { background:#ec9550; }
   .ph-Taper { background:#e3bd52; } .ph-Recover { background:#c9d8ea; } .ph-Race { background:#de5f55; } .ph-none { background:#c9c9cd; }
+  /* a day's details, opened under its week */
+  .dpanel { grid-column:1 / -1; background:var(--frost); border-bottom:1px solid var(--rule); padding:28px 32px 32px; }
+  .dpanel[hidden] { display:none; }
+  .dd[hidden] { display:none; }
+  .dd .dtop { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
+  .dd h4 { margin:0; font-size:15px; font-weight:600; color:var(--lichen); display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .dd .x { flex:none; width:36px; height:36px; border-radius:50%; border:1px solid var(--rule); background:#fff; color:var(--ink);
+           font:inherit; font-size:20px; line-height:1; cursor:pointer; }
+  .dd .x:focus-visible { outline:2px solid var(--ink); outline-offset:2px; }
+  .dd .big { font-size:clamp(24px, 3vw, 32px); font-weight:600; line-height:1.15; margin:10px 0 0; color:var(--ink); }
+  .dd .big .vb { display:block; width:40px; height:5px; border-radius:3px; margin:0 0 12px; }
+  .dd .body { display:grid; grid-template-columns:minmax(0, 1.2fr) minmax(0, 1fr); gap:12px 48px; margin-top:16px; max-width:980px; }
+  .dd p { margin:0 0 10px; font-size:16px; line-height:1.5; text-wrap:pretty; }
+  .dd .aim { font-weight:600; }
+  .dd .soft { color:var(--lichen); font-size:15px; }
+  .dd .chg s { color:var(--lichen); }
+  .dd .dx { margin:0 0 10px; }
+  .pill { display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:600; color:var(--ink);
+          background:#fff; border-radius:999px; padding:3px 10px 3px 8px; }
   .key { display:flex; flex-wrap:wrap; gap:8px 20px; font-size:13px; color:var(--lichen); margin-top:16px; align-items:center; }
   .key > span { display:inline-flex; align-items:center; gap:6px; }
-  .key .bx { display:inline-block; width:18px; height:14px; border-radius:3px; border:1px solid var(--ink); }
-  .key .bx.pen { border:1px dashed #a9a9ae; }
+  .bx { display:inline-block; width:18px; height:14px; border-radius:3px; flex:none; }
+  .bx.cf-Today { border:2px solid var(--ink); }
+  .bx.cf-Likely { border:1.5px solid #8e8e93; }
+  .bx.cf-Probable { border:1.5px dashed #b0b0b5; }
+  .bx.cf-Sketch { border:1.5px dotted #b0b0b5; opacity:.8; }
   .key .br { flex-basis:100%; height:0; }
   .key i { display:inline-block; width:14px; height:4px; border-radius:2px; }
-  .key .kn { display:inline; }
+  .key i.bx { width:18px; height:14px; border-radius:3px; }
+  .key .kn { display:inline; max-width:70ch; }
+  .day .conf { display:flex; align-items:center; gap:6px; }
   @media (max-width: 760px) {
     .wrow { grid-template-columns:repeat(7, minmax(0, 1fr)); }
     .wrow .dow.wkh { display:none; }
@@ -134,11 +173,16 @@
     .c { min-height:76px; padding:6px 4px; gap:3px; }
     .c:nth-child(7) { border-right:0; }
     .wk:empty { display:none; }
-    .c.pen::after { inset:2px; border-radius:4px; }
+    .c.cf-Likely::after, .c.cf-Probable::after, .c.cf-Sketch::after { inset:2px; border-radius:4px; }
     .c .n { font-size:13px; }
     .c .k { font-size:11px; }
-    .c .m { font-size:11px; }
+    .c .m, .c .st { font-size:11px; }
+    .c .st .lg { display:none; }
+    .c .ck { width:13px; height:13px; font-size:8px; }
     .mnav { gap:16px; }
+    .dpanel { padding:20px 16px 24px; }
+    .dd .body { grid-template-columns:1fr; gap:0; }
+    .dd .big { font-size:24px; }
   }
 </style>
 {% endblock %}
@@ -152,7 +196,7 @@
 <div class="week">
 {% for d in plan.days %}{% set dd = date.fromisoformat(d.date) %}
   {% set dt = (done|selectattr('score','ne',none)|list or done)[0].tone if (d.confidence == 'Today' and done) else none %}
-  <div class="day{{ ' today' if d.confidence == 'Today' }}{{ ' did-' ~ dt if dt }}{{ ' sketch' if d.confidence == 'Sketch' }}">
+  <div class="day{{ ' today' if d.confidence == 'Today' }}{{ ' did-' ~ dt if dt }}">
     <div class="dh"><span class="wd">{{ 'Today' if d.confidence == 'Today' else dd.strftime('%a') }}</span>
       <span class="dn">{{ dd.day }}</span><span class="vbar v-{{ d.verdict }}"></span></div>
     <div class="db">{% if d.confidence == 'Today' and done %}<div class="done-card">
@@ -174,7 +218,7 @@
         {% if d.was_title and d.was_title != {'rest':'Day off','light':'Walk','easy':'Easy','steady':'Steady','hard':'Hard'}[d.was] %}<p class="ttl">{{ d.was_title }}</p>{% endif %}
         <p class="why">{{ d.because }}</p></div>{% endif %}
     </div>
-    <span class="conf">{{ d.confidence }}</span>
+    <span class="conf"><i class="bx cf-{{ d.confidence }}" aria-hidden="true"></i>{{ d.confidence }}</span>
   </div>
 {% endfor %}
 </div>
@@ -188,23 +232,89 @@
     <h3>{{ cal.title }}</h3>
     {% if cal_next %}<a class="arr" href="/calendar?m={{ cal_next }}#whole" aria-label="Next month">›</a>{% else %}<span class="arr off" aria-hidden="true">›</span>{% endif %}
   </div>
+  {% set K = {'rest':'Day off','light':'Walk','easy':'Easy','steady':'Steady','hard':'Hard','long':'Long','race':'Race day'} %}
+  {% set DEP = {'Today':'Set this morning from last night\'s sleep and HRV.',
+                'Likely':'Tomorrow. Tonight\'s sleep and how today goes can still change it.',
+                'Probable':'Depends on the nights between now and then, and on doing what\'s planned until then.',
+                'Sketch':'A sketch from the plan\'s week. It becomes a real session about a week out, from how you train and recover until then.'} %}
+  {% set main = (done|selectattr('score','ne',none)|list or done)[0] if done else none %}
   <div class="wcal">
     <div class="wrow">{% for d in ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}<div class="dow">{{ d }}</div>{% endfor %}<div class="dow wkh">Week</div></div>
-    {% for wk in cal.weeks if wk.shown %}
+    {% for wk in cal.weeks if wk.shown %}{% set wi = loop.index %}
     <div class="wrow">
       {% for c in wk.cells %}
         {% if not c %}<div class="c out"></div>
-        {% elif c.past %}<div class="c past"><span class="n">{{ c.day }}</span></div>
-        {% else %}
-        <div class="c{{ ' pen' if not c.firm }}{{ ' tod' if c.today }}{{ ' race' if c.kind == 'race' }}" title="{{ c.title or c.label }}">
+        {% elif c.past %}{% set h = past.get(c.date) if past else none %}
+          {% if h and h.trained %}
+          <div class="c past done t-{{ h.tone }}" title="{{ h.did|join(', ') }}: {{ h.status }}">
+            <span class="n">{{ c.day }}</span><span class="vb v-{{ h.verdict }}"></span>
+            <span class="k">{{ h.did[0].rsplit(' ', 1)[0] if h.did else 'Done' }}</span>
+            <span class="st t-{{ h.tone }}">{% if h.tone == 'good' %}<span class="ck" aria-hidden="true">✓</span>{% endif %}{{ h.short }}</span>
+          </div>
+          {% else %}<div class="c past"><span class="n">{{ c.day }}</span></div>{% endif %}
+        {% else %}{% set did = c.today and main %}
+        <button type="button" class="c cf-{{ c.conf }}{{ ' tod' if c.today }}{{ ' race' if c.kind == 'race' }}{{ ' done t-' ~ (main.tone or 'muted') if did }}"
+                data-d="{{ c.date }}" aria-expanded="false" aria-controls="wp{{ wi }}"
+                title="{{ (main.sport ~ ' ' ~ main.dur ~ (', ' ~ main.score ~ '%' if main.score is not none else '')) if did else (c.title or (c.label ~ (' ' ~ c.dur if c.dur else '') ~ ', a sketch')) }}">
           <span class="n">{{ c.day }}</span>
+          {% if did %}
+          <span class="vb v-{{ c.kind }}"></span>
+          <span class="k">{{ main.sport }}</span>
+          <span class="st t-{{ main.tone or 'muted' }}">{% if main.tone == 'good' %}<span class="ck" aria-hidden="true">✓</span>{% endif %}{{ (main.score ~ '%') if main.score is not none else 'Done' }}</span>
+          {% else %}
           <span class="vb v-{{ c.kind }}"></span>
           <span class="k">{{ 'Race day' if c.kind == 'race' else c.label }}</span>
           {% if c.dur %}<span class="m">{{ c.dur }}</span>{% endif %}
-        </div>
+          {% endif %}
+        </button>
         {% endif %}
       {% endfor %}
       <div class="wk"><b><i class="ph-{{ wk.phase or 'none' }}"></i>{{ wk.phase ~ ' week' if wk.phase else 'Your usual week' }}</b>{% if wk.hours %}<span>{{ '%g' % wk.hours }} hours</span>{% endif %}</div>
+      <div class="dpanel" id="wp{{ wi }}" role="region" aria-label="Day details" hidden>
+      {% for c in wk.cells if c and not c.past %}{% set dd = date.fromisoformat(c.date) %}
+        <div class="dd" data-d="{{ c.date }}" hidden>
+          <div class="dtop">
+            <h4>{{ dd.strftime('%A, %B %-d') }}<span class="pill"><i class="bx cf-{{ c.conf }}" aria-hidden="true"></i>{{ c.conf }}</span></h4>
+            <button type="button" class="x" aria-label="Close">×</button>
+          </div>
+          {% if c.today and done %}
+          <p class="big"><span class="vb v-{{ c.kind }}"></span>Done</p>
+          <div class="body"><div>
+            {% for x in done %}<div class="dx t-{{ x.tone or 'muted' }}">
+              <span class="dw1">{{ x.sport }} {{ x.dur }}</span>
+              {% if x.score is not none %}<span class="dsc">{% if x.tone == 'good' %}<span class="ck" aria-hidden="true">✓</span> {% endif %}{{ x.score }}%{% if x.word %}, {{ x.word|lower }}{% endif %}</span>{% endif %}
+              {% if x.head %}<p class="soft" style="margin-top:6px">{{ x.head }}</p>{% endif %}
+            </div>{% endfor %}
+          </div><div>
+            <p class="soft">The plan was</p><p>{{ c.title }}</p>
+          </div></div>
+          {% elif c.conf != 'Sketch' %}
+          <p class="big"><span class="vb v-{{ c.kind }}"></span>{{ K[c.kind] }}{% if c.dur %}, {{ c.dur }}{% endif %}</p>
+          <div class="body"><div>
+            {% if c.title and c.title != K[c.kind] %}<p class="aim">{{ c.title }}</p>{% endif %}
+            {% if c.detail and c.kind != 'rest' %}<p>{{ c.detail }}</p>{% endif %}
+            {% if c.options %}<p class="soft">{{ c.options }}</p>{% endif %}
+          </div><div>
+            {% if c.was %}<p class="chg">This was {{ K[c.was]|lower }}. {{ 'A knock-on from an earlier day changing.' if c.because.startswith('Knock-on') else c.because }}</p>
+            {% elif c.reason %}<p>{{ c.reason }}</p>{% endif %}
+            {% if c.phase %}<p class="soft">{{ c.phase }} week{% if c.week_hours %}, {{ '%g' % c.week_hours }} hours{% endif %}.</p>{% endif %}
+            <p class="soft">{{ DEP[c.conf] }}</p>
+          </div></div>
+          {% else %}
+          <p class="big"><span class="vb v-{{ c.kind }}"></span>{% if c.kind == 'long' %}Long {{ c.noun }}{% else %}{{ K[c.kind] }}{% endif %}{% if c.dur %}, {{ c.dur }}{% endif %}</p>
+          <div class="body"><div>
+            {% if c.kind == 'race' %}<p>Race day. Easy warm-up, start slower than you want to, and enjoy it.</p>
+            {% elif c.kind == 'rest' %}<p>Nothing planned. Rest is part of the plan.</p>
+            {% elif c.aim %}<p class="aim">{{ c.aim }}.</p>{% endif %}
+            {% if c.kind == 'long' %}<p>The week's long {{ c.noun }}. The session that builds you for the goal.</p>{% endif %}
+          </div><div>
+            <p class="soft">{% if c.week_phase %}{{ c.week_phase }} week{% else %}Your usual week{% endif %}{% if c.week_hours %}: {{ '%g' % c.week_hours }} hours{% endif %}{% if c.week_hard %}, {{ c.week_hard }} hard day{{ 's' if c.week_hard != 1 }}{% endif %}{% if c.wlong %}, long {{ c.week_noun }} {{ c.wlong }}{% endif %}.</p>
+            <p class="soft">{{ DEP['Sketch'] }}</p>
+          </div></div>
+          {% endif %}
+        </div>
+      {% endfor %}
+      </div>
     </div>
     {% endfor %}
   </div>
@@ -212,9 +322,44 @@
     <span><i class="v-easy"></i>Easy</span><span><i class="v-steady"></i>Steady</span><span><i class="v-hard"></i>Hard</span>
     <span><i class="v-long"></i>Long</span><span><i class="v-rest"></i>Rest</span>{% if cal.race %}<span><i class="v-race"></i>Race day</span>{% endif %}
     <span class="br"></span>
-    <span><i class="bx"></i>Firm</span><span><i class="bx pen"></i>Pencilled in</span>
-    <span class="kn">Pencilled-in days firm up as they come into view, from how you actually train and recover.</span>
+    <span><i class="bx cf-Today"></i>Today</span><span><i class="bx cf-Likely"></i>Likely</span>
+    <span><i class="bx cf-Probable"></i>Probable</span><span><i class="bx cf-Sketch"></i>Sketch</span>
+    <span class="br"></span>
+    <span class="kn">Every day after today depends on how you follow the plan and how you recover, so days firm up as they get closer. Tap a day for details.</span>
   </div>
+  <script>
+  (function () {
+    var cal = document.querySelector('.wcal');
+    if (!cal) return;
+    var openBtn = null;
+    function close(focus) {
+      if (!openBtn) return;
+      var p = document.getElementById(openBtn.getAttribute('aria-controls'));
+      if (p) p.hidden = true;
+      openBtn.setAttribute('aria-expanded', 'false');
+      openBtn.classList.remove('sel');
+      if (focus) openBtn.focus();
+      openBtn = null;
+    }
+    cal.addEventListener('click', function (e) {
+      if (e.target.closest('.dd .x')) { close(true); return; }
+      var b = e.target.closest('button.c[data-d]');
+      if (!b) return;
+      var same = b === openBtn;
+      close(false);
+      if (same) return;
+      var p = document.getElementById(b.getAttribute('aria-controls'));
+      p.querySelectorAll('.dd').forEach(function (x) { x.hidden = x.getAttribute('data-d') !== b.getAttribute('data-d'); });
+      p.hidden = false;
+      b.setAttribute('aria-expanded', 'true');
+      b.classList.add('sel');
+      openBtn = b;
+      var r = p.getBoundingClientRect();
+      if (r.bottom > window.innerHeight) p.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(true); });
+  })();
+  </script>
   {% endif %}
 </section>
 
