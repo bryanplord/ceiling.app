@@ -50,29 +50,79 @@ class Profile:
         return self.load_days[-1] if self.load_days else None
 
 
-def build(store: Store, as_of: str | None = None) -> Profile:
+# What each activity's stream says that doesn't depend on the day you look from: cleaned heart
+# rate, peak, best 20/60 minutes, steady-state efficiency, 30-s histogram. Building a profile for
+# another morning (yesterday's plan, two weeks of Workouts, a History month) used to re-read and
+# re-analyse every stream each time; now each stream is analysed once per data version.
+_FACTS: dict = {}       # (db path, owner) -> (data version, {activity id: _Facts})
+
+
+@dataclass
+class _Facts:
+    stamp: tuple
+    h: object = None                         # cleaned 1 Hz heart rate (numpy), None without a stream
+    peak: object = None
+    e20: float | None = None
+    e60: float | None = None
+    steady: object = None
+    hist: object = None                      # 30-s smoothed bpm histogram, None if too short
+    hrr: dict = field(default_factory=dict)  # threshold bpm -> heart-rate recovery
+
+
+def _facts(store: Store, a: Activity, memo: dict) -> _Facts:
+    import numpy as _np
+    stamp = (a.date, a.sport, a.raw_type, a.moving_s, a.avg_hr, a.max_hr, a.distance_m, a.start_local)
+    f = memo.get(a.id)
+    if f is not None and f.stamp == stamp:
+        return f
+    f = _Facts(stamp)
+    st = store.stream(a.id)
+    if st:
+        t, h, c = st
+        f.h = hra.clean(t, h)
+        f.peak = hra.credible_peak(a.id, a.date, a.sport, t, h, c)
+        if a.moving_s >= 25 * 60:
+            f.e20 = hra.best_sustained(t, h, 20 * 60)
+            f.e60 = hra.best_sustained(t, h, 60 * 60) if a.moving_s >= 60 * 60 else None
+        f.steady = aer.steady_session(a.id, a.date, a.sport, a.raw_type, t, h, store.speed(a.id))
+        v_ = f.h[~_np.isnan(f.h)]
+        if len(v_) >= 60:
+            v_ = _np.convolve(v_, _np.ones(30) / 30, mode="valid")
+            f.hist = _np.bincount(_np.clip(_np.round(v_).astype(int), 0, 230), minlength=231)
+    memo[a.id] = f
+    return f
+
+
+def build(store: Store, as_of: str | None = None, version=None) -> Profile:
+    """version: the store's data version (service.data_version). When given, each activity's
+    stream is analysed once per version and reused for every other morning's profile."""
     as_of = as_of or local_today().isoformat()
     acts = [a for a in store.activities() if a.date <= as_of]
     wellness = [w for w in store.wellness() if w.date <= as_of]
     past_acts = [a for a in acts if a.date < as_of]   # the morning view: today's sessions don't count yet
 
-    streams = {}
+    if version is None:
+        memo: dict = {}
+    else:
+        slot = (getattr(store, "path", ""), getattr(store, "owner", ""))
+        hit = _FACTS.get(slot)
+        if hit is None or hit[0] != version:
+            hit = (version, {})
+            _FACTS[slot] = hit
+        memo = hit[1]
+    facts = {a.id: _facts(store, a, memo) for a in acts}
+
     peaks, efforts, steady = [], [], []
     for a in past_acts:
-        st = store.stream(a.id)
-        if not st:
+        f = facts[a.id]
+        if f.h is None:
             continue
-        t, h, c = st
-        streams[a.id] = (t, h)
-        p = hra.credible_peak(a.id, a.date, a.sport, t, h, c)
-        if p:
-            peaks.append(p)
+        if f.peak:
+            peaks.append(f.peak)
         if a.moving_s >= 25 * 60:
-            efforts.append((a.date, hra.best_sustained(t, h, 20 * 60),
-                            hra.best_sustained(t, h, 60 * 60) if a.moving_s >= 60 * 60 else None))
-        s = aer.steady_session(a.id, a.date, a.sport, a.raw_type, t, h, store.speed(a.id))
-        if s:
-            steady.append(s)
+            efforts.append((a.date, f.e20, f.e60))
+        if f.steady:
+            steady.append(f.steady)
 
     mx = hra.estimate_max_hr(peaks)
     th = hra.estimate_threshold(efforts)
@@ -89,9 +139,8 @@ def build(store: Store, as_of: str | None = None) -> Profile:
     session_load: dict[str, float] = {}
     daily: dict[str, float] = {}
     for a in acts:
-        st = streams.get(a.id) or store.stream(a.id)
-        if st:
-            v = la.trimp(st[0], st[1], rest, max_bpm)
+        if facts[a.id].h is not None:
+            v = la.trimp_clean(facts[a.id].h, rest, max_bpm)
         else:
             v = la.trimp_from_summary(a.moving_s / 60, a.avg_hr, rest, max_bpm)
         session_load[a.id] = v
@@ -104,8 +153,11 @@ def build(store: Store, as_of: str | None = None) -> Profile:
     hrr = []
     if th.bpm:
         for a in past_acts:
-            if a.id in streams:
-                v = prog.hr_recovery(*streams[a.id], th.bpm)
+            f = facts[a.id]
+            if f.h is not None:
+                if th.bpm not in f.hrr:
+                    f.hrr[th.bpm] = prog.hr_recovery_clean(f.h, th.bpm)
+                v = f.hrr[th.bpm]
                 if v:
                     hrr.append((a.date, v))
 
@@ -118,16 +170,11 @@ def build(store: Store, as_of: str | None = None) -> Profile:
             typical[sport] = statistics.median(mins)
     mix = [s for s, _ in Counter(a.sport for a in past_acts if a.date >= cutoff28).most_common()]
 
-    import numpy as _np
     cut150 = (date.fromisoformat(as_of) - timedelta(days=150)).isoformat()
     hr_hist = {}
     for a in past_acts:
-        if a.date >= cut150 and a.id in streams:
-            h_ = hra.clean(*streams[a.id])
-            v_ = h_[~_np.isnan(h_)]
-            if len(v_) >= 60:
-                v_ = _np.convolve(v_, _np.ones(30) / 30, mode="valid")
-                hr_hist[a.id] = _np.bincount(_np.clip(_np.round(v_).astype(int), 0, 230), minlength=231)
+        if a.date >= cut150 and facts[a.id].hist is not None:
+            hr_hist[a.id] = facts[a.id].hist
     return Profile(
         hr_hist=hr_hist,
         as_of=as_of, max_hr=mx, threshold=th, aerobic=lt1, zones=zones, rest_hr=rest,

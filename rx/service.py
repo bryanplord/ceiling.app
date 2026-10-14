@@ -92,11 +92,12 @@ def today_rx(store: Store, day: str | None = None):
     """Profile + prescription for a day, rebuilt only when the data changes.
     Building means reading every heart-rate stream, so it must not run per request."""
     day = day or local_today().isoformat()
-    key = (day, data_version(store))
+    ver = data_version(store)
+    key = (day, ver)
     with _build_lock:
         hit = _built.get(key)
         if hit is None:
-            p = prof.build(store, day)
+            p = prof.build(store, day, version=ver)
             p.programs = []
             try:
                 from . import goals as _gl
@@ -130,15 +131,37 @@ def today_rx(store: Store, day: str | None = None):
     return hit
 
 
+_inflight: dict = {}
+
+
 def cached(store: Store, name: str, day: str, make):
-    """Memoize anything derived from a day's profile under the same data version."""
+    """Memoize anything derived from a day's profile under the same data version.
+    One build per key: a request that arrives while the background warm (or another request)
+    is already building the same thing waits for it instead of building it again."""
     key = (name, day, data_version(store))
     with _build_lock:
         if key in _built:
             return _built[key]
-    val = make()                 # built outside the lock so one slow build never blocks every page
-    with _build_lock:
-        return _built.setdefault(key, val)
+        ev = _inflight.get(key)
+        mine = ev is None
+        if mine:
+            ev = _inflight[key] = threading.Event()
+    if not mine:
+        ev.wait(180)
+        with _build_lock:
+            if key in _built:
+                return _built[key]
+        val = make()             # the other build failed or is stuck: build it here
+        with _build_lock:
+            return _built.setdefault(key, val)
+    try:
+        val = make()             # built outside the lock so one slow build never blocks every page
+        with _build_lock:
+            return _built.setdefault(key, val)
+    finally:
+        with _build_lock:
+            _inflight.pop(key, None)
+        ev.set()
 
 
 def peek(store: Store, name: str, day: str):

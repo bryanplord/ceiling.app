@@ -48,7 +48,11 @@ def _trend(change: float, threshold: float, higher_is_better: bool = True) -> st
 
 def hr_recovery(time: list, hr: list, lthr: float) -> float | None:
     """HR drop in the 60 s after the hardest 3-minute block, if that block ended hard."""
-    h = clean(time, hr)
+    return hr_recovery_clean(clean(time, hr), lthr)
+
+
+def hr_recovery_clean(h: np.ndarray, lthr: float) -> float | None:
+    """hr_recovery() on an already-cleaned 1 Hz heart rate (see hr.clean)."""
     if len(h) < 600:
         return None
     w = 180

@@ -34,7 +34,7 @@ MORNING_EVERY_S = 10 * 60
 
 def _have_last_night(store) -> bool:
     today = local_today().isoformat()
-    w = next((w for w in store.wellness() if w.date == today), None)
+    w = next((w for w in store.wellness(today) if w.date == today), None)
     return bool(w and (w.hrv or w.sleep_secs or w.sleep_score))
 
 
@@ -51,7 +51,14 @@ async def sign_in_gate(request: Request, call_next):
     path = request.url.path
     email = auth.verify("session", request.cookies.get(auth.COOKIE)) if auth.enabled() else None
     current_owner.set(owner_of(email))
-    if path in ("/favicon.ico", "/apple-touch-icon.png", "/apple-touch-icon-precomposed.png", "/healthz", "/login", "/logout", "/plan.ics", "/how", "/science", "/join", "/morning", "/after", "/schedule", "/learns") or path.startswith("/static/"):
+    if path.startswith("/static/"):
+        # Icons and the share image: versioned links (?v=) never change, the rest rarely do.
+        r = await call_next(request)
+        if r.status_code == 200:
+            r.headers["Cache-Control"] = ("public, max-age=31536000, immutable" if "v" in request.query_params
+                                          else "public, max-age=86400")
+        return r
+    if path in ("/favicon.ico", "/apple-touch-icon.png", "/apple-touch-icon-precomposed.png", "/healthz", "/login", "/logout", "/plan.ics", "/how", "/science", "/join", "/morning", "/after", "/schedule", "/learns"):
         return await call_next(request)
     if _signed_in(request):
         # A new athlete has no data yet: every page sends them to Data to connect it.
@@ -236,7 +243,7 @@ def _refresh_in_background(force: bool = False, owner: str | None = None) -> Non
                 store.set_meta("last_sync", "0")   # try again on the next visit
             store.sync()
             bust(store)
-            _warm(store)
+            _warm(store, if_changed=True)
         except Exception as e:  # never take the site down over a sync
             print(f"sync failed: {e}")
             if store:
@@ -250,10 +257,19 @@ def _refresh_in_background(force: bool = False, owner: str | None = None) -> Non
     threading.Thread(target=run, daemon=True).start()
 
 
-def _warm(store=None) -> None:
-    """Build today's page ahead of the first visitor."""
+_warmed: dict = {}
+
+
+def _warm(store=None, if_changed: bool = False) -> None:
+    """Build today's page ahead of the first visitor. After a sync (if_changed), only when the
+    sync actually brought something new or the day has turned: most 15-minute pulls bring
+    nothing, and on a 0.1-CPU host a needless rebuild slows every page while it runs."""
     try:
         store = store or open_store()
+        from ..service import data_version
+        mark = (local_today().isoformat(), data_version(store))
+        if if_changed and _warmed.get(store.owner) == mark:
+            return
         p, rx = today_rx(store)
         cached(store, "dash", rx.date, lambda: dashboard.build(store, p, rx))
         cached(store, "story", rx.date, lambda: storymod.build(store, p))
@@ -266,8 +282,10 @@ def _warm(store=None) -> None:
         cached(store, "hrhist", rx.date, lambda: dist.hr_histogram(store, p))
         for _k, _l, _d, _c in ROOM_WINDOWS:
             cached(store, f"hrwin:{_k}", rx.date, lambda d=_d: dist.hr_window(store, p, rx.date, d))
+        _rooms_cached(store, p, rx, _after(store, p, rx, jr.load(store, rx.date)))
         ym = rx.date[:7]
         cached(store, f"month:{ym}", rx.date, lambda: histmod.month(p, ym, rx.date, _live_rx(store, ym), store))
+        _warmed[store.owner] = mark
     except Exception as e:
         print(f"warm failed: {e}")
 
@@ -311,7 +329,23 @@ def healthz():
     exist. No dates, names, heart rates or anything else about the athlete.
     The keep-awake ping hits this every 10 minutes, so it also drives the refresh:
     the morning's data is pulled before you open the page."""
-    _refresh_all()
+    # Render's own health check also lands here every few seconds. On a 0.1-CPU instance that
+    # traffic must cost next to nothing: check whether a sync is due at most once a minute, and
+    # answer from a copy at most 15 seconds old.
+    now = time.time()
+    if now - _health["checked"] >= 60:
+        _health["checked"] = now
+        _refresh_all()
+    if _health["text"] and now - _health["at"] < 15:
+        return _health["text"]
+    _health.update(text=_healthz(), at=now)
+    return _health["text"]
+
+
+_health: dict = {"checked": 0.0, "text": "", "at": 0.0}
+
+
+def _healthz() -> str:
     try:
         s = open_store("")
         n = s.counts()
@@ -360,7 +394,7 @@ def today(request: Request, d: str | None = None):
     syncing = bool(lk and lk.locked())   # only a sync actually in progress; never a stale flag
     from .. import journal as jr
     entry = jr.load(store, rx.date)
-    after = today_after(store, p, rx)
+    after = _after(store, p, rx, entry)
     from ..analysis import energy as en
     from zoneinfo import ZoneInfo
     try:
@@ -377,7 +411,8 @@ def today(request: Request, d: str | None = None):
     return _page(request, "today.html", rx=rx, waiting=not _have_last_night(store), updated=mins_ago,
                  after=after, energy=energy, entry=entry, timeline=jr.timeline(entry), jnote=jr.effect(entry["tags"])[1] if entry else "", patterns=pats,
                  syncing=syncing, d=dash, p=p, recent=recent,
-                 spark=dashboard.spark, rooms=_rooms(store, p, rx, after), room=True,
+                 spark=dashboard.spark, room=True,
+                 rooms=_rooms_cached(store, p, rx, after),
                  st=st, hist=storymod.history_chart(st),
                  sleep_chart=sleepmod.chart(rx.sleep) if rx.sleep else "",
                  base_need=sleepmod._hm(rx.sleep.base) if rx.sleep else "",
@@ -579,6 +614,19 @@ ROOM_WINDOWS = [("today", "Today", 1, "where your heart was today"),
                 ("7d", "7 days", 7, "where you trained, last 7 days"),
                 ("30d", "30 days", 30, "where you trained, last 30 days"),
                 ("all", "All time", None, "where you've trained, all time")]
+
+
+def _after(store, p, rx, entry):
+    """today_after, built once per data version and journal state (it reviews today's streams).
+    Today's energy line stays live: it moves with the clock."""
+    import json as _json
+    jkey = _json.dumps(entry, sort_keys=True, default=str) if entry else ""
+    return cached(store, f"after:{hash(jkey)}", rx.date, lambda: today_after(store, p, rx))
+
+
+def _rooms_cached(store, p, rx, after) -> list[dict]:
+    done = bool(after and after.get("done"))
+    return cached(store, f"rooms:{done}", rx.date, lambda: _rooms(store, p, rx, after))
 
 
 def _rooms(store, p, rx, after) -> list[dict]:

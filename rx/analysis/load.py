@@ -19,7 +19,11 @@ CTL_DAYS = 42
 
 
 def trimp(time: list, hr: list, rest: float, max_hr: float) -> float:
-    h = clean(time, hr)
+    return trimp_clean(clean(time, hr), rest, max_hr)
+
+
+def trimp_clean(h: np.ndarray, rest: float, max_hr: float) -> float:
+    """trimp() on an already-cleaned 1 Hz heart rate (see hr.clean)."""
     h = h[~np.isnan(h)]
     if len(h) == 0 or max_hr <= rest:
         return 0.0
