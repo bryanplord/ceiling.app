@@ -219,19 +219,71 @@ def lift_plan(store, programs, day: date) -> dict | None:
     return None
 
 
-def scheduled(store, programs, day: date, no_days: list[int] | None = None) -> str | None:
-    """Which session (key) falls on this day, or None."""
-    lp = lift_plan(store, programs, day)
+def _order(kind: str, n: int) -> list[str]:
+    return RHYTHM[kind].get(n) or RHYTHM[kind][max(RHYTHM[kind])]
+
+
+def plan_ahead(store, programs, start: date, days: int = 70, no_days: list[int] | None = None) -> dict:
+    """Which lift falls on each day from `start`, the way a coach would run it: you do the next
+    session, not the one pinned to a weekday. A lift is due when you still owe lifts this week and
+    you've had a day off since the last one (back-to-back is fine at four or more a week, since the
+    split alternates). Miss one and it simply moves to the next day you can. What you've already
+    logged this week counts. {date: session key}."""
+    lp = lift_plan(store, programs, start)
     if not lp:
-        return None
+        return {}
     st = settings(store)
     kind = "strength" if st["train"] == "strength" else "endurance"
     n = lp["days"] if kind == "strength" else min(lp["days"], 3)
-    rhythm = RHYTHM[kind].get(n) or RHYTHM[kind][max(RHYTHM[kind])]
-    days = [d for d in DAYS[min(n, 5)] if d not in (no_days or [])]
-    if day.weekday() not in days:
-        return None
-    return rhythm[days.index(day.weekday()) % len(rhythm)]
+    order = _order(kind, n)
+    gap = 1 if n >= 4 else 2
+    logs = {d: lg for d, lg in all_logs(store).items() if done_sets(lg)[0]}
+    mon = start - timedelta(days=start.weekday())
+    done_week = sum(1 for d in logs if mon.isoformat() <= d < start.isoformat())
+    past = sorted(d for d in logs if d < start.isoformat())
+    last = date.fromisoformat(past[-1]) if past else None
+    last_key = logs[past[-1]].get("session") if past else None
+    out = {}
+    for i in range(days):
+        d = start + timedelta(days=i)
+        if d.weekday() == 0 and i:
+            done_week = 0
+        if d.weekday() in (no_days or []) or done_week >= n:
+            continue
+        if last and (d - last).days < gap:
+            continue
+        k = order[(order.index(last_key) + 1) % len(order)] if last_key in order else order[done_week % len(order)]
+        out[d.isoformat()] = k
+        done_week += 1
+        last, last_key = d, k
+    return out
+
+
+def scheduled(store, programs, day: date, no_days: list[int] | None = None) -> str | None:
+    """Which session (key) is due on this day, or None. From today on it follows plan_ahead; a day
+    already behind you shows what you logged."""
+    from .clock import local_today
+    today = local_today()
+    if day < today:
+        lg = log_for(store, day.isoformat())
+        return lg.get("session") if lg and done_sets(lg)[0] else None
+    return plan_ahead(store, programs, today, max(14, (day - today).days + 1), no_days).get(day.isoformat())
+
+
+def rest_reason(store, programs, day: date) -> str:
+    """Why there's no lift today, in a sentence."""
+    lp = lift_plan(store, programs, day)
+    if not lp:
+        return ""
+    logs = {d for d, lg in all_logs(store).items() if done_sets(lg)[0]}
+    y = (day - timedelta(days=1)).isoformat()
+    mon = day - timedelta(days=day.weekday())
+    wk = sum(1 for d in logs if mon.isoformat() <= d < day.isoformat())
+    if y in logs:
+        return "You lifted yesterday. Muscle is built on the days between lifts."
+    if wk >= lp["days"]:
+        return f"That's your {lp['days']} lifts for this week."
+    return "A day between lifts."
 
 
 def session(store, key: str, day: str, verdict: str = "", tomorrow: str = "", recovery_low: bool = False,

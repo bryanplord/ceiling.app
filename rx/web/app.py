@@ -635,7 +635,7 @@ def strength_page(request: Request):
             recent.append({"date": date.fromisoformat(d).strftime("%a %b %-d"),
                            "name": sg.SESSIONS.get(lg_.get("session"), {}).get("name", "Lift"), "done": dn, "of": of})
     dn, of = sg.done_sets(lg)
-    return _page(request, "strength.html", sess=sess, summary=sg.summary(sess) if sess else "", done=dn, of=of,
+    return _page(request, "strength.html", rest=sg.rest_reason(store, lifts, today), sess=sess, summary=sg.summary(sess) if sess else "", done=dn, of=of,
                  finished=bool(lg and lg.get("done")), nxt=nxt, plan=plan, week=week, moves=moves[:10], recent=recent,
                  st=st, equip=sg.EQUIP, sessions=sg.SESSIONS)
 
@@ -746,7 +746,7 @@ def today(request: Request, d: str | None = None):
         ls, lg, lst, nxt = _lift_today(store, p, rx)
         dn, of = sg.done_sets(lg)
         if ls or lst["train"] == "strength" or getattr(p, "lifts", None):
-            lift = {"s": ls, "summary": sg.summary(ls) if ls else "", "done": dn, "of": of,
+            lift = {"s": ls, "rest": sg.rest_reason(store, getattr(p, "lifts", None) or [], date.fromisoformat(rx.date)), "summary": sg.summary(ls) if ls else "", "done": dn, "of": of,
                     "finished": bool(lg and lg.get("done")), "only": lst["train"] == "strength", "next": nxt,
                     "moves": [m.name for c in (ls.circuits if ls else []) for m in c]}
     except Exception as e:

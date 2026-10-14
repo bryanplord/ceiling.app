@@ -192,7 +192,7 @@
     <p class="foot"><a class="go" href="/lift">{{ 'Done: ' ~ lift.done ~ ' of ' ~ lift.of ~ ' sets' if lift.finished else ('Keep going: ' ~ lift.done ~ ' of ' ~ lift.of ~ ' sets' if lift.done else 'Start lifting') }}</a></p>
     {% else %}
     <p class="big">Rest from lifting.</p>
-    <p class="lead">Muscle is built on the days between lifts. A walk of 30 minutes or more keeps you moving without costing the next one.</p>
+    <p class="lead">{{ lift.rest or 'A day between lifts.' }} A walk of 30 minutes or more keeps you moving without costing the next one.</p>
     {% if lift.next %}<p class="foot">Next lift: {{ lift.next[1] | lower }}, {{ lift.next[0] }}.</p>{% endif %}
     {% endif %}
   </section>

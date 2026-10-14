@@ -31,8 +31,12 @@ def test_schedule_and_recovery():
     g = gl.Goal("strength", lift_days=3, id="x")
     progs = [SimpleNamespace(goal=g)]
     mon = date(2026, 10, 12)
-    keys = [sg.scheduled(s, progs, date(2026, 10, 12 + i)) for i in range(7)]
-    assert [k for k in keys if k] == ["lower", "upper", "full"] and keys[1] is None
+    plan = sg.plan_ahead(s, progs, mon, 7)
+    assert list(plan.values()) == ["lower", "upper", "full"] and "2026-10-13" not in plan
+    # miss Monday and the lift simply moves to the next day you can
+    sg.save_log(s, "2026-10-13", {"session": "lower", "sets": {"squat": [[50, 8, True]]}})
+    plan = sg.plan_ahead(s, progs, date(2026, 10, 14), 6)
+    assert "2026-10-14" not in plan and plan["2026-10-15"] == "upper"
     # a hard day tomorrow keeps heavy legs off today
     sess = sg.session(s, "lower", mon.isoformat(), "steady", tomorrow="hard")
     assert sess.key == "upper" and "no heavy legs" in sess.why

@@ -65,7 +65,7 @@
   <div><p class="k">Today</p><p class="nm">{{ sess.name }}.</p><p class="sm">{{ summary }}</p>{% if sess.why %}<p class="why">{{ sess.why }}</p>{% endif %}</div>
   <a class="go" href="/lift">{{ 'Done: ' ~ done ~ ' of ' ~ of ~ ' sets' if finished else ('Keep going' if done else 'Start lifting') }}</a>
   {% elif plan %}
-  <div><p class="k">Today</p><p class="nm">Rest from lifting.</p><p class="sm">{% if nxt %}Next: {{ nxt[1] | lower }}, {{ nxt[0] }}.{% endif %} Muscle is built on the days between.</p></div>
+  <div><p class="k">Today</p><p class="nm">Rest from lifting.</p><p class="sm">{{ rest }} {% if nxt %}Next: {{ nxt[1] | lower }}, {{ nxt[0] }}.{% endif %}</p></div>
   <a class="go" href="/lift" style="background:#fff;color:var(--ink)">Lift anyway</a>
   {% else %}
   <div><p class="k">Get started</p><p class="nm">Start lifting.</p><p class="sm">Pick how many days. Ceiling builds the week, puts it on your calendar, and starts the weights from your first session.</p></div>

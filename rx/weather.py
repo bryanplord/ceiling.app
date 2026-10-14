@@ -25,6 +25,9 @@ def where(store) -> tuple[float, float, str]:
 
 
 def fetch(store) -> dict | None:
+    import os
+    if os.getenv("PYTEST_CURRENT_TEST") or os.getenv("RX_NO_WEATHER"):
+        return None
     lat, lon, _ = where(store)
     key = f"wx:{lat:.2f},{lon:.2f}"
     try:
