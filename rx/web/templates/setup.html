@@ -17,7 +17,7 @@
   .opt span { display:block; padding:18px 20px; border-radius:18px; background:var(--frost); font-size:18px; font-weight:650;
               border:2px solid transparent; transition:background-color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease); }
   .opt:hover span { background:var(--frost2); }
-  .opt input:checked + span { background:#fff; border-color:var(--ink); }
+  .opt input:checked + span { background:#eaf3ee; border-color:var(--good); }
   .opt input:focus-visible + span { outline:2px solid var(--ceiling); outline-offset:2px; }
   .opt small { display:block; font-size:14px; font-weight:400; color:var(--lichen); margin-top:2px; }
   .grp { margin:24px 0 10px; font-size:14px; font-weight:700; color:var(--lichen); }
@@ -28,8 +28,10 @@
              border:1.5px solid transparent; transition:background-color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease); }
   .pl span small { font-size:13px; font-weight:600; color:var(--lichen); }
   .pl:hover span { background:var(--frost2); }
-  .pl input:checked + span { background:var(--ink); color:#fff; }
-  .pl input:checked + span small { color:rgba(255,255,255,.7); }
+  /* picked: a light tint, an outline and a check, so nothing competes with the black Next button */
+  .pl input:checked + span { background:#eaf3ee; border-color:var(--good); color:var(--ink); }
+  .pl input:checked + span::before { content:""; width:6px; height:11px; margin:-3px 2px 0 0; border:solid var(--good); border-width:0 2.2px 2.2px 0; transform:rotate(45deg); }
+  .pl input:checked + span small { color:var(--good); }
   .pl input:focus-visible + span { outline:2px solid var(--ceiling); outline-offset:2px; }
   .pl.new span { animation:rise var(--t) var(--ease-out) both; }
   .addany { display:flex; gap:8px; margin:18px 0 0; max-width:520px; }
