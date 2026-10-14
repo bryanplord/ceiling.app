@@ -550,7 +550,13 @@ def _session(p: Profile, v: str, day: str | None = None, noun: str | None = None
     noun = "session"
     if day and v not in (REST, LIGHT):
         try:
-            sport, kind, _, _ = choose_activity(v, p, day)
+            cut = (date.fromisoformat(day) - timedelta(days=30)).isoformat()
+            runs = sum(1 for a in p.activities if a.sport == RUN and cut <= a.date < day)
+            ban_ = {"run", "trail run"} if runs < 6 and v in (STEADY, HARD) else None
+            js = getattr(p, "journal", None) or {}
+            if js.get("ban"):
+                ban_ = set(ban_ or ()) | set(js["ban"])
+            sport, kind, _, _ = choose_activity(v, p, day, ban=ban_)
             noun = NOUN.get(kind or "", None) or {BIKE: "ride", RUN: "run", SKI: "ski tour", WALK: "walk"}.get(sport, "session")
         except Exception:
             pass
@@ -565,7 +571,13 @@ def _session_short(p: Profile, v: str, day: str | None = None) -> str:
     noun = "session"
     if day and v not in (REST, LIGHT):
         try:
-            sport, kind, _, _ = choose_activity(v, p, day)
+            cut = (date.fromisoformat(day) - timedelta(days=30)).isoformat()
+            runs = sum(1 for a in p.activities if a.sport == RUN and cut <= a.date < day)
+            ban_ = {"run", "trail run"} if runs < 6 and v in (STEADY, HARD) else None
+            js = getattr(p, "journal", None) or {}
+            if js.get("ban"):
+                ban_ = set(ban_ or ()) | set(js["ban"])
+            sport, kind, _, _ = choose_activity(v, p, day, ban=ban_)
             noun = NOUN.get(kind or "", None) or {BIKE: "ride", RUN: "run", SKI: "ski tour", WALK: "walk"}.get(sport, "session")
         except Exception:
             pass
@@ -832,6 +844,7 @@ SPORT_OF = {"mountain bike": BIKE, "road ride": BIKE, "gravel ride": BIKE, "trai
             "run": RUN, "trail run": RUN, "ski tour": SKI, "nordic ski": SKI, "hike": WALK, "walk": WALK,
             "resort skiing": SKI}
 CONTROLLED = {"road ride", "gravel ride", "trainer ride", "run", "hike"}   # easy to hold a steady HR
+INTERVAL_OK = {"road ride", "trainer ride", "run", "trail run", "ski tour"}  # where intervals actually work
 
 
 def choose_activity(verdict: str, p: Profile, day: str, planned: dict | None = None,
@@ -857,12 +870,27 @@ def choose_activity(verdict: str, p: Profile, day: str, planned: dict | None = N
     skied14 = mix14.get(SKI, 0.0) > 0
     band = _band(verdict, p)
 
-    if verdict == HARD or not band or not stats:
+    if verdict == HARD:
+        # Intervals need terrain you control. Never on a mountain bike (or lift-served skiing, or a
+        # hike): trail turns every effort into spikes and rests. Road, trainer, run, skin track only.
+        allowed = {k: v for k, v in stats.items() if k in INTERVAL_OK and k not in (ban or set())}
+        if prefer:
+            pref = {k: v for k, v in allowed.items() if SPORT_OF.get(k) == prefer}
+            allowed = pref or allowed
+        if allowed:
+            main = max(allowed, key=lambda k: allowed[k]["n"])
+        else:
+            main = "trainer ride"
+        where = {"run": "On a flat road, a track or a treadmill, where nothing interrupts the efforts.",
+                 "trail run": "On a steady uphill trail, walking back down between efforts.",
+                 "ski tour": "On the skin track, up a steady slope: one effort per climb.",
+                 "trainer ride": "On the trainer: nothing interrupts the efforts and the numbers stay honest."
+                 }.get(main, "On the road bike, on a steady climb or a flat stretch where you control the effort.")
+        return (SPORT_OF.get(main, BIKE), main, where + " Not on the mountain bike: trail breaks intervals into spikes and rests.", None)
+    if not band or not stats:
         pool = {k: v for k, v in stats.items() if SPORT_OF.get(k) != WALK} or stats
         main = max(pool, key=lambda k: pool[k]["n"]) if pool else None
-        return (SPORT_OF.get(main, BIKE), main,
-                "Do the hard efforts on a steady climb or a flat road where you control the effort. "
-                "Technical trail breaks intervals into spikes and rests.", None)
+        return (SPORT_OF.get(main, BIKE), main, "Your main sport.", None)
 
     lo, hi = band
     best, best_score, notes = None, -99.0, {}
@@ -962,8 +990,8 @@ def alternatives(p: Profile, rx: Rx, chosen: str | None, include_chosen: bool = 
             continue
         if k in SNOW and not winter:
             continue
-        if rx.verdict == HARD and k in ("hike", "resort skiing", "nordic ski"):
-            continue
+        if rx.verdict == HARD and k not in INTERVAL_OK:
+            continue                                  # never intervals on a mountain bike
         if rx.verdict == STEADY and k == "resort skiing":
             continue
         noun = NOUN.get(k, k)

@@ -133,23 +133,64 @@
   .v-long { background:#2b7a8c; } .v-race { background:#de5f55; }
   .ph-Base { background:#7fa7d9; } .ph-Build { background:#46b07f; } .ph-Peak { background:#ec9550; }
   .ph-Taper { background:#e3bd52; } .ph-Recover { background:#c9d8ea; } .ph-Race { background:#de5f55; } .ph-none { background:#c9c9cd; }
-  /* a day's details, opened under its week */
-  .dpanel { grid-column:1 / -1; background:var(--frost); border-bottom:1px solid var(--rule); padding:28px 32px 32px; }
-  .dpanel[hidden] { display:none; }
+  /* a day's details: a drawer from the right (a bottom sheet on a phone) */
+  .dscrim { position:fixed; inset:0; z-index:40; background:rgba(242,242,243,.82); opacity:0; transition:opacity .2s ease; }
+  .dscrim.on { opacity:1; }
+  .wcal { transition:transform .2s ease, width .2s ease, background-color .2s ease; }
+  .wcal.shift { position:relative; z-index:41; background:var(--frost); }
+  .wcal.shift .wkrow:not(.on) > * { opacity:.6; }
+  .wcal.shift .wkrow.on { background:#fff; }
+  .wcal.open button.c.sel { box-shadow:inset 0 0 0 2px var(--ink); }
+  .wcal.open button.c.sel:not(.done):not(.race) { background:#fff; }
+  .wcal.open .c.sel::after { display:none; }
+  .wcal.open .c.sel > * { opacity:1; }
+  .dconn { position:fixed; z-index:42; background:#fff; pointer-events:none; }
+  .drawer { position:fixed; z-index:43; top:0; right:0; bottom:0; width:480px; max-width:100%; background:#fff;
+            border-left:1px solid var(--rule); box-shadow:-24px 0 48px rgba(10,10,10,.06);
+            padding:28px 40px 40px; overflow-y:auto; overscroll-behavior:contain;
+            transform:translateX(100%); transition:transform .2s ease-out; }
+  .drawer.on { transform:none; }
+  .drawer:focus { outline:none; }
+  .dnotch { position:fixed; z-index:44; width:0; height:0; border-top:9px solid transparent; border-bottom:9px solid transparent;
+            border-right:9px solid var(--ink); pointer-events:none; }
+  .dnotch[hidden] { display:none; }
+  .dtool { position:absolute; top:28px; right:40px; display:flex; gap:8px; }
+  .ib { width:36px; height:36px; border:0; margin:0; padding:0; border-radius:50%; background:var(--frost); color:var(--ink);
+        display:inline-flex; align-items:center; justify-content:center; cursor:pointer; flex:none; }
+  .ib:hover { background:var(--frost2); }
+  .ib:disabled { color:#c4c4c8; background:var(--frost); cursor:default; }
+  .ib:focus-visible { outline:2px solid var(--ink); outline-offset:2px; }
+  .ib.xclose { margin-left:8px; }
   .dd[hidden] { display:none; }
-  .dd .dtop { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
-  .dd h4 { margin:0; font-size:15px; font-weight:600; color:var(--lichen); display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-  .dd .x { flex:none; width:36px; height:36px; border-radius:50%; border:1px solid var(--rule); background:#fff; color:var(--ink);
-           font:inherit; font-size:20px; line-height:1; cursor:pointer; }
-  .dd .x:focus-visible { outline:2px solid var(--ink); outline-offset:2px; }
-  .dd .big { font-size:clamp(24px, 3vw, 32px); font-weight:600; line-height:1.15; margin:10px 0 0; color:var(--ink); }
-  .dd .big .vb { display:block; width:40px; height:5px; border-radius:3px; margin:0 0 12px; }
-  .dd .body { display:grid; grid-template-columns:minmax(0, 1.2fr) minmax(0, 1fr); gap:12px 48px; margin-top:16px; max-width:980px; }
-  .dd p { margin:0 0 10px; font-size:16px; line-height:1.5; text-wrap:pretty; }
-  .dd .aim { font-weight:600; }
-  .dd .soft { color:var(--lichen); font-size:15px; }
-  .dd .chg s { color:var(--lichen); }
-  .dd .dx { margin:0 0 10px; }
+  .dd .dhead { display:flex; align-items:center; gap:12px; flex-wrap:wrap; min-height:36px; padding-right:136px; }
+  .dd h3 { margin:0; font-size:15px; font-weight:600; color:var(--ink); }
+  .dd .vb { display:block; width:40px; height:5px; border-radius:3px; margin:28px 0 14px; }
+  .dd .dbig { margin:0; font-size:44px; line-height:1.04; font-weight:700; letter-spacing:-0.03em; color:var(--ink); text-wrap:balance; }
+  .dd .dlead { margin:14px 0 0; font-size:17px; line-height:24px; font-weight:600; color:var(--ink); text-wrap:balance; }
+  .dd .dshort { display:none; }
+  .dd .dsub { margin:8px 0 0; font-size:17px; line-height:24px; color:var(--lichen); text-wrap:pretty; }
+  .dd .drows { margin-top:28px; border-bottom:1px solid var(--rule); }
+  .dd .drows p { margin:0; padding:11px 0; border-top:1px solid var(--rule); font-size:15px; line-height:21px; text-wrap:pretty; }
+  .dd .drows b { font-weight:600; }
+  .dd .dx { margin:14px 0 0; }
+  .dd .dx .dw1 { font-size:17px; }
+  .dd .dsc { display:flex; align-items:center; gap:6px; font-size:17px; }
+  .dd .dsc.big2 { font-size:17px; margin-top:10px; }
+  .dd .soft { color:var(--lichen); }
+  @media (max-width: 760px) {
+    .drawer { top:auto; left:0; width:100%; max-height:85vh; max-height:85dvh; border-left:0; border-radius:16px 16px 0 0;
+              box-shadow:0 -16px 40px rgba(10,10,10,.12); padding:28px 20px 32px; transform:translateY(100%); }
+    .drawer::before { content:""; position:absolute; top:8px; left:50%; width:36px; height:4px; margin-left:-18px; border-radius:2px; background:var(--frost2); }
+    .dtool { top:22px; right:20px; }
+    .ib.xclose { margin-left:4px; }
+    .dd .dhead { padding-right:124px; gap:10px; }
+    .dd .dlong { display:none; } .dd .dshort { display:inline; }
+    .dd .vb { margin-top:20px; }
+    .dd .dbig { font-size:34px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .dscrim, .drawer, .wcal { transition:none; }
+  }
   .pill { display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:600; color:var(--ink);
           background:#fff; border-radius:999px; padding:3px 10px 3px 8px; }
   .key { display:flex; flex-wrap:wrap; gap:8px 20px; font-size:13px; color:var(--lichen); margin-top:16px; align-items:center; }
@@ -180,9 +221,6 @@
     .c .st .lg { display:none; }
     .c .ck { width:13px; height:13px; font-size:8px; }
     .mnav { gap:16px; }
-    .dpanel { padding:20px 16px 24px; }
-    .dd .body { grid-template-columns:1fr; gap:0; }
-    .dd .big { font-size:24px; }
   }
 </style>
 {% endblock %}
@@ -233,28 +271,30 @@
     {% if cal_next %}<a class="arr" href="/calendar?m={{ cal_next }}#whole" aria-label="Next month">›</a>{% else %}<span class="arr off" aria-hidden="true">›</span>{% endif %}
   </div>
   {% set K = {'rest':'Day off','light':'Walk','easy':'Easy','steady':'Steady','hard':'Hard','long':'Long','race':'Race day'} %}
-  {% set DEP = {'Today':'Set this morning from last night\'s sleep and HRV.',
-                'Likely':'Tomorrow. Tonight\'s sleep and how today goes can still change it.',
-                'Probable':'Depends on the nights between now and then, and on doing what\'s planned until then.',
-                'Sketch':'A sketch from the plan\'s week. It becomes a real session about a week out, from how you train and recover until then.'} %}
+  {% set DEP = {'Today':'Nothing now. It was set this morning from last night\'s sleep and HRV.',
+                'Likely':'Tonight\'s sleep and how today goes. Either can still change it.',
+                'Probable':'The nights between now and then, and doing what\'s planned until then.',
+                'Sketch':'How you train and recover until then. It becomes a real session about a week out.'} %}
+  {% set WAS = {'rest':'a day off','light':'a walk','easy':'an easy day','steady':'a steady day','hard':'a hard day','long':'a long day','race':'race day'} %}
   {% set main = (done|selectattr('score','ne',none)|list or done)[0] if done else none %}
   <div class="wcal">
     <div class="wrow">{% for d in ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}<div class="dow">{{ d }}</div>{% endfor %}<div class="dow wkh">Week</div></div>
-    {% for wk in cal.weeks if wk.shown %}{% set wi = loop.index %}
-    <div class="wrow">
+    {% for wk in cal.weeks if wk.shown %}
+    <div class="wrow wkrow">
       {% for c in wk.cells %}
         {% if not c %}<div class="c out"></div>
         {% elif c.past %}{% set h = past.get(c.date) if past else none %}
           {% if h and h.trained %}
-          <div class="c past done t-{{ h.tone }}" title="{{ h.did|join(', ') }}: {{ h.status }}">
+          <button type="button" class="c past done t-{{ h.tone }}" data-d="{{ c.date }}" aria-haspopup="dialog" aria-expanded="false" aria-controls="dday"
+                  title="{{ h.did|join(', ') }}: {{ h.status }}">
             <span class="n">{{ c.day }}</span><span class="vb v-{{ h.verdict }}"></span>
             <span class="k">{{ h.did[0].rsplit(' ', 1)[0] if h.did else 'Done' }}</span>
             <span class="st t-{{ h.tone }}">{% if h.tone == 'good' %}<span class="ck" aria-hidden="true">✓</span>{% endif %}{{ h.short }}</span>
-          </div>
+          </button>
           {% else %}<div class="c past"><span class="n">{{ c.day }}</span></div>{% endif %}
         {% else %}{% set did = c.today and main %}
         <button type="button" class="c cf-{{ c.conf }}{{ ' tod' if c.today }}{{ ' race' if c.kind == 'race' }}{{ ' done t-' ~ (main.tone or 'muted') if did }}"
-                data-d="{{ c.date }}" aria-expanded="false" aria-controls="wp{{ wi }}"
+                data-d="{{ c.date }}" aria-haspopup="dialog" aria-expanded="false" aria-controls="dday"
                 title="{{ (main.sport ~ ' ' ~ main.dur ~ (', ' ~ main.score ~ '%' if main.score is not none else '')) if did else (c.title or (c.label ~ (' ' ~ c.dur if c.dur else '') ~ ', a sketch')) }}">
           <span class="n">{{ c.day }}</span>
           {% if did %}
@@ -270,54 +310,73 @@
         {% endif %}
       {% endfor %}
       <div class="wk"><b><i class="ph-{{ wk.phase or 'none' }}"></i>{{ wk.phase ~ ' week' if wk.phase else 'Your usual week' }}</b>{% if wk.hours %}<span>{{ '%g' % wk.hours }} hours</span>{% endif %}</div>
-      <div class="dpanel" id="wp{{ wi }}" role="region" aria-label="Day details" hidden>
-      {% for c in wk.cells if c and not c.past %}{% set dd = date.fromisoformat(c.date) %}
-        <div class="dd" data-d="{{ c.date }}" hidden>
-          <div class="dtop">
-            <h4>{{ dd.strftime('%A, %B %-d') }}<span class="pill"><i class="bx cf-{{ c.conf }}" aria-hidden="true"></i>{{ c.conf }}</span></h4>
-            <button type="button" class="x" aria-label="Close">×</button>
-          </div>
-          {% if c.today and done %}
-          <p class="big"><span class="vb v-{{ c.kind }}"></span>Done</p>
-          <div class="body"><div>
-            {% for x in done %}<div class="dx t-{{ x.tone or 'muted' }}">
-              <span class="dw1">{{ x.sport }} {{ x.dur }}</span>
-              {% if x.score is not none %}<span class="dsc">{% if x.tone == 'good' %}<span class="ck" aria-hidden="true">✓</span> {% endif %}{{ x.score }}%{% if x.word %}, {{ x.word|lower }}{% endif %}</span>{% endif %}
-              {% if x.head %}<p class="soft" style="margin-top:6px">{{ x.head }}</p>{% endif %}
-            </div>{% endfor %}
-          </div><div>
-            <p class="soft">The plan was</p><p>{{ c.title }}</p>
-          </div></div>
-          {% elif c.conf != 'Sketch' %}
-          <p class="big"><span class="vb v-{{ c.kind }}"></span>{{ K[c.kind] }}{% if c.dur %}, {{ c.dur }}{% endif %}</p>
-          <div class="body"><div>
-            {% if c.title and c.title != K[c.kind] %}<p class="aim">{{ c.title }}</p>{% endif %}
-            {% if c.detail and c.kind != 'rest' %}<p>{{ c.detail }}</p>{% endif %}
-            {% if c.options %}<p class="soft">{{ c.options }}</p>{% endif %}
-          </div><div>
-            {% if c.was %}<p class="chg">This was {{ K[c.was]|lower }}. {{ 'A knock-on from an earlier day changing.' if c.because.startswith('Knock-on') else c.because }}</p>
-            {% elif c.reason %}<p>{{ c.reason }}</p>{% endif %}
-            {% if c.phase %}<p class="soft">{{ c.phase }} week{% if c.week_hours %}, {{ '%g' % c.week_hours }} hours{% endif %}.</p>{% endif %}
-            <p class="soft">{{ DEP[c.conf] }}</p>
-          </div></div>
-          {% else %}
-          <p class="big"><span class="vb v-{{ c.kind }}"></span>{% if c.kind == 'long' %}Long {{ c.noun }}{% else %}{{ K[c.kind] }}{% if c.noun and c.noun != 'session' %} {{ c.noun }}{% endif %}{% endif %}{% if c.dur %}, {{ c.dur }}{% endif %}</p>
-          <div class="body"><div>
-            {% if c.kind == 'race' %}<p>Race day. Easy warm-up, start slower than you want to, and enjoy it.</p>
-            {% elif c.kind == 'rest' %}<p>Nothing planned. Rest is part of the plan.</p>
-            {% elif c.aim %}<p class="aim">{{ c.aim }}.</p>{% endif %}
-            {% if c.kind == 'long' %}<p>The week's long {{ c.noun }}. The session that builds you for the goal.</p>{% endif %}
-          </div><div>
-            <p class="soft">{% if c.week_phase %}{{ c.week_phase }} week{% else %}Your usual week{% endif %}{% if c.week_hours %}: {{ '%g' % c.week_hours }} hours{% endif %}{% if c.week_hard %}, {{ c.week_hard }} hard day{{ 's' if c.week_hard != 1 }}{% endif %}{% if c.wlong %}, long {{ c.week_noun }} {{ c.wlong }}{% endif %}.</p>
-            <p class="soft">{{ DEP['Sketch'] }}</p>
-          </div></div>
-          {% endif %}
-        </div>
-      {% endfor %}
-      </div>
     </div>
     {% endfor %}
   </div>
+  <div class="dscrim" hidden></div>
+  <div class="dconn" aria-hidden="true" hidden></div>
+  <span class="dnotch" aria-hidden="true" hidden></span>
+  <section class="drawer" id="dday" role="dialog" aria-modal="false" aria-label="Day details" tabindex="-1" hidden>
+    <div class="dtool">
+      <button type="button" class="ib dprev" aria-label="Previous day"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3L5 8l5 5"/></svg></button>
+      <button type="button" class="ib dnext" aria-label="Next day"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg></button>
+      <button type="button" class="ib xclose" aria-label="Close day details"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
+    </div>
+    {% for wk in cal.weeks if wk.shown %}{% for c in wk.cells if c %}{% set dd = date.fromisoformat(c.date) %}
+    {% if c.past %}{% set h = past.get(c.date) if past else none %}
+      {% if h and h.trained %}
+      <article class="dd" data-d="{{ c.date }}" aria-labelledby="ddt-{{ c.date }}" hidden>
+        <div class="dhead"><h3 id="ddt-{{ c.date }}"><span class="dlong">{{ dd.strftime('%A, %B %-d') }}</span><span class="dshort">{{ dd.strftime('%a, %b %-d') }}</span></h3></div>
+        <span class="vb v-{{ h.verdict }}"></span>
+        <h2 class="dbig">{{ h.did[0] if h.did else 'Done' }}</h2>
+        <p class="dsc big2 st t-{{ h.tone }}">{% if h.tone == 'good' %}<span class="ck" aria-hidden="true">✓</span>{% endif %}{{ h.status }}</p>
+        <div class="drows">
+          {% if h.did|length > 1 %}<p><b>Also.</b> {{ h.did[1:]|join(', ') }}.</p>{% endif %}
+          <p><b>The plan was.</b> {{ K[h.kind] if h.kind in K else h.kind|capitalize }}.</p>
+        </div>
+      </article>
+      {% endif %}
+    {% else %}
+      <article class="dd" data-d="{{ c.date }}" aria-labelledby="ddt-{{ c.date }}" hidden>
+        <div class="dhead"><h3 id="ddt-{{ c.date }}"><span class="dlong">{{ dd.strftime('%A, %B %-d') }}</span><span class="dshort">{{ dd.strftime('%a, %b %-d') }}</span></h3><span class="pill"><i class="bx cf-{{ c.conf }}" aria-hidden="true"></i>{{ c.conf }}</span></div>
+        {% if c.today and done %}
+        <span class="vb v-{{ c.kind }}"></span>
+        <h2 class="dbig">{{ main.sport }} {{ main.dur }}</h2>
+        {% for x in done %}<div class="dx t-{{ x.tone or 'muted' }}">
+          {% if not loop.first or done|length > 1 %}<span class="dw1">{{ x.sport }} {{ x.dur }}</span>{% endif %}
+          {% if x.score is not none %}<span class="dsc">{% if x.tone == 'good' %}<span class="ck" aria-hidden="true">✓</span>{% endif %}{{ x.score }}%{% if x.word %}, {{ x.word|lower }}{% endif %}</span>{% else %}<span class="dsc">Done</span>{% endif %}
+          {% if x.head %}<p class="dsub">{{ x.head }}</p>{% endif %}
+        </div>{% endfor %}
+        <div class="drows"><p><b>The plan was.</b> {{ c.title }}</p></div>
+        {% elif c.conf != 'Sketch' %}
+        <span class="vb v-{{ c.kind }}"></span>
+        <h2 class="dbig">{{ K[c.kind] }}{% if c.dur %}, {{ c.dur }}{% endif %}</h2>
+        {% if c.title and c.title != K[c.kind] %}<p class="dlead">{{ c.title }}</p>{% endif %}
+        {% if c.detail and c.kind != 'rest' %}<p class="dsub">{{ c.detail }}</p>{% endif %}
+        <div class="drows">
+          {% if c.options %}{% set o = c.options[3:] if c.options.startswith('Or ') else c.options %}<p><b>Or.</b> {{ o[:1]|upper }}{{ o[1:] }}</p>{% endif %}
+          {% if c.was %}{% set bw = c.because or '' %}{% set bc = 'a knock-on from an earlier day changing.' if bw.startswith('Knock-on') else (bw[:1]|lower ~ bw[1:] if bw[1:2].islower() else bw) %}
+          <p><b>What changed.</b> This was {{ WAS.get(c.was, c.was) }}; {{ bc }}</p>
+          {% elif c.reason %}<p><b>Why.</b> {{ c.reason }}</p>{% endif %}
+          {% if c.phase %}<p><b>Week.</b> {{ c.phase }} week{% if c.week_hours %}, {{ '%g' % c.week_hours }} hours{% endif %}.</p>{% endif %}
+          <p><b>Depends on.</b> {{ DEP[c.conf] }}</p>
+        </div>
+        {% else %}
+        <span class="vb v-{{ c.kind }}"></span>
+        <h2 class="dbig">{% if c.kind == 'long' %}Long {{ c.noun }}{% else %}{{ K[c.kind] }}{% if c.noun and c.noun != 'session' %} {{ c.noun }}{% endif %}{% endif %}{% if c.dur %}, {{ c.dur }}{% endif %}</h2>
+        {% if c.kind == 'race' %}<p class="dlead">Race day. Easy warm-up, start slower than you want to, and enjoy it.</p>
+        {% elif c.kind == 'rest' %}<p class="dlead">Nothing planned. Rest is part of the plan.</p>
+        {% elif c.aim %}<p class="dlead">{{ c.aim }}.</p>{% endif %}
+        {% if c.kind == 'long' %}<p class="dsub">The week's long {{ c.noun }}. The session that builds you for the goal.</p>{% endif %}
+        <div class="drows">
+          <p><b>Week.</b> {% if c.week_phase %}{{ c.week_phase }} week{% else %}Your usual week{% endif %}{% if c.week_hours %}: {{ '%g' % c.week_hours }} hours{% endif %}{% if c.week_hard %}, {{ c.week_hard }} hard day{{ 's' if c.week_hard != 1 }}{% endif %}{% if c.wlong %}, long {{ c.week_noun }}&nbsp;{{ c.wlong|replace(' ', ' ') }}{% endif %}.</p>
+          <p><b>Depends on.</b> {{ DEP['Sketch'] }}</p>
+        </div>
+        {% endif %}
+      </article>
+    {% endif %}
+    {% endfor %}{% endfor %}
+  </section>
   <div class="key">
     <span><i class="v-easy"></i>Easy</span><span><i class="v-steady"></i>Steady</span><span><i class="v-hard"></i>Hard</span>
     <span><i class="v-long"></i>Long</span><span><i class="v-rest"></i>Rest</span>{% if cal.race %}<span><i class="v-race"></i>Race day</span>{% endif %}
@@ -329,35 +388,107 @@
   </div>
   <script>
   (function () {
-    var cal = document.querySelector('.wcal');
-    if (!cal) return;
-    var openBtn = null;
-    function close(focus) {
-      if (!openBtn) return;
-      var p = document.getElementById(openBtn.getAttribute('aria-controls'));
-      if (p) p.hidden = true;
-      openBtn.setAttribute('aria-expanded', 'false');
-      openBtn.classList.remove('sel');
-      if (focus) openBtn.focus();
-      openBtn = null;
+    var cal = document.querySelector('.wcal'), dr = document.getElementById('dday');
+    if (!cal || !dr) return;
+    var scrim = document.querySelector('.dscrim'), conn = document.querySelector('.dconn'), notch = document.querySelector('.dnotch');
+    var prevB = dr.querySelector('.dprev'), nextB = dr.querySelector('.dnext');
+    var days = Array.prototype.slice.call(cal.querySelectorAll('button.c[data-d]'));
+    var sel = null, timer = null, raf = 0;
+    var phone = window.matchMedia('(max-width: 760px)');
+    var still = window.matchMedia('(prefers-reduced-motion: reduce)');
+    var GAP = 40, EDGE = 48, MINW = 640;
+
+    var gridRight = 0;
+    function place() {                   // squeeze the grid left of the drawer when there's room for both
+      raf = 0;
+      var shift = false, tx = 0, w = '';
+      var vw = document.documentElement.clientWidth;
+      if (sel && !phone.matches) {
+        var r = cal.parentElement.getBoundingClientRect(), right = vw - dr.offsetWidth - GAP;
+        gridRight = r.right;
+        if (r.right <= right) shift = true;
+        else {
+          var left = Math.min(r.left, Math.max(EDGE, right - r.width)), ww = right - left;
+          if (ww >= MINW) { shift = true; tx = left - r.left; w = ww + 'px'; gridRight = right; }
+        }
+      }
+      cal.style.transform = tx ? 'translateX(' + tx + 'px)' : '';
+      cal.style.width = shift ? w : '';
+      cal.classList.toggle('shift', shift);
+      dr.classList.toggle('shift', shift);
+      conn.hidden = notch.hidden = !shift;
+      if (shift) tie();
     }
+    function tie() {                     // the white bridge and notch from the chosen week to the drawer
+      if (!sel) return;
+      var row = sel.closest('.wkrow').getBoundingClientRect();
+      var dl = document.documentElement.clientWidth - dr.offsetWidth;
+      conn.style.left = gridRight + 'px'; conn.style.width = Math.max(0, dl - gridRight) + 'px';
+      conn.style.top = row.top + 'px'; conn.style.height = row.height + 'px';
+      var y = row.top + row.height / 2 - 9;
+      notch.style.display = (y < 8 || y > window.innerHeight - 26) ? 'none' : '';
+      notch.style.top = y + 'px'; notch.style.left = (dl - 9) + 'px';
+    }
+    function queue() { if (sel && !raf) raf = requestAnimationFrame(place); }
+
+    function show(b, focus) {
+      if (sel) { sel.classList.remove('sel'); sel.setAttribute('aria-expanded', 'false'); sel.closest('.wkrow').classList.remove('on'); }
+      sel = b;
+      b.classList.add('sel'); b.setAttribute('aria-expanded', 'true'); b.closest('.wkrow').classList.add('on');
+      var d = b.getAttribute('data-d'), art = null;
+      dr.querySelectorAll('.dd').forEach(function (x) { var on = x.getAttribute('data-d') === d; x.hidden = !on; if (on) art = x; });
+      if (art) dr.setAttribute('aria-labelledby', 'ddt-' + d);
+      var i = days.indexOf(b);
+      prevB.disabled = i <= 0; nextB.disabled = i >= days.length - 1;
+      dr.scrollTop = 0;
+      if (timer) { clearTimeout(timer); timer = null; }
+      if (dr.hidden) {
+        dr.hidden = false; scrim.hidden = false;
+        cal.classList.add('open');
+        dr.getBoundingClientRect();      // let the closed position land so the slide animates
+        dr.classList.add('on'); scrim.classList.add('on');
+      }
+      place();
+      if (!phone.matches) {
+        var r = b.getBoundingClientRect();
+        if (r.top < 0 || r.bottom > window.innerHeight) b.scrollIntoView({ block: 'nearest', behavior: still.matches ? 'auto' : 'smooth' });
+      }
+      if (focus && !dr.contains(document.activeElement)) dr.focus({ preventScroll: true });
+    }
+    function close() {
+      if (!sel) return;
+      var b = sel;
+      b.classList.remove('sel'); b.setAttribute('aria-expanded', 'false'); b.closest('.wkrow').classList.remove('on');
+      sel = null;
+      dr.classList.remove('on'); scrim.classList.remove('on');
+      cal.classList.remove('open', 'shift'); dr.classList.remove('shift');
+      cal.style.transform = ''; cal.style.width = ''; conn.hidden = notch.hidden = true;
+      timer = setTimeout(function () { dr.hidden = true; scrim.hidden = true; timer = null; }, still.matches ? 0 : 200);
+      b.focus({ preventScroll: true });
+    }
+    function step(n) {
+      if (!sel) return;
+      var j = days.indexOf(sel) + n;
+      if (j >= 0 && j < days.length) show(days[j], false);
+    }
+
     cal.addEventListener('click', function (e) {
-      if (e.target.closest('.dd .x')) { close(true); return; }
       var b = e.target.closest('button.c[data-d]');
       if (!b) return;
-      var same = b === openBtn;
-      close(false);
-      if (same) return;
-      var p = document.getElementById(b.getAttribute('aria-controls'));
-      p.querySelectorAll('.dd').forEach(function (x) { x.hidden = x.getAttribute('data-d') !== b.getAttribute('data-d'); });
-      p.hidden = false;
-      b.setAttribute('aria-expanded', 'true');
-      b.classList.add('sel');
-      openBtn = b;
-      var r = p.getBoundingClientRect();
-      if (r.bottom > window.innerHeight) p.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      if (b === sel) { close(); return; }
+      show(b, true);
     });
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(true); });
+    dr.querySelector('.xclose').addEventListener('click', close);
+    prevB.addEventListener('click', function () { step(-1); });
+    nextB.addEventListener('click', function () { step(1); });
+    scrim.addEventListener('click', close);
+    dr.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowLeft') { step(-1); e.preventDefault(); }
+      else if (e.key === 'ArrowRight') { step(1); e.preventDefault(); }
+    });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && sel) close(); });
+    window.addEventListener('resize', queue);
+    window.addEventListener('scroll', function () { if (sel && cal.classList.contains('shift')) requestAnimationFrame(tie); }, { passive: true });
   })();
   </script>
   {% endif %}
