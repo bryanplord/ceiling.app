@@ -76,7 +76,7 @@
   <p class="lsum rise" style="--i:2">{% if sess.mode == 'mobility' %}Twenty minutes, easy.{% else %}{{ sess.circuits | length }} circuits, {{ sess.rounds }} rounds each, about {{ sess.minutes }} minutes. {{ 'A heavier week: fewer reps, more weight.' if sess.heavy else 'A lighter week: more reps, less weight.' }}{% endif %}</p>
   {% if sess.why %}<p class="lwhy rise" style="--i:3">{{ sess.why }}</p>{% endif %}
   {% if sess.mode in ('full', 'short') %}
-  <nav class="seg rise" style="--i:3" aria-label="Length"><a href="/lift?v=full{{ '&s=' ~ sess.key if request.query_params.get('s') }}"{% if sess.mode == 'full' %} aria-current="true"{% endif %}>Full</a><a href="/lift?v=short{{ '&s=' ~ sess.key if request.query_params.get('s') }}"{% if sess.mode == 'short' %} aria-current="true"{% endif %}>Short, 2 rounds</a></nav>
+  <nav class="seg rise" style="--i:3" aria-label="Length"><a href="/lift?v=full{{ '&s=' ~ sess.key if request.query_params.get('s') }}"{% if sess.mode == 'full' %} aria-current="true"{% endif %}>Full, {{ st.rounds }} rounds</a><a href="/lift?v=short{{ '&s=' ~ sess.key if request.query_params.get('s') }}"{% if sess.mode == 'short' %} aria-current="true"{% endif %}>Short, 2 rounds</a></nav>
   {% endif %}
 
   {% if sess.mode == 'mobility' %}
@@ -97,7 +97,7 @@
           <span class="rn">Round {{ r + 1 }}</span>
           {% if m.bodyweight %}<label><span class="sr" style="position:absolute;left:-9999px">Weight</span><input type="text" value="Body" disabled aria-label="Bodyweight"></label>
           {% else %}<label><input type="number" inputmode="decimal" step="0.5" min="0" name="w" value="{{ (pv[0] if pv and pv[0] is not none else (m.weight if m.weight is not none else '')) }}" placeholder="—" aria-label="{{ m.name }}, round {{ r + 1 }}, weight"><small>{{ st.units }}</small></label>{% endif %}
-          <label><input type="number" inputmode="numeric" min="0" name="r" value="{{ pv[1] if pv and pv[1] is not none else '' }}" placeholder="{{ m.lo if m.lo == m.hi else (m.lo ~ '–' ~ m.hi) }}" aria-label="{{ m.name }}, round {{ r + 1 }}, reps"><small>{{ 'reps' if m.unit == 'reps' else m.unit }}{{ ' a side' if m.side }}</small></label>
+          <label><input type="number" inputmode="numeric" min="0" name="r" value="{{ pv[1] if pv and pv[1] is not none else '' }}" placeholder="{{ 'Failure' if sess.failure and loop.last and m.unit == 'reps' else (m.lo if m.lo == m.hi else (m.lo ~ '–' ~ m.hi)) }}" aria-label="{{ m.name }}, round {{ r + 1 }}, reps"><small>{{ 'reps' if m.unit == 'reps' else m.unit }}{{ ' a side' if m.side }}</small></label>
           <button type="button" class="tick" aria-pressed="{{ 'true' if pv and pv[2] else 'false' }}" aria-label="Done: {{ m.name }}, round {{ r + 1 }}"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5l4 4 8-9" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         </div>{% endfor %}
       </div>
@@ -159,7 +159,7 @@
     if (row) {
       row.classList.toggle('done', on);
       const r = row.querySelector('input[name=r]');
-      if (on && r && !r.value) r.value = r.placeholder.split('–').pop();   // ticking means you hit the target
+      if (on && r && !r.value && /\d/.test(r.placeholder)) r.value = r.placeholder.split('–').pop();   // ticking means you hit the target
       // Carry this weight down to the next rounds you haven't touched.
       const w = row.querySelector('input[name=w]');
       if (on && w && w.value) row.parentElement.querySelectorAll('.set').forEach(s2 => {

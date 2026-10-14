@@ -118,6 +118,7 @@ class Session:
     mode: str = "full"            # full | short | lighter | mobility
     why: str = ""                 # why today's version (recovery, tomorrow)
     mobility: list[str] = field(default_factory=list)
+    failure: bool = False         # last round of each move to failure
 
 
 # -------------------------------------------------------------------------- settings
@@ -127,8 +128,13 @@ def settings(store) -> dict:
         s = json.loads(store.get_meta("strength_settings") or "{}")
     except ValueError:
         s = {}
+    try:
+        rounds = max(1, min(8, int(s.get("rounds") or 3)))
+    except (TypeError, ValueError):
+        rounds = 3
     return {"train": s.get("train") or "endurance", "equip": s.get("equip") or "gym",
-            "units": s.get("units") or "lb", "length": s.get("length") or "full"}
+            "units": s.get("units") or "lb", "length": s.get("length") or "full",
+            "rounds": rounds, "failure": bool(s.get("failure"))}
 
 
 def save_settings(store, **kw) -> dict:
@@ -247,7 +253,7 @@ def session(store, key: str, day: str, verdict: str = "", tomorrow: str = "", re
         mode = "lighter"
         why = (why + " " if why else "") + "Recovery is down: same moves, two rounds, stop three reps short of hard."
     spec = SESSIONS[key]
-    rounds = 2 if mode in ("short", "lighter") else 3
+    rounds = 2 if mode in ("short", "lighter") else st["rounds"]
     circuits = spec["circuits"][:2] if mode == "short" else spec["circuits"]
     out: list[list[Move]] = []
     for c in circuits:
@@ -264,7 +270,8 @@ def session(store, key: str, day: str, verdict: str = "", tomorrow: str = "", re
         out.append(row)
     n_moves = sum(len(c) for c in out)
     minutes = 8 + round(n_moves * rounds * 1.6)        # warm-up plus about 90 seconds a set with rest
-    return Session(key, spec["name"], rounds, out, minutes, heavy, mode, why)
+    return Session(key, spec["name"], rounds, out, minutes, heavy, mode, why,
+                   failure=st["failure"] and mode not in ("lighter",))
 
 
 def summary(sess: Session) -> str:

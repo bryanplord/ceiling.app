@@ -69,6 +69,11 @@
   .al-k { font-size:15px; font-weight:700; color:#5e5e63; }
   .al-v { flex:1 1 320px; font-size:17px; } .al-v b { margin-right:6px; }
   .al-go { background:var(--ink); color:var(--snow); border-radius:999px; padding:10px 20px; font-weight:650; font-size:15px; }
+  .chart-x { position:relative; display:block; width:100%; border:0; background:none; padding:20px 0 0; margin-top:auto; cursor:zoom-in; color:inherit; font:inherit; }
+  .chart-x .xp { position:absolute; top:28px; right:8px; width:30px; height:30px; border-radius:50%; background:rgba(255,255,255,.92);
+                 display:grid; place-items:center; box-shadow:0 1px 4px rgba(0,0,0,.12); opacity:.85; transition:opacity var(--t-fast) var(--ease), transform var(--t-fast) var(--ease); }
+  .chart-x .xp svg { width:14px; height:14px; }
+  .chart-x:hover .xp { opacity:1; transform:scale(1.06); }
   .open-s { margin:14px 0 0; padding:14px 0 0; border:0; border-top:1px solid #dcdce0; background:none; font:inherit; text-align:left; cursor:pointer;
             display:flex; flex-direction:column; gap:2px; width:100%; color:inherit; }
   .open-s span { font-size:14px; color:#5e5e63; }
@@ -155,7 +160,7 @@
     <h2>Today</h2>
     <div class="bigrow"><p class="big {{ M.tone }}">{{ M.word }}.</p><span class="pct {{ M.tone }}">{{ M.score }}%</span></div>
     {% if C.under is not none %}<p class="lead strong">{{ C.under }}% under {{ rx.hr_ceiling }}{% if M.zones %}, mostly {{ (M.zones | sort(attribute=3, reverse=True) | first)[0] }}{% endif %}.</p>{% endif %}
-    {% if C.trace %}<div class="chart">{{ C.trace | safe }}</div>{% endif %}
+    {% if C.trace %}<button type="button" class="chart chart-x" aria-label="Expand the session" aria-controls="session">{{ C.trace | safe }}<span class="xp" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M9.5 2.5h4v4M13.5 2.5l-5 5M6.5 13.5h-4v-4M2.5 13.5l5-5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span></button>{% endif %}
     <button type="button" class="open-s" aria-expanded="false" aria-controls="session"><span>{{ M.name }}, {{ M.dur }}{% if M.avg %}, average {{ M.avg }}{% endif %}</span><b>See the session</b></button>
   </section>
   <section class="tc" aria-label="If you want more">
@@ -312,6 +317,7 @@
                 setTimeout(() => panel.scrollIntoView({behavior: 'smooth', block: 'start'}), 120); })); }
     else { panel.classList.remove('on'); setTimeout(() => { if (!panel.classList.contains('on')) panel.hidden = true; }, 700); } };
   btn.addEventListener('click', () => set(btn.getAttribute('aria-expanded') !== 'true'));
+  const cx = document.querySelector('.chart-x'); if (cx) cx.addEventListener('click', () => set(true));
   panel.querySelector('.s-x').addEventListener('click', () => { set(false); btn.scrollIntoView({behavior: 'smooth', block: 'center'}); });
 })();
 (() => {

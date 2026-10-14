@@ -137,15 +137,15 @@ def trace(stream, points: int = 90) -> list[tuple[float, float]]:
     return out
 
 
-def trace_svg(tr, p, ceiling: int | None, w: int = 330, h: int = 250) -> str:
+def trace_svg(tr, p, ceiling: int | None, w: int = 330, h: int = 250, labels: bool = True) -> str:
     try:
-        return _trace_svg(tr, p, ceiling, w, h)
+        return _trace_svg(tr, p, ceiling, w, h, labels)
     except Exception as e:
         print(f"trace chart failed: {e!r}")
         return ""
 
 
-def _trace_svg(tr, p, ceiling: int | None, w: int = 330, h: int = 250) -> str:
+def _trace_svg(tr, p, ceiling: int | None, w: int = 330, h: int = 250, labels: bool = True) -> str:
     if not tr or ceiling is None or not p.zones:
         return ""
     vals = [v for _, v in tr]
@@ -161,14 +161,22 @@ def _trace_svg(tr, p, ceiling: int | None, w: int = 330, h: int = 250) -> str:
     o = [f'<svg class="tgt" viewBox="0 0 {w} {h}" role="img" aria-label="Heart rate through the session: '
          f'{round((1 - over) * 100)} percent under {ceiling}, peak {round(peak[1])}.">',
          f'<defs><clipPath id="ovc"><rect x="0" y="-20" width="{w}" height="{Y(ceiling) + 20:.1f}"/></clipPath></defs>']
-    _zone_layer(o, p, Y, w, ph, lo, hi, fs, ceiling)
+    if labels:
+        _zone_layer(o, p, Y, w, ph, lo, hi, fs, ceiling)
+    else:                                   # small version: the colours alone, no words to collide
+        for name, cls, z0, z1 in bands(p):
+            if z1 <= lo or z0 >= hi:
+                continue
+            y0, y1 = Y(min(z1, hi)), Y(max(z0, lo))
+            o.append(f'<rect x="0" y="{y0:.1f}" width="{w}" height="{y1 - y0:.1f}" fill="{BAND_FILL[cls]}"/>')
     pts = " ".join(f"{X(m):.1f},{Y(v):.1f}" for m, v in tr)
     o.append(f'<polyline points="{pts}" fill="none" stroke="{INK}" stroke-width="2.25" stroke-linejoin="round" stroke-linecap="round"/>')
     o.append(f'<polyline points="{pts}" fill="none" stroke="{RED}" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round" clip-path="url(#ovc)"/>')
     o.append(f'<line x1="0" y1="{Y(ceiling):.1f}" x2="{w}" y2="{Y(ceiling):.1f}" stroke="{RED}" stroke-width="2"/>')
-    o.append(f'<text x="{w - 4}" y="{Y(ceiling) - 7:.1f}" text-anchor="end" {FONT} font-size="17" font-weight="800" font-stretch="125%" fill="{STOP}">{ceiling}</text>')
+    o.append(f'<text x="6" y="{Y(ceiling) - 7:.1f}" {FONT} font-size="17" font-weight="800" font-stretch="125%" fill="{STOP}" paint-order="stroke" stroke="#fff" stroke-opacity=".8" stroke-width="3">{ceiling}</text>')
     if peak[1] > ceiling + 2:
-        o.append(f'<text x="{X(peak[0]):.1f}" y="{max(12, Y(peak[1]) - 7):.1f}" text-anchor="middle" {FONT} font-size="12" font-weight="700" fill="{STOP}">{round(peak[1])}</text>')
+        px = min(max(X(peak[0]), 16), w - 16)
+        o.append(f'<text x="{px:.1f}" y="{max(12, Y(peak[1]) - 8):.1f}" text-anchor="middle" {FONT} font-size="12" font-weight="700" fill="{STOP}" paint-order="stroke" stroke="#fff" stroke-width="3">{round(peak[1])}</text>')
     o.append(f'<line x1="0" y1="{ph}" x2="{w}" y2="{ph}" stroke="#c7c7cc"/>')
     o.append(f'<text x="0" y="{ph + 18}" {FONT} font-size="12" fill="{GRAPH}">0</text>')
     o.append(f'<text x="{w}" y="{ph + 18}" text-anchor="end" {FONT} font-size="12" fill="{GRAPH}">{round(end)} min</text>')

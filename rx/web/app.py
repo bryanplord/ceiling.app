@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
+import json
 import os
 import threading
 import time
@@ -479,7 +480,7 @@ def _today_cards_(p, rx, after) -> dict:
     M = (after or {}).get("main") if after and after.get("done") else None
     if M:
         tr = M.get("trace") or []
-        out["trace"] = charts.trace_svg(tr, p, c)
+        out["trace"] = charts.trace_svg(tr, p, c, h=300, labels=False)
         out["trace_big"] = charts.trace_svg(tr, p, c, w=1100, h=300)
         out["under"] = round(100 * sum(1 for _, v in tr if v <= c) / len(tr)) if tr and c else None
     if after and after.get("done"):
@@ -651,9 +652,20 @@ async def strength_settings(request: Request):
                      equip=f.get("equip") if f.get("equip") in sg.EQUIP else None,
                      units=f.get("units") if f.get("units") in ("lb", "kg") else None,
                      length=f.get("length") if f.get("length") in ("full", "short") else None)
+    said = ""
+    if "rounds" in f:                                 # 2, 3, 4 or anything typed: "5", "to failure", "4 to failure"
+        import re as _re
+        t = f["rounds"].strip().lower()
+        n = _re.search(r"\d+", t)
+        cur = sg.settings(store)
+        st_ = {"rounds": max(1, min(8, int(n.group()))) if n else cur["rounds"], "failure": "fail" in t}
+        raw = json.loads(store.get_meta("strength_settings") or "{}")
+        raw.update(st_)
+        store.set_meta("strength_settings", json.dumps(raw))
+        said = f"{st_['rounds']} rounds" + (", last one to failure" if st_["failure"] else "")
     bust(store)
     if "application/json" in request.headers.get("accept", ""):
-        return JSONResponse({"ok": True})
+        return JSONResponse({"ok": True, "said": said})
     return RedirectResponse("/strength", status_code=303)
 
 
