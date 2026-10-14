@@ -576,6 +576,36 @@ def lift_page(request: Request, v: str | None = None, s: str | None = None):
                  day_label=date.fromisoformat(rx.date).strftime("%A, %B %-d"), sessions=sg.SESSIONS, equip=sg.EQUIP)
 
 
+@app.get("/lift/move")
+def lift_move(ex: str):
+    """One move's sheet: alternates (with why), your history with it, how to do it."""
+    from fastapi.responses import JSONResponse
+    from .. import strength as sg
+    if ex not in sg.LIB:
+        return JSONResponse({"ok": False}, status_code=404)
+    store = open_store()
+    st = sg.settings(store)
+    L = sg.LIB[ex]
+    name = L[st["equip"]]
+    import urllib.parse as _u
+    return JSONResponse({"ok": True, "name": name, "muscles": L["muscles"], "cue": L["cue"], "units": st["units"],
+                         "video": "https://www.youtube.com/results?search_query=" + _u.quote_plus(name + " form"),
+                         "alts": sg.alternates(store, ex), "history": sg.history_rows(store, ex, local_today().isoformat() + "~")})
+
+
+@app.post("/lift/swap")
+async def lift_swap(request: Request):
+    from .. import strength as sg
+    form = parse_qs((await request.body()).decode())
+    f = {k: (v[0] if v else "") for k, v in form.items()}
+    slot, to = f.get("slot", ""), f.get("to", "")
+    if slot in sg.LIB and to.partition("@")[0] in sg.LIB:
+        store = open_store()
+        sg.swap(store, local_today().isoformat(), slot, to, f.get("always") == "1")
+    back = "/lift" + (("?" + f["q"]) if f.get("q") else "")
+    return RedirectResponse(back, status_code=303)
+
+
 @app.post("/lift")
 async def lift_save(request: Request):
     """Autosave from the lift page: every set as you tick it, and 'done' when you finish."""
@@ -600,7 +630,8 @@ async def lift_save(request: Request):
                     w, n = None, None
                 clean_.append([w, n, bool(r[2]) if len(r) > 2 else False])
             sets[ex] = clean_
-    lg = {"session": str(body.get("session", ""))[:20], "mode": str(body.get("mode", ""))[:10], "sets": sets,
+    prev = sg.log_for(store, day) or {}
+    lg = {"swaps": prev.get("swaps") or {}, "session": str(body.get("session", ""))[:20], "mode": str(body.get("mode", ""))[:10], "sets": sets,
           "done": bool(body.get("done")), "mobility": [bool(x) for x in (body.get("mobility") or [])][:12]}
     sg.save_log(store, day, lg)
     if lg["done"]:

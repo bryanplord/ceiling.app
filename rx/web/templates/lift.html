@@ -56,6 +56,58 @@
     .set { grid-template-columns:52px 1fr 1fr 44px; gap:8px; } .mv { padding:16px 16px 12px; }
     .dock { margin:32px -20px 0; padding:14px 20px calc(14px + env(safe-area-inset-bottom)); }
   }
+  .focus[hidden], .fx-rest[hidden], .sheet[hidden], .sheet-bg[hidden] { display:none !important; }
+  .mvh { position:relative; padding-right:44px; }
+  .more { position:absolute; right:-6px; top:-4px; width:38px; height:38px; border:0; border-radius:50%; background:transparent; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:3px; }
+  .more i { width:4px; height:4px; border-radius:50%; background:#6e6e73; }
+  .more:hover { background:rgba(0,0,0,.06); }
+  .lastt { margin:6px 0 0; font-size:14px; color:#4a4a4f; font-weight:600; }
+  .go-focus { display:block; margin:22px 0 0; background:var(--ink); color:#fff; border:0; border-radius:999px; padding:14px 26px; font:inherit; font-size:16px; font-weight:650; cursor:pointer; }
+  .sheet-bg { position:fixed; inset:0; background:rgba(0,0,0,.28); z-index:40; animation:fadein var(--t) var(--ease) both; }
+  @keyframes fadein { from { opacity:0; } }
+  .sheet { position:fixed; z-index:41; left:50%; bottom:0; transform:translateX(-50%); width:min(560px, 100%); max-height:86vh; overflow:auto; background:#fff;
+           border-radius:24px 24px 0 0; padding:22px 24px calc(28px + env(safe-area-inset-bottom)); box-shadow:0 -10px 40px rgba(0,0,0,.18); animation:sheetup var(--t) var(--ease-out) both; }
+  @keyframes sheetup { from { transform:translate(-50%, 40px); opacity:0; } }
+  @media (min-width:760px) { .sheet { bottom:auto; top:50%; transform:translate(-50%, -50%); border-radius:24px; } @keyframes sheetup { from { transform:translate(-50%, -46%); opacity:0; } } }
+  .sh-top { display:flex; justify-content:space-between; align-items:baseline; gap:12px; }
+  .sh-top h2 { margin:0; font-size:24px; font-weight:800; color:var(--ink); letter-spacing:-0.01em; }
+  .sh-x { border:0; background:none; font:inherit; color:var(--lichen); cursor:pointer; }
+  .sh-mus { margin:4px 0 0; color:var(--lichen); font-size:15px; } .sh-cue { margin:10px 0 0; font-size:16px; line-height:1.45; }
+  .sh-vid { display:inline-block; margin:10px 0 0; font-weight:650; color:var(--ink); }
+  .sheet h3 { margin:24px 0 10px; font-size:15px; font-weight:700; color:var(--lichen); }
+  .sh-alts { display:flex; flex-direction:column; gap:8px; }
+  .sh-alt { display:flex; align-items:center; gap:12px; width:100%; text-align:left; border:0; background:#f5f5f7; border-radius:16px; padding:14px 16px; font:inherit; cursor:pointer; }
+  .sh-alt:hover { background:#ececef; }
+  .sh-alt b { display:block; font-size:16px; } .sh-alt small { display:block; font-size:13px; color:var(--lichen); margin-top:2px; }
+  .sh-alt span:first-child { flex:1; }
+  .sh-alt .sw { width:34px; height:34px; border-radius:50%; background:#2f6fec; color:#fff; display:grid; place-items:center; font-size:16px; flex:none; }
+  .sh-always { display:flex; gap:8px; align-items:center; margin:12px 0 0; font-size:15px; color:#4a4a4f; }
+  .sh-hist { list-style:none; padding:0; margin:0; } .sh-hist li { margin:0; display:flex; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px solid var(--rule); font-size:15px; }
+  .sh-hist li span { color:var(--lichen); }
+  .focus { position:fixed; inset:0; z-index:30; background:#fff; display:flex; flex-direction:column; animation:fadein var(--t) var(--ease) both; }
+  .fx-top { display:flex; align-items:center; gap:14px; padding:18px 22px; border-bottom:1px solid var(--rule); }
+  .fx-clock { font-size:18px; font-weight:700; font-variant-numeric:tabular-nums; background:#f5f5f7; border-radius:999px; padding:6px 14px; }
+  .fx-where { flex:1; font-size:14px; line-height:1.3; color:var(--lichen); } .fx-where b { color:var(--ink); font-weight:650; }
+  .fx-list { border:1px solid var(--rule); background:#fff; border-radius:999px; padding:8px 16px; font:inherit; font-weight:600; cursor:pointer; }
+  .fx-body { flex:1; overflow:auto; width:min(640px, 100%); margin:0 auto; padding:28px 22px 32px; display:flex; flex-direction:column; }
+  .fx-body.swap { animation:rise var(--t) var(--ease-out) both; }
+  .fx-mus { margin:0; color:var(--lichen); font-size:15px; }
+  .fx-name { margin:6px 0 0; font-size:clamp(32px, 7vw, 48px); font-weight:800; letter-spacing:-0.02em; line-height:1.05; color:var(--ink); }
+  .fx-cue { margin:12px 0 0; font-size:17px; line-height:1.45; color:#3a3a3f; }
+  .fx-last { margin:8px 0 0; font-size:15px; font-weight:600; color:var(--good); }
+  .fx-pill { display:grid; grid-template-columns:1fr 1fr; margin:28px 0 0; border-radius:999px; background:#e8f0fd; border:1.5px solid #9ec0f5; overflow:hidden; }
+  .fx-cell { display:flex; align-items:center; justify-content:space-between; padding:10px 12px; }
+  .fx-cell + .fx-cell { border-left:1.5px solid #9ec0f5; }
+  .fx-cell span { text-align:center; } .fx-cell b { font-size:30px; font-variant-numeric:tabular-nums; } .fx-cell small { margin-left:6px; color:#4a4a4f; font-size:15px; }
+  .fx-cell button { width:40px; height:40px; border-radius:50%; border:0; background:#fff; font-size:22px; cursor:pointer; }
+  .fx-act { display:flex; align-items:center; justify-content:space-between; margin:28px 0 0; }
+  .fx-back, .fx-skip { width:56px; height:56px; border-radius:50%; border:0; background:#f2f2f4; font:inherit; font-weight:650; cursor:pointer; }
+  .fx-done { width:88px; height:88px; border-radius:50%; border:0; background:#2f6fec; cursor:pointer; display:grid; place-items:center; box-shadow:0 8px 20px rgba(47,111,236,.35); }
+  .fx-done svg { width:36px; height:36px; }
+  .fx-next { margin:24px 0 0; text-align:center; color:var(--lichen); font-size:15px; }
+  .fx-rest { position:absolute; inset:64px 0 0; background:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; animation:fadein var(--t) var(--ease) both; }
+  .fx-rest p { margin:0; font-size:18px; color:var(--lichen); font-weight:650; } .fx-rest b { font-size:88px; font-weight:800; font-variant-numeric:tabular-nums; letter-spacing:-0.03em; }
+  .fx-rest span { color:var(--lichen); } .fx-rest button { margin-top:14px; border:1px solid var(--rule); background:#fff; border-radius:999px; padding:12px 22px; font:inherit; font-weight:650; cursor:pointer; }
 </style>
 {% endblock %}
 {% block body %}
@@ -79,6 +131,7 @@
   <nav class="seg rise" style="--i:3" aria-label="Length"><a href="/lift?v=full{{ '&s=' ~ sess.key if request.query_params.get('s') }}"{% if sess.mode == 'full' %} aria-current="true"{% endif %}>Full, {{ st.rounds }} rounds</a><a href="/lift?v=short{{ '&s=' ~ sess.key if request.query_params.get('s') }}"{% if sess.mode == 'short' %} aria-current="true"{% endif %}>Short, 2 rounds</a></nav>
   {% endif %}
 
+  {% if sess.mode != 'mobility' %}<button type="button" class="go-focus rise" id="goFocus" style="--i:3">Start: one set at a time</button>{% endif %}
   {% if sess.mode == 'mobility' %}
   <ul class="mob" id="mob">{% for m in sess.mobility %}<li><button type="button" class="tick" aria-pressed="{{ 'true' if (log.mobility or [])[loop.index0] else 'false' }}" aria-label="Done: {{ m }}"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5l4 4 8-9" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>{{ m }}</li>{% endfor %}</ul>
   {% else %}
@@ -89,8 +142,10 @@
     <h2>Circuit {{ ci }}<small>{{ sess.rounds }} rounds. Do one set of each, then repeat.</small></h2>
     {% for m in c %}{% set prev = (log.sets or {}).get(m.id) or [] %}
     <article class="mv" data-ex="{{ m.id }}">
-      <div class="mvh"><b>{{ m.name }}</b><span>{{ m.muscles }}</span></div>
+      <div class="mvh"><b>{{ m.name }}</b><span>{{ m.muscles }}</span>
+        <button type="button" class="more" data-ex="{{ m.id }}" data-slot="{{ m.slot or m.id }}" aria-label="Swap, history and how-to for {{ m.name }}" aria-haspopup="dialog"><i></i><i></i><i></i></button></div>
       <p class="cue">{{ m.cue }}</p>
+      {% if m.last %}<p class="lastt">Last time: {{ m.last }}</p>{% endif %}
       {% if m.note %}<p class="wn">{{ m.note }}</p>{% endif %}
       <div class="sets">{% for r in range(sess.rounds) %}{% set pv = prev[r] if prev | length > r else none %}
         <div class="set{{ ' done' if pv and pv[2] }}">
@@ -107,6 +162,39 @@
   {% endfor %}
   </form>
   {% endif %}
+
+  <div class="sheet-bg" id="sheetBg" hidden></div>
+  <section class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="shName" hidden>
+    <div class="sh-top"><h2 id="shName"></h2><button type="button" class="sh-x" aria-label="Close">Close</button></div>
+    <p class="sh-mus" id="shMus"></p>
+    <p class="sh-cue" id="shCue"></p>
+    <a class="sh-vid" id="shVid" target="_blank" rel="noopener">Watch how it's done</a>
+    <h3>Swap for</h3>
+    <form method="post" action="/lift/swap" id="shSwap"><input type="hidden" name="slot" id="shSlot"><input type="hidden" name="q" value="{{ request.url.query }}">
+      <div id="shAlts" class="sh-alts"></div>
+      <label class="sh-always"><input type="checkbox" name="always" value="1"> Use it from now on</label></form>
+    <h3>Your history</h3>
+    <ol id="shHist" class="sh-hist"></ol>
+  </section>
+
+  <section class="focus" id="focus" aria-label="One set at a time" hidden>
+    <div class="fx-top"><span class="fx-clock" id="fxClock">00:00</span><span class="fx-where" id="fxWhere"></span><button type="button" class="fx-list" id="fxList">Whole list</button></div>
+    <div class="fx-body" id="fxBody">
+      <p class="fx-mus" id="fxMus"></p>
+      <h2 class="fx-name" id="fxName"></h2>
+      <p class="fx-cue" id="fxCue"></p>
+      <p class="fx-last" id="fxLast"></p>
+      <div class="fx-pill">
+        <div class="fx-cell" id="fxReps"><button type="button" data-d="-1" aria-label="One fewer rep">−</button><span><b id="fxRepsV"></b><small id="fxRepsU">reps</small></span><button type="button" data-d="1" aria-label="One more rep">+</button></div>
+        <div class="fx-cell" id="fxW"><button type="button" data-d="-1" aria-label="Less weight">−</button><span><b id="fxWV"></b><small>{{ st.units }}</small></span><button type="button" data-d="1" aria-label="More weight">+</button></div>
+      </div>
+      <div class="fx-act"><button type="button" class="fx-back" id="fxBack" aria-label="Back one set">&larr;</button>
+        <button type="button" class="fx-done" id="fxDone" aria-label="Set done"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5l4 4 8-9" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <button type="button" class="fx-skip" id="fxSkip">Skip</button></div>
+      <p class="fx-next" id="fxNext"></p>
+    </div>
+    <div class="fx-rest" id="fxRest" hidden><p>Rest</p><b id="fxRestT">0:45</b><span id="fxRestNext"></span><button type="button" id="fxRestSkip">Skip rest</button></div>
+  </section>
 
   <div class="finished" id="finished"{% if not log.done %} hidden{% endif %} role="status"><b>Done.</b><span id="finsay">Logged. Ceiling sets next time's weights from this.</span></div>
   <div class="dock">
@@ -176,6 +264,76 @@
     fin.disabled = false;
   });
   paint();
+})();
+
+(() => {                                   // the move sheet: how to, swap, history
+  const sheet = document.getElementById('sheet'), bg = document.getElementById('sheetBg'); if (!sheet) return;
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const close = () => { sheet.hidden = true; bg.hidden = true; };
+  window.__openMove = async (ex, slot) => {
+    const r = await fetch('/lift/move?ex=' + encodeURIComponent(ex)); if (!r.ok) return; const j = await r.json();
+    $('shName').textContent = j.name; $('shMus').textContent = j.muscles; $('shCue').textContent = j.cue; $('shVid').href = j.video; $('shSlot').value = slot;
+    $('shAlts').innerHTML = j.alts.map(a => `<button class="sh-alt" type="submit" name="to" value="${esc(a.to)}"><span><b>${esc(a.name)}</b><small>${esc(a.tag)}</small></span><span class="sw" aria-hidden="true">⇄</span></button>`).join('') || '<p class="muted">No swaps for this one.</p>';
+    $('shHist').innerHTML = j.history.map(h => `<li><b>${esc(h.date)}</b><span>${h.sets.map(x => (x[0] ? x[0] + ' ' + j.units + ' × ' : '') + (x[1] ?? '–')).join(', ')}</span></li>`).join('') || '<li><span>Nothing logged yet.</span></li>';
+    sheet.hidden = false; bg.hidden = false; sheet.querySelector('.sh-x').focus();
+  };
+  document.addEventListener('click', e => { const b = e.target.closest('.more'); if (b) window.__openMove(b.dataset.ex, b.dataset.slot); });
+  sheet.querySelector('.sh-x').addEventListener('click', close); bg.addEventListener('click', close);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !sheet.hidden) close(); });
+})();
+(() => {                                   // one set at a time
+  const focus = document.getElementById('focus'), go = document.getElementById('goFocus'); if (!focus || !go) return;
+  const $ = id => document.getElementById(id);
+  const seq = [];
+  document.querySelectorAll('.circ').forEach((c, ci) => {
+    const mvs = [...c.querySelectorAll('.mv')]; const rounds = mvs[0] ? mvs[0].querySelectorAll('.set').length : 0;
+    for (let r = 0; r < rounds; r++) mvs.forEach((mv, k) => seq.push({mv, set: mv.querySelectorAll('.set')[r], ci, r, rounds, last: k === mvs.length - 1}));
+  });
+  let i = 0, t0 = Date.now(), clock, rest;
+  const done = e => e.set.querySelector('.tick').getAttribute('aria-pressed') === 'true';
+  const val = (inp, fallback) => inp ? (inp.value || (inp.placeholder || '').split('–').pop() || fallback) : fallback;
+  const show = () => {
+    const e = seq[i]; if (!e) { close(); document.getElementById('fin').click(); return; }
+    const body = $('fxBody'); body.classList.remove('swap'); void body.offsetWidth; body.classList.add('swap');
+    const mv = e.mv;
+    $("fxWhere").innerHTML = `<b>Circuit ${e.ci + 1}</b><br>Round ${e.r + 1} of ${e.rounds}`;
+    $('fxName').textContent = mv.querySelector('.mvh b').textContent;
+    $('fxMus').textContent = mv.querySelector('.mvh span').textContent;
+    $('fxCue').textContent = mv.querySelector('.cue').textContent;
+    const lt = mv.querySelector('.lastt'), wn = mv.querySelector('.wn');
+    $('fxLast').textContent = [lt && lt.textContent, wn && wn.textContent].filter(Boolean).join(' ');
+    const r = e.set.querySelector('input[name=r]'), w = e.set.querySelector('input[name=w]');
+    $('fxRepsV').textContent = val(r, '–'); $('fxRepsU').textContent = r ? r.nextElementSibling.textContent : 'reps';
+    $('fxW').style.display = w ? '' : 'none'; if (w) $('fxWV').textContent = w.value || '0';
+    const n = seq[i + 1]; $('fxNext').textContent = n ? 'Up next: ' + n.mv.querySelector('.mvh b').textContent : 'Last set';
+  };
+  const step = (cell, d) => {
+    const e = seq[i]; const inp = e.set.querySelector(cell === 'r' ? 'input[name=r]' : 'input[name=w]'); if (!inp) return;
+    const inc = cell === 'r' ? 1 : ({{ 5 if st.units == 'lb' else 2.5 }});
+    const cur = parseFloat(inp.value || (inp.placeholder || '').split('–').pop()) || 0;
+    inp.value = Math.max(0, cur + d * inc); inp.dispatchEvent(new Event('input', {bubbles: true})); show();
+  };
+  $('fxReps').addEventListener('click', ev => { const b = ev.target.closest('button'); if (b) step('r', +b.dataset.d); });
+  $('fxW').addEventListener('click', ev => { const b = ev.target.closest('button'); if (b) step('w', +b.dataset.d); });
+  const restFor = (secs, label) => {
+    const box = $('fxRest'); box.hidden = false; $('fxRestNext').textContent = label; let left = secs;
+    const tick = () => { $('fxRestT').textContent = Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0'); if (left-- <= 0) end(); };
+    const end = () => { clearInterval(rest); box.hidden = true; show(); };
+    clearInterval(rest); tick(); rest = setInterval(tick, 1000); $('fxRestSkip').onclick = end;
+  };
+  $('fxDone').addEventListener('click', () => {
+    const e = seq[i]; if (!done(e)) e.set.querySelector('.tick').click();
+    i++; const n = seq[i];
+    if (!n) { show(); return; }
+    restFor(e.last ? 75 : 20, 'Next: ' + n.mv.querySelector('.mvh b').textContent);
+  });
+  $('fxSkip').addEventListener('click', () => { i++; show(); });
+  $('fxBack').addEventListener('click', () => { i = Math.max(0, i - 1); const e = seq[i]; if (done(e)) e.set.querySelector('.tick').click(); show(); });
+  const open = () => { i = Math.max(0, seq.findIndex(e => !done(e))); if (i < 0) i = 0; focus.hidden = false; document.body.style.overflow = 'hidden';
+    clearInterval(clock); clock = setInterval(() => { const s = Math.floor((Date.now() - t0) / 1000); $('fxClock').textContent = String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); }, 1000); show(); };
+  const close = () => { focus.hidden = true; document.body.style.overflow = ''; clearInterval(rest); };
+  go.addEventListener('click', open); $('fxList').addEventListener('click', close);
 })();
 </script>
 {% endif %}

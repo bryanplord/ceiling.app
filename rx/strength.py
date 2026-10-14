@@ -70,6 +70,80 @@ LIB: dict[str, dict] = {
                  cue="Light, quick contacts. 50 seconds.", pat="power", heavy=(1, 1), light=(1, 1), inc=0, unit="50 s"),
 }
 
+LIB.update({
+    "slrdl": dict(gym="Single-leg Romanian deadlift", home="Single-leg dumbbell RDL", body="Single-leg hip hinge", muscles="Hamstrings, glutes, balance",
+                  cue="Hips square, reach the free leg back, soft standing knee.", pat="lower", heavy=(8, 10), light=(10, 12), inc=5, side=True),
+    "goodmorning": dict(gym="Barbell good morning", home="Dumbbell good morning", body="Band good morning", muscles="Hamstrings, lower back",
+                        cue="Bar on your upper back, hinge until your chest is nearly level, stand by squeezing glutes.", pat="lower", heavy=(8, 10), light=(10, 12), inc=5),
+    "legpress": dict(gym="Leg press", home="Goblet box squat", body="Wall sit", muscles="Quads, glutes",
+                     cue="Feet hip-width, lower until your knees reach 90 degrees, press through your heels.", pat="lower", heavy=(8, 10), light=(12, 15), inc=10),
+    "pullup": dict(gym="Pull-up or assisted pull-up", home="Band-assisted pull-up", body="Inverted row under a table", muscles="Lats, biceps",
+                   cue="Start from a dead hang, pull your chest to the bar, lower all the way.", pat="pull", heavy=(5, 8), light=(8, 10), inc=0),
+    "incline": dict(gym="Incline dumbbell press", home="Incline dumbbell press", body="Incline push-up", muscles="Upper chest, shoulders",
+                    cue="Bench at 30 degrees, elbows 45 degrees from your sides.", pat="push", heavy=(8, 10), light=(10, 12), inc=5),
+})
+
+# Alternates, with the reason each one is offered (like the best strength apps: equipment, back
+# friendly, home, knee friendly). The same move with other equipment is always offered too.
+ALTS = {
+    "squat": [("legpress", "Back friendly"), ("split", "Single leg"), ("stepup", "Knee friendly")],
+    "rdl": [("thrust", "Back friendly"), ("slrdl", "Single leg"), ("goodmorning", "Equipment"), ("deadlift", "Heavier")],
+    "lunge": [("split", "More stable"), ("stepup", "Knee friendly"), ("squat", "Both legs")],
+    "thrust": [("rdl", "More hamstring"), ("stepup", "Single leg")],
+    "stepup": [("lunge", "No box"), ("split", "More stable")],
+    "bench": [("pushup", "No equipment"), ("incline", "Shoulder friendly")],
+    "row": [("pulldown", "Vertical pull"), ("pullup", "Bodyweight")],
+    "press": [("incline", "Shoulder friendly"), ("raise", "Lighter")],
+    "pulldown": [("pullup", "Harder"), ("row", "Back friendly")],
+    "deadlift": [("rdl", "Back friendly"), ("thrust", "Back friendly"), ("swing", "Power")],
+    "split": [("lunge", "No bench"), ("stepup", "Knee friendly")],
+    "pushup": [("bench", "Heavier"), ("incline", "Easier")],
+    "deadbug": [("pallof", "Standing"), ("sideplank", "Obliques")],
+    "pallof": [("deadbug", "On the floor"), ("sideplank", "Obliques")],
+    "sideplank": [("pallof", "Standing"), ("deadbug", "On the floor")],
+    "swing": [("thrust", "Back friendly"), ("stepup", "Low impact")],
+    "climber": [("rope", "Upright"), ("stepup", "Low impact")],
+    "rope": [("climber", "No rope"), ("stepup", "Low impact")],
+}
+EQ_TAG = {"gym": "Gym", "home": "Home", "body": "No equipment"}
+
+
+def alternates(store, ex: str) -> list[dict]:
+    """[{to, name, tag}] for the swap sheet: other moves for the same job, then this move with other equipment."""
+    st = settings(store)
+    eq = st["equip"]
+    out = [{"to": f"{k}@{eq}", "name": LIB[k][eq], "tag": tag} for k, tag in ALTS.get(ex, []) if k in LIB]
+    for e, tag in EQ_TAG.items():
+        if e != eq and LIB[ex][e] != LIB[ex][eq]:
+            out.append({"to": f"{ex}@{e}", "name": LIB[ex][e], "tag": tag})
+    return out
+
+
+def swaps(store, day: str) -> dict:
+    """Today's swaps plus the ones you asked to keep: {move: 'other@equipment'}."""
+    out = dict(settings_raw(store).get("prefer") or {})
+    lg = log_for(store, day) or {}
+    out.update(lg.get("swaps") or {})
+    return out
+
+
+def settings_raw(store) -> dict:
+    try:
+        return json.loads(store.get_meta("strength_settings") or "{}")
+    except ValueError:
+        return {}
+
+
+def swap(store, day: str, ex: str, to: str, always: bool) -> None:
+    lg = log_for(store, day) or {"sets": {}}
+    lg.setdefault("swaps", {})[ex] = to
+    save_log(store, day, lg)
+    if always:
+        s = settings_raw(store)
+        s.setdefault("prefer", {})[ex] = to
+        store.set_meta("strength_settings", json.dumps(s))
+
+
 # Sessions: circuits of moves, done for rounds. The last circuit drops in the short version.
 SESSIONS: dict[str, dict] = {
     "lower": dict(name="Lower body", circuits=[["squat", "deadbug"], ["rdl", "lunge"], ["thrust", "calf"]]),
@@ -105,6 +179,8 @@ class Move:
     side: bool = False
     unit: str = "reps"
     bodyweight: bool = False
+    slot: str = ""
+    last: str = ""                # what you did last time: "95 lb × 8"
 
 
 @dataclass
@@ -152,6 +228,16 @@ def log_for(store, day: str) -> dict | None:
         return json.loads(v) if v else None
     except ValueError:
         return None
+
+
+def history_rows(store, ex: str, before: str, n: int = 6) -> list[dict]:
+    """Your last sessions of one move, for its history sheet: date, best set, and every set."""
+    out = []
+    for d, sets in history(store, ex, before)[:n]:
+        best = max(sets, key=lambda x: ((x[0] or 0), (x[1] or 0)))
+        out.append({"date": date.fromisoformat(d).strftime("%a %b %-d"), "best": best,
+                    "sets": [[x[0], x[1]] for x in sets]})
+    return out
 
 
 def save_log(store, day: str, data: dict) -> None:
@@ -308,17 +394,29 @@ def session(store, key: str, day: str, verdict: str = "", tomorrow: str = "", re
     rounds = 2 if mode in ("short", "lighter") else st["rounds"]
     circuits = spec["circuits"][:2] if mode == "short" else spec["circuits"]
     out: list[list[Move]] = []
+    sw = swaps(store, day)
     for c in circuits:
         row = []
-        for ex in c:
+        for ex0 in c:
+            ex, eq_ = ex0, eq
+            if ex0 in sw:                                  # you swapped it (today, or for good)
+                k, _, e = sw[ex0].partition("@")
+                if k in LIB:
+                    ex, eq_ = k, (e if e in EQ_TAG else eq)
             L = LIB[ex]
             lo, hi = L["heavy"] if heavy else L["light"]
             w, note = prescribe_weight(store, ex, lo, hi, L["inc"], day, units)
             if mode == "lighter" and w:
                 w = round(w * 0.9 / (5 if units == "lb" else 2)) * (5 if units == "lb" else 2)
                 note = f"Lighter today: {w:g} {units}."
-            row.append(Move(ex, L[eq], L["muscles"], L["cue"], lo, hi, w, note, L.get("side", False),
-                            L.get("unit", "reps"), not L["inc"]))
+            mv = Move(ex, L[eq_], L["muscles"], L["cue"], lo, hi, w, note, L.get("side", False),
+                      L.get("unit", "reps"), not L["inc"])
+            mv.slot = ex0                                  # the planned move this one stands in for
+            h = history(store, ex, day)
+            if h:
+                b = max(h[0][1], key=lambda x: ((x[0] or 0), (x[1] or 0)))
+                mv.last = (f"{b[0]:g} {units} × {b[1]}" if b[0] else f"{b[1]} reps") + ", " + date.fromisoformat(h[0][0]).strftime("%b %-d")
+            row.append(mv)
         out.append(row)
     n_moves = sum(len(c) for c in out)
     minutes = 8 + round(n_moves * rounds * 1.6)        # warm-up plus about 90 seconds a set with rest
