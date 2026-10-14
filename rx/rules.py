@@ -314,3 +314,32 @@ def steps(store, day: str) -> tuple[int | None, int]:
         pass
     usual = sorted(hist)[len(hist) // 2] if len(hist) >= 5 else 8000
     return today_n, usual
+
+
+def wake_from_data(store, day: str) -> float | None:
+    """Your usual wake time from your watch's sleep: the median end of sleep over the last two
+    weeks, in hours (6.75 = 6:45 AM). None when the data doesn't carry it."""
+    import statistics
+    since = (date.fromisoformat(day) - timedelta(days=14)).isoformat()
+    ends = []
+    try:
+        rows = store.wellness_raw(since)
+    except Exception:
+        return None
+    for r in rows:
+        try:
+            raw = json.loads(r["raw"]) if r["raw"] else {}
+        except ValueError:
+            continue
+        dto = ((raw.get("sleep") or {}).get("dailySleepDTO") or {}) if isinstance(raw.get("sleep"), dict) else {}
+        v = dto.get("sleepEndTimestampLocal") or raw.get("sleepEndTimestampLocal") or raw.get("sleepEnd")
+        h = None
+        if isinstance(v, (int, float)) and v > 1e9:
+            from datetime import datetime, timezone
+            t = datetime.fromtimestamp(v / 1000 if v > 1e12 else v, tz=timezone.utc)   # Garmin's "local" stamps
+            h = t.hour + t.minute / 60
+        elif isinstance(v, str) and len(v) >= 16:
+            h = int(v[11:13]) + int(v[14:16]) / 60
+        if h is not None and 3 <= h <= 12:
+            ends.append(h)
+    return round(statistics.median(ends) * 4) / 4 if len(ends) >= 3 else None

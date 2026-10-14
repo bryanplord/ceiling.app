@@ -99,7 +99,11 @@ def today_rx(store: Store, day: str | None = None):
     key = (day, ver)
     try:                                     # your wake time sets tonight's bedtime
         from .analysis import sleep as _sl
-        _sl.WAKE.set(float(store.get_meta("wake_hour") or 0) or None)
+        _w = float(store.get_meta("wake_hour") or 0) or None
+        if not _w:                           # not set by you: read it from your watch's sleep
+            from . import rules as _rl0
+            _w = _rl0.wake_from_data(store, day)
+        _sl.WAKE.set(_w)
     except (ValueError, TypeError):
         pass
     with _build_lock:

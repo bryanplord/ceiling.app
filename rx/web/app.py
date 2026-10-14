@@ -45,6 +45,41 @@ def _signed_in(request: Request) -> bool:
     return auth.enabled() and bool(auth.verify("session", request.cookies.get(auth.COOKIE)))
 
 
+_warm_lock = threading.Lock()
+
+
+def _rewarm(store) -> None:
+    """After a change you made (a check-in, a rule, a setting, a lift), forget the old pages and
+    rebuild them in the background straight away, so the next page you open is ready instead of
+    rebuilding while you wait. One rebuild at a time: on a small server two at once is slower."""
+    bust(store)
+    def run():
+        if not _warm_lock.acquire(blocking=False):
+            return
+        try:
+            _warm(store)
+        finally:
+            _warm_lock.release()
+    threading.Thread(target=run, daemon=True).start()
+
+
+_timings: list = []
+
+
+@app.middleware("http")
+async def _timed(request: Request, call_next):
+    """How long each page takes on the server, kept for /healthz (paths and milliseconds only)."""
+    t = time.perf_counter()
+    r = await call_next(request)
+    ms = round((time.perf_counter() - t) * 1000)
+    p = request.url.path
+    if not p.startswith(("/static", "/healthz", "/favicon", "/apple-touch")):
+        _timings.append((time.strftime("%H:%M"), p, ms))
+        del _timings[:-60]
+        r.headers["Server-Timing"] = f"app;dur={ms}"
+    return r
+
+
 @app.exception_handler(Exception)
 async def _crash(request: Request, exc: Exception):
     """Never a bare 500. The traceback goes to the log and to the signed-in athlete's own Data page,
@@ -378,7 +413,8 @@ def _healthz() -> str:
                 f"activities: {n['activities']}  with heart-rate streams: {n['streams']}  "
                 f"days of sleep/HRV: {n['wellness']}\n"
                 f"nights with breathing rate (last 30): "
-                f"{sum(1 for w in s.wellness((local_today() - timedelta(days=30)).isoformat()) if w.breathing)}")
+                f"{sum(1 for w in s.wellness((local_today() - timedelta(days=30)).isoformat()) if w.breathing)}\n"
+                + "recent pages (server ms): " + ", ".join(f"{t} {p} {ms}" for t, p, ms in _timings[-15:]))
     except Exception as e:
         return f"ok\nstore unavailable: {type(e).__name__}"
 
@@ -391,9 +427,12 @@ def _energy(store, p, rx):
     from ..analysis import energy as en
     from zoneinfo import ZoneInfo
     try:
-        wk = float(store.get_meta("wake_hour") or 7.0)
+        wk = float(store.get_meta("wake_hour") or 0)
     except ValueError:
-        wk = 7.0
+        wk = 0
+    if not wk:
+        from .. import rules as _rl
+        wk = _rl.wake_from_data(store, rx.date) or 7.0
     try:
         from ..config import settings as _st
         return en.build(p, rx.date, datetime.now(ZoneInfo(_st().tz)).replace(tzinfo=None), wk)
@@ -565,7 +604,7 @@ async def lift_save(request: Request):
           "done": bool(body.get("done")), "mobility": [bool(x) for x in (body.get("mobility") or [])][:12]}
     sg.save_log(store, day, lg)
     if lg["done"]:
-        bust(store)
+        _rewarm(store)
     d, n = sg.done_sets(lg)
     return JSONResponse({"ok": True, "done": d, "of": n})
 
@@ -586,7 +625,7 @@ async def training_settings(request: Request):
             store.set_meta("wake_hour", str(int(hh) + int(mm) / 60))
         except ValueError:
             pass
-    bust(store)
+    _rewarm(store)
     return RedirectResponse("/me?saved=1", status_code=303)
 
 
@@ -663,7 +702,7 @@ async def strength_settings(request: Request):
         raw.update(st_)
         store.set_meta("strength_settings", json.dumps(raw))
         said = f"{st_['rounds']} rounds" + (", last one to failure" if st_["failure"] else "")
-    bust(store)
+    _rewarm(store)
     if "application/json" in request.headers.get("accept", ""):
         return JSONResponse({"ok": True, "said": said})
     return RedirectResponse("/strength", status_code=303)
@@ -680,7 +719,7 @@ async def strength_start(request: Request):
     store = open_store()
     g = gl.save_plan(store, g)
     gl.commit(store, g.id, today)
-    bust(store)
+    _rewarm(store)
     return RedirectResponse("/strength", status_code=303)
 
 
@@ -693,7 +732,7 @@ async def wake_setting(request: Request):
     try:
         hh, mm = v.split(":")
         store.set_meta("wake_hour", str(int(hh) + int(mm) / 60))
-        bust(store)
+        _rewarm(store)
         ok = True
     except ValueError:
         ok = False
@@ -755,7 +794,7 @@ async def setup_save(request: Request):
         gl.commit(store, g.id, today)
     elif goal in ("event", "weight") and not gl.active(store, today):
         nxt = "/plan/new"
-    bust(store)
+    _rewarm(store)
     return RedirectResponse(nxt, status_code=303)
 
 
@@ -766,7 +805,7 @@ async def rule_again(request: Request, rid: str):
     form = parse_qs((await request.body()).decode())
     store = open_store()
     rl.answer(store, rid, (form.get("again", ["1"])[0] == "1"), local_today().isoformat())
-    bust(store)
+    _rewarm(store)
     return RedirectResponse("/", status_code=303)
 
 
@@ -775,7 +814,7 @@ async def rule_end(request: Request, rid: str):
     from .. import rules as rl
     store = open_store()
     rl.end(store, rid, local_today().isoformat())
-    bust(store)
+    _rewarm(store)
     back = request.headers.get("referer") or "/"
     return RedirectResponse(back if back.startswith(str(request.base_url)) else "/", status_code=303)
 
@@ -1328,7 +1367,7 @@ async def journal_save(request: Request):
                             "end it any time on Today or in Profile.")
     if saved:
         jr.save(store, day, text, taps, at)
-        bust(store)                                     # tomorrow (and this morning, if early) re-reads it
+        _rewarm(store)                                     # tomorrow (and this morning, if early) re-reads it
     if "application/json" in request.headers.get("accept", ""):
         entry = jr.load(store, day) or {}
         try:
