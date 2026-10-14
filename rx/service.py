@@ -339,6 +339,8 @@ def today_after(store: Store, p, rx) -> dict | None:
             if rv:
                 mins = zone_minutes(p, st[0], st[1])
                 tot = sum(mins) or 1
+                from .web.charts import trace as _trace
+                row["trace"] = _trace(st)
                 row.update(ceil_frac=rv.ceil_frac, why=rv.why, tells=rv.tells, target=rv.target, score=rv.score, word=rv.word, tone=rv.tone, head=rv.headline, right=rv.right,
                            fix=rv.fix, stats=rv.stats, parts=rv.parts,
                            zones=[(n, c, round(mm), mm / tot * 100) for (n, c, _, _), mm in zip(bands(p), mins)])

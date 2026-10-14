@@ -381,6 +381,77 @@ def _energy(store, p, rx):
         return None
 
 
+_VWORD = {"rest": "Day off", "light": "Walk day", "easy": "Easy day", "steady": "Steady day", "hard": "Hard day"}
+
+
+def _kind(text: str) -> str:
+    t = text.lower()
+    for k, w in (("hard", "hard"), ("steady", "steady"), ("easy", "easy"), ("light", "walk"), ("rest", "day off")):
+        if w in t:
+            return k
+    return "easy"
+
+
+def _sentences(text: str) -> list[str]:
+    import re as _re
+    return [x.strip().rstrip(".") for x in _re.split(r"(?<=[.!?])\s+", text or "") if x.strip()]
+
+
+def _today_cards(p, rx, after) -> dict:
+    """Today's three cards, in words the template only has to place: the day, the ways to do it,
+    and tomorrow; after a session, the score, what more you could do, and tomorrow re-decided."""
+    import re as _re
+    from . import charts
+    c = rx.hr_ceiling
+    a = charts.aim(rx)
+    mn = charts.minimum_minutes(rx)
+    mx_abs = charts.maximum_minutes(rx)
+    cap = []
+    if mn:
+        cap.append(f"At least {mn} minutes holds your fitness" + (f"; {rx.max_minutes} builds it." if rx.max_minutes else "."))
+    if mx_abs and rx.maximum:
+        tail = " ".join(_sentences(rx.maximum)[1:])
+        if tail:
+            cap.append(tail.replace("Past that", f"Past {mx_abs}", 1) + ".")
+    ways = []
+    if rx.what:
+        name, _, rest = rx.what.partition(",")
+        name = _re.sub(r"^(A|An)\s+(easy|steady|hard|short|long)?\s*", "", name).strip()
+        mins = _re.search(r"(\d+) minutes", rest or rx.what)
+        ways.append({"name": name[:1].upper() + name[1:], "dur": (f"Up to {mins.group(1)} min" if mins else ""),
+                     "why": (_sentences(rx.activity_why)[:1] or [""])[0], "pick": True, "no": False})
+    for title, note, tone, short, k in rx.options or []:
+        name, _, rest = title.partition(",")
+        mins = _re.search(r"(\d+) minutes", rest)
+        ways.append({"name": name.strip(), "dur": f"{mins.group(1)} min" if mins else "", "why": note,
+                     "pick": False, "no": tone == "bad"})
+    n_ok = len(ways)
+    tmw = []
+    for label, tone, text in rx.tomorrow or []:
+        ss = _sentences(text)
+        i = next((j for j, x in enumerate(ss) if "omorrow" in x), 0)
+        k = _kind(ss[i] if ss else text)
+        other = (ss[:i] or ss[i + 1:i + 2])
+        tmw.append({"label": label, "k": k, "word": _VWORD[k].replace(" day", "").replace("Day off", "Day off"),
+                    "detail": (other[0] + ".") if other else ""})
+    out = {"vword": _VWORD.get(rx.verdict, "Today") + ".", "intro": f"{rx.why_need} {rx.why_story}".strip(),
+           "target": charts.target_svg(rx, p), "caption": " ".join(cap), "ways": ways,
+           "ways_big": {1: "One way.", 2: "Two ways.", 3: "Three ways.", 4: "Four ways."}.get(n_ok, f"{n_ok} ways."),
+           "ways_sub": (f"All at {a}." if all(not w["no"] for w in ways) else f"All at {a}; one makes it harder.") if a and n_ok > 1 else "", "tmw": tmw,
+           "tonight": (f"In bed by {rx.sleep.lights_out} for {rx.sleep_if[0][0][9:]}." if rx.sleep and getattr(rx.sleep, "lights_out", None) and rx.sleep_if else "")}
+    M = (after or {}).get("main") if after and after.get("done") else None
+    if M:
+        tr = M.get("trace") or []
+        out["trace"] = charts.trace_svg(tr, p, c)
+        out["under"] = round(100 * sum(1 for _, v in tr if v <= c) / len(tr)) if tr and c else None
+    if after and after.get("done"):
+        t = after.get("tomorrow") or ""
+        head, _, rest = t.partition(":") if ":" in t else t.partition(".")
+        k = _kind(head)
+        out["post_tmw"] = {"k": k, "word": _VWORD[k] + ".", "detail": (rest.strip()[:1].upper() + rest.strip()[1:] + ".") if rest.strip() else ""}
+    return out
+
+
 @app.get("/", response_class=HTMLResponse)
 def today(request: Request, d: str | None = None):
     """Today is the prescription (or, after a session, the review) and the check-in. The numbers live
@@ -407,11 +478,11 @@ def today(request: Request, d: str | None = None):
         if energy:
             body.append(f"energy {energy.now}")
         if dash.hrv.value not in ("", "—"):
-            body.append(f"HRV {dash.hrv.value}")
+            body.append(f"HRV {dash.hrv.value.replace(' ms', '')}")
     pats = cached(store, "patterns", rx.date, lambda: jr.patterns(store, p.wellness))
     return _page(request, "today.html", rx=rx, waiting=not _have_last_night(store), updated=mins_ago,
                  after=after, entry=entry, timeline=jr.timeline(entry), jnote=jr.effect(entry["tags"], jr.hrv_low(p.wellness, rx.date))[1] if entry else "", patterns=pats,
-                 syncing=syncing, p=p, body=", ".join(body),
+                 syncing=syncing, p=p, body=", ".join(body), cards=_today_cards(p, rx, after),
                  day_label=when.strftime("%A, %B %-d"))
 
 
