@@ -23,6 +23,12 @@
   .segs input:focus-visible + span { outline:2px solid var(--ceiling); outline-offset:2px; }
   .fld input[type=time] { font:inherit; font-size:17px; padding:8px 12px; border:1px solid var(--rule); border-radius:12px; width:max-content; }
   .fld small { grid-column:2; color:var(--lichen); font-size:14px; margin-top:-6px; }
+  .shead { display:flex; justify-content:space-between; align-items:baseline; }
+  .chg { font-weight:650; text-decoration:none; color:var(--ink); border:1px solid var(--rule); border-radius:999px; padding:7px 16px; }
+  .chg:hover { border-color:var(--ink); }
+  .rrow { display:flex; flex-wrap:wrap; align-items:center; gap:4px 12px; padding:8px 0; }
+  .rrow span { color:var(--lichen); flex:1 1 220px; } .rrow form { margin:0; }
+  .rrow button { font:inherit; font-size:14px; font-weight:650; border:1px solid var(--rule); background:#fff; border-radius:999px; padding:6px 14px; cursor:pointer; }
   .save { margin-top:20px; background:var(--ink); color:var(--snow); border:0; border-radius:999px; padding:13px 26px; font:inherit; font-weight:650; cursor:pointer; }
   .ok { color:var(--good); font-weight:600; margin:0 0 12px; }
   @media (max-width:700px) { .fld { grid-template-columns:1fr; } .fld small { grid-column:1; } }
@@ -36,11 +42,16 @@
   <a href="/logout"><b>Sign out</b><span></span><i></i></a>
 </nav>
 
-<section class="set2 rise" style="--i:2">
-  <h2>Your day</h2>
+<section class="set2 rise" style="--i:2" id="setup">
+  <div class="shead"><h2>Your setup</h2><a class="chg" href="/setup">Change</a></div>
+  <div class="fld"><span>What you do</span><div>{% set sp = [] %}{% for k in setup.sports or [] %}{% set _ = sp.append(sports[k]) %}{% endfor %}{{ sp | join(', ') or 'Not set' }}</div></div>
+  <div class="fld"><span>Working toward</span><div>{{ goals.get(setup.goal, 'Not set') }}</div></div>
+  <div class="fld"><span>Days a week</span><div>{{ setup.days or 'Not set' }}</div></div>
   <div class="fld"><span><label for="wake">You wake up at</label></span>
-    <div><input type="time" id="wake" name="wake" value="{{ wake }}" step="300"><span class="ok" id="wsaved" role="status" style="margin-left:12px;opacity:0;transition:opacity var(--t) var(--ease)">Saved</span></div>
-    <small>Sets tonight's bedtime and your energy curve.</small></div>
+    <div><input type="time" id="wake" name="wake" value="{{ wake }}" step="300"><span class="ok" id="wsaved" role="status" style="margin-left:12px;opacity:0;transition:opacity var(--t) var(--ease)">Saved</span></div></div>
+  <div class="fld"><span>Holding you back</span><div>
+    {% for r, d in rules %}<div class="rrow"><b>{{ r.text }}</b><span>{{ d }}</span><form method="post" action="/rules/{{ r.id }}/end"><button type="submit">End</button></form></div>
+    {% else %}<span class="muted">Nothing right now. Tell your coach on Today ("healing from a crash, no running for 3 weeks", "traveling for 5 days") and it shows up here.</span>{% endfor %}</div></div>
   <p style="margin-top:18px;color:var(--lichen)">Equipment, units and how lifting fits your week live in <a href="/strength">Strength</a>.</p>
 </section>
 <script>

@@ -702,6 +702,72 @@ async def wake_setting(request: Request):
     return RedirectResponse("/me", status_code=303)
 
 
+@app.get("/setup", response_class=HTMLResponse)
+def setup_page(request: Request):
+    """Five questions, one at a time. The same page changes them later (Profile, 'Change')."""
+    from .. import rules as rl
+    store = open_store()
+    p, rx = today_rx(store)
+    cur = rl.setup(store) or rl.guess(store, p)
+    first = not rl.setup(store)
+    return _page(request, "setup.html", s=cur, first=first, sports=rl.SPORTS, goals=rl.GOALS)
+
+
+@app.post("/setup")
+async def setup_save(request: Request):
+    from .. import rules as rl, goals as gl
+    form = parse_qs((await request.body()).decode())
+    f = {k: (v[0] if v else "") for k, v in form.items()}
+    sports = [x for x in form.get("sports", []) if x in rl.SPORTS] or ["ride"]
+    goal = f.get("goal") if f.get("goal") in rl.GOALS else "direct"
+    days = max(1, min(7, int(f["days"]) if f.get("days", "").isdigit() else 5))
+    limits = (f.get("limits") or "").strip()[:500]
+    store = open_store()
+    today = local_today()
+    old = rl.setup(store) or {}
+    rl.save_setup(store, {"sports": sports, "goal": goal, "days": days, "limits": limits})
+    if f.get("wake"):
+        try:
+            hh, mm = f["wake"].split(":")
+            store.set_meta("wake_hour", str(int(hh) + int(mm) / 60))
+        except ValueError:
+            pass
+    if limits and limits != old.get("limits"):          # what's holding you back becomes a standing rule
+        r = rl.parse(limits, today)
+        if r:
+            r["from"] = "setup"
+            rl.add(store, r)
+    nxt = "/"
+    if goal == "stronger" and "lift" in sports and not any(g.kind == "strength" for g in gl.active(store, today)):
+        g = gl.save_plan(store, gl.Goal("strength", created=today.isoformat(), lift_days=min(5, max(2, days // 2 + 1))))
+        gl.commit(store, g.id, today)
+    elif goal in ("event", "weight") and not gl.active(store, today):
+        nxt = "/plan/new"
+    bust(store)
+    return RedirectResponse(nxt, status_code=303)
+
+
+@app.post("/rules/{rid}/again")
+async def rule_again(request: Request, rid: str):
+    """After a break from lifting: start again, or give it another week."""
+    from .. import rules as rl
+    form = parse_qs((await request.body()).decode())
+    store = open_store()
+    rl.answer(store, rid, (form.get("again", ["1"])[0] == "1"), local_today().isoformat())
+    bust(store)
+    return RedirectResponse("/", status_code=303)
+
+
+@app.post("/rules/{rid}/end")
+async def rule_end(request: Request, rid: str):
+    from .. import rules as rl
+    store = open_store()
+    rl.end(store, rid, local_today().isoformat())
+    bust(store)
+    back = request.headers.get("referer") or "/"
+    return RedirectResponse(back if back.startswith(str(request.base_url)) else "/", status_code=303)
+
+
 @app.get("/", response_class=HTMLResponse)
 def today(request: Request, d: str | None = None):
     """Today is the prescription (or, after a session, the review) and the check-in. The numbers live
@@ -710,9 +776,16 @@ def today(request: Request, d: str | None = None):
         return _site(request, "site_home.html")
     _refresh_in_background()
     store = open_store()
+    from .. import rules as rl
+    if not rl.setup(store) and not d:                # first visit: five questions before the first prescription
+        return RedirectResponse("/setup", status_code=303)
     p, rx = today_rx(store, d)
     dash = cached(store, "dash", rx.date, lambda: dashboard.build(store, p, rx))
     when = date.fromisoformat(rx.date)
+    standing = [(r, rl.describe(r)) for r in rl.active(store, rx.date)]
+    travel = next((r for r, _ in standing if r.get("travel")), None)
+    steps_now, steps_usual = rl.steps(store, rx.date) if travel else (None, 0)
+    lapsed = rl.lapsed_lift(store, rx.date)
     last = store.get_meta("last_sync")
     mins_ago = int((time.time() - float(last)) / 60) if last and float(last) > 0 else None
     lk = _sync_locks.get(current_owner.get())
@@ -745,14 +818,18 @@ def today(request: Request, d: str | None = None):
         from .. import strength as sg
         ls, lg, lst, nxt = _lift_today(store, p, rx)
         dn, of = sg.done_sets(lg)
-        if getattr(p, "lifts", None):          # lifting appears only once you've committed to a strength plan
+        if getattr(p, "lifts", None) and not (getattr(p, "journal", None) or {}).get("nolift"):
+            # lifting appears only once you've committed to a strength plan, and not while a rule rules it out
             lift = {"s": ls, "rest": sg.rest_reason(store, getattr(p, "lifts", None) or [], date.fromisoformat(rx.date)), "summary": sg.summary(ls) if ls else "", "done": dn, "of": of,
                     "finished": bool(lg and lg.get("done")), "only": lst["train"] == "strength", "next": nxt,
                     "moves": [m.name for c in (ls.circuits if ls else []) for m in c]}
     except Exception as e:
         import traceback
         print(f"lift today failed: {e!r}\n{traceback.format_exc()}")
-    return _page(request, "today.html", lift=lift, rx=rx, waiting=not _have_last_night(store), updated=mins_ago,
+    return _page(request, "today.html", standing=standing, travel=travel, steps_now=steps_now,
+                 steps_goal=max(8000, int(round(steps_usual * 1.15 / 500) * 500)) if travel else 0,
+                 travel_until=date.fromisoformat(travel["until"]).strftime("%A, %B %-d") if travel and travel.get("until") else "",
+                 lapsed=lapsed, lapsed_when=date.fromisoformat(lapsed["until"]).strftime("%B %-d") if lapsed else "", lift=lift, rx=rx, waiting=not _have_last_night(store), updated=mins_ago,
                  after=after, entry=entry, thread=list(zip(jr.timeline(entry), jr.replies(entry, jr.hrv_low(p.wellness, rx.date)))), patterns=pats,
                  syncing=syncing, p=p, body=", ".join(body), cards=_today_cards(p, rx, after, wx_tom),
                  day_label=when.strftime("%A, %B %-d"))
@@ -797,7 +874,10 @@ def me_page(request: Request, saved: str | None = None):
         w = float(store.get_meta("wake_hour") or 7.0)
     except ValueError:
         w = 7.0
-    return _page(request, "me.html", st=sg.settings(store), train=sg.TRAIN, equip=sg.EQUIP, saved=bool(saved),
+    from .. import rules as rl
+    rules_ = [(r, rl.describe(r)) for r in rl.active(store, local_today().isoformat())]
+    return _page(request, "me.html", setup=rl.setup(store) or {}, sports=rl.SPORTS, goals=rl.GOALS, rules=rules_,
+                 st=sg.settings(store), train=sg.TRAIN, equip=sg.EQUIP, saved=bool(saved),
                  wake=f"{int(w):02d}:{int(round((w - int(w)) * 60)) % 60:02d}")
 
 
@@ -1220,6 +1300,20 @@ async def journal_save(request: Request):
     day = now.date().isoformat()
     at = now.strftime("%-I:%M %p")                      # 12-hour, athlete's local time
     saved = bool(text or any(taps.values()))
+    rule_say = ""
+    if text:
+        from .. import rules as rl
+        if rl.ended_by(text):
+            for r in rl.active(store, day):
+                rl.end(store, r["id"], day)
+                rule_say = "Good news. Ceiling's back to planning without the limits you'd set. "
+        else:
+            r = rl.parse(text, now.date())
+            if r:
+                rl.add(store, r)
+                dd = rl.describe(r)
+                rule_say = (f"Got it, and I'll keep it: {dd[:1].lower()}{dd[1:]} Every day plans around it until then; "
+                            "end it any time on Today or in Profile.")
     if saved:
         jr.save(store, day, text, taps, at)
         bust(store)                                     # tomorrow (and this morning, if early) re-reads it
@@ -1233,7 +1327,10 @@ async def journal_save(request: Request):
         cap, note = jr.effect(entry.get("tags", {}), low)
         log = entry.get("log") or []
         reps = jr.replies(entry, low) if saved else []
-        return JSONResponse({"ok": saved, "at": at, "note": note, "reply": reps[-1] if reps else "",
+        last = reps[-1] if reps else ""
+        if rule_say and last.startswith(("Got it. Nothing changes", "Good. Today stands")):
+            last = ""
+        return JSONResponse({"ok": saved, "at": at, "note": note, "reply": (rule_say + " " + last).strip(),
                              "entry": jr.view(log[-1]) if saved and log else None})
     return RedirectResponse("/#journal", status_code=303)
 

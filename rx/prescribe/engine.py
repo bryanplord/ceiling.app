@@ -368,6 +368,10 @@ def _next_verdict(p: Profile, rx: Rx, load: float) -> str:
     good_night = Recovery(rx.date, *[_assume_green(s) for s in rx.recovery.signals])
     y2 = la.step(p.yesterday, load, rx.date)
     v, _ = decide(Inputs(good_night, y2, [p.yesterday.load, load]))
+    js = getattr(p, "journal", None) or {}
+    nxt = (date.fromisoformat(rx.date) + timedelta(days=1)).isoformat()
+    if js.get("rule_cap") and (not js.get("rule_until") or nxt <= js["rule_until"]):
+        v = cap_verdict(v, js["rule_cap"])            # a standing rule (an injury) still holds tomorrow
     return v
 
 
@@ -987,8 +991,9 @@ def alternatives(p: Profile, rx: Rx, chosen: str | None, include_chosen: bool = 
     runs30 = sum(1 for a in p.activities if a.sport == RUN and
                  (date.fromisoformat(rx.date) - timedelta(days=30)).isoformat() <= a.date < rx.date)
     out = []
+    banned = (getattr(p, "journal", None) or {}).get("ban") or set()
     for k, st in stats.items():
-        if (k == chosen and not include_chosen) or k == "walk" or st["n"] < 3:
+        if (k == chosen and not include_chosen) or k == "walk" or st["n"] < 3 or k in banned:
             continue
         if k in SNOW and not winter:
             continue

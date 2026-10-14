@@ -320,9 +320,17 @@ def replies(entry: dict | None, hrv_low: bool = False) -> list[str]:
     """What the coach said back to each check-in: only what that check-in changed."""
     log = [e for e in ((entry or {}).get("log") or []) if e.get("text") or e.get("taps")]
     out, before = [], []
+    from . import rules as _rl
+    from datetime import date as _d
     for i in range(len(log)):
         _, notes = _effect(build_tags(log[:i + 1]), hrv_low)
         new = [n for n in notes if n not in before]
+        r = _rl.parse(log[i].get("text") or "", _d.today())
+        if r:                                       # it became a standing rule: say so, the way it was said then
+            dd = _rl.describe(r)
+            out.append(f"Got it, and I'll keep it: {dd[:1].lower()}{dd[1:]} " + " ".join(new))
+            before = notes
+            continue
         if new:
             out.append(" ".join(new))
         else:

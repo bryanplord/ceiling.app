@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block head %}
+<style>
+  .su { max-width:720px; margin:0 auto; padding-top:12px; }
+  .su .dots { display:flex; gap:6px; margin:0 0 40px; }
+  .su .dots i { width:28px; height:4px; border-radius:2px; background:var(--frost2); transition:background-color var(--t) var(--ease); }
+  .su .dots i.on { background:var(--ink); }
+  .step { display:none; }
+  .step.on { display:block; animation:stepin var(--t-slow) var(--ease-out) both; }
+  @keyframes stepin { from { opacity:0; transform:translateY(16px); } }
+  .su h1 { text-transform:none; letter-spacing:-0.02em; font-stretch:112%; font-weight:800; font-size:clamp(34px, 5.4vw, 56px); line-height:1.05; margin:0 0 12px; }
+  .su .sub { margin:0 0 28px; font-size:19px; color:var(--lichen); max-width:52ch; }
+  .opts { display:grid; gap:10px; }
+  .opts.grid { grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); }
+  .opt { position:relative; display:block; }
+  .opt input { position:absolute; opacity:0; inset:0; margin:0; cursor:pointer; }
+  .opt span { display:block; padding:18px 20px; border-radius:18px; background:var(--frost); font-size:18px; font-weight:650;
+              border:2px solid transparent; transition:background-color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease); }
+  .opt:hover span { background:var(--frost2); }
+  .opt input:checked + span { background:#fff; border-color:var(--ink); }
+  .opt input:focus-visible + span { outline:2px solid var(--ceiling); outline-offset:2px; }
+  .opt small { display:block; font-size:14px; font-weight:400; color:var(--lichen); margin-top:2px; }
+  .su textarea { width:100%; min-height:130px; font:inherit; font-size:18px; line-height:1.45; padding:16px 18px; border-radius:18px; border:1px solid #d1d1d6; resize:vertical;
+                 transition:border-color var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease); }
+  .su textarea:focus { outline:0; border-color:var(--ink); box-shadow:0 0 0 4px rgba(0,0,0,.05); }
+  .ex { margin:12px 0 0; display:flex; flex-wrap:wrap; gap:8px; }
+  .ex button { font:inherit; font-size:14px; padding:7px 14px; border-radius:999px; border:1px solid var(--rule); background:#fff; cursor:pointer; color:var(--lichen); }
+  .ex button:hover { color:var(--ink); border-color:var(--ink); }
+  .segs { display:inline-flex; flex-wrap:wrap; background:var(--frost); border-radius:999px; padding:4px; gap:2px; }
+  .segs label { position:relative; }
+  .segs input { position:absolute; opacity:0; inset:0; margin:0; cursor:pointer; }
+  .segs label span { display:block; min-width:44px; text-align:center; padding:10px 14px; border-radius:999px; font-size:17px; font-weight:650; color:var(--lichen);
+                     transition:background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease); }
+  .segs input:checked + span { background:#fff; color:var(--ink); box-shadow:0 1px 3px rgba(0,0,0,.1); }
+  .su input[type=time] { font:inherit; font-size:28px; font-weight:700; padding:12px 18px; border-radius:16px; border:1px solid #d1d1d6; }
+  .nav { display:flex; justify-content:space-between; align-items:center; margin:44px 0 0; }
+  .nav .back { background:none; border:0; font:inherit; font-size:16px; color:var(--lichen); cursor:pointer; }
+  .nav .back:hover { color:var(--ink); }
+  .nav .next { background:var(--ink); color:#fff; border:0; border-radius:999px; padding:15px 30px; font:inherit; font-size:17px; font-weight:650; cursor:pointer; }
+  .nav .next:hover { background:#333; }
+  .skip { margin-top:18px; font-size:15px; color:var(--lichen); }
+</style>
+{% endblock %}
+{% block body %}
+<form class="su" method="post" action="/setup" id="su">
+  <div class="dots" aria-hidden="true">{% for i in range(5) %}<i class="{{ 'on' if loop.first }}"></i>{% endfor %}</div>
+
+  <section class="step on" data-step="0" aria-label="What you do">
+    <h1>{{ 'Welcome. What do you do?' if first else 'What do you do?' }}</h1>
+    <p class="sub">Pick everything. Ceiling only suggests what you choose here.</p>
+    <div class="opts grid">{% for k, l in sports.items() %}<label class="opt"><input type="checkbox" name="sports" value="{{ k }}" {{ 'checked' if k in (s.sports or []) }}><span>{{ l }}</span></label>{% endfor %}</div>
+  </section>
+
+  <section class="step" data-step="1" aria-label="What you're working toward">
+    <h1>What are you working toward?</h1>
+    <p class="sub">You can add a plan with a date any time.</p>
+    <div class="opts">{% for k, l in goals.items() %}<label class="opt"><input type="radio" name="goal" value="{{ k }}" {{ 'checked' if s.goal == k }}><span>{{ l }}</span></label>{% endfor %}</div>
+  </section>
+
+  <section class="step" data-step="2" aria-label="Anything holding you back">
+    <h1>Anything holding you back?</h1>
+    <p class="sub">An injury, a crash, an illness, little time. Say it the way you'd tell a coach. Leave it blank if nothing is.</p>
+    <textarea name="limits" id="limits" placeholder="Healing from a crash, no lifting or running for four weeks.">{{ s.limits or '' }}</textarea>
+    <div class="ex">{% for e in ["Healing from a crash, no running for 4 weeks", "Not lifting right now", "Sore knee: no running until Nov 15"] %}<button type="button" data-ex="{{ e }}">{{ e }}</button>{% endfor %}</div>
+  </section>
+
+  <section class="step" data-step="3" aria-label="Days a week">
+    <h1>How many days a week can you train?</h1>
+    <p class="sub">Days with something on them, not hours.</p>
+    <div class="segs" role="radiogroup" aria-label="Days a week">{% for n in range(1, 8) %}<label><input type="radio" name="days" value="{{ n }}" {{ 'checked' if (s.days or 5) == n }}><span>{{ n }}</span></label>{% endfor %}</div>
+  </section>
+
+  <section class="step" data-step="4" aria-label="Wake time">
+    <h1>When do you usually wake up?</h1>
+    <p class="sub">It sets tonight's bedtime and your energy through the day.</p>
+    <input type="time" name="wake" value="{{ s.wake or '07:00' }}" step="300" aria-label="Wake time">
+  </section>
+
+  <div class="nav"><button type="button" class="back" hidden>&larr; Back</button><span></span><button type="button" class="next">Next</button></div>
+  {% if not first %}<p class="skip"><a href="/me">Cancel</a></p>{% endif %}
+</form>
+<script>
+(() => {
+  const f = document.getElementById('su'), steps = [...f.querySelectorAll('.step')], dots = [...f.querySelectorAll('.dots i')];
+  const back = f.querySelector('.back'), next = f.querySelector('.next'); let i = 0;
+  const show = n => { i = n; steps.forEach((s, k) => s.classList.toggle('on', k === i)); dots.forEach((d, k) => d.classList.toggle('on', k <= i));
+    back.hidden = i === 0; next.textContent = i === steps.length - 1 ? 'Done' : 'Next'; window.scrollTo({top: 0, behavior: 'smooth'}); };
+  next.addEventListener('click', () => {
+    if (i === 0 && !f.querySelector('input[name=sports]:checked')) { f.querySelector('.opts').animate([{transform:'translateX(-6px)'},{transform:'translateX(6px)'},{transform:'none'}], {duration:240}); return; }
+    i < steps.length - 1 ? show(i + 1) : f.submit(); });
+  back.addEventListener('click', () => show(Math.max(0, i - 1)));
+  f.querySelectorAll('.ex button').forEach(b => b.addEventListener('click', () => { const t = document.getElementById('limits'); t.value = b.dataset.ex; t.focus(); }));
+  f.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') { e.preventDefault(); next.click(); } });
+})();
+</script>
+{% endblock %}

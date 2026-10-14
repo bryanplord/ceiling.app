@@ -92,6 +92,15 @@
   .s-x:hover { color:var(--ink); }
   .session .card { background:#fff; }
   .s-chart { margin:18px 0 8px; } .s-chart svg { width:100%; height:auto; display:block; overflow:visible; }
+  .rules { display:flex; flex-direction:column; gap:8px; margin:18px 0 0; max-width:980px; }
+  .rule { display:flex; align-items:center; flex-wrap:wrap; gap:6px 14px; padding:12px 16px; border-radius:16px; background:#fff6e5; }
+  .rule.ask { background:#eef3fd; }
+  .rule .rk { font-weight:700; } .rule .rd { color:#4a4a4f; flex:1 1 280px; }
+  .rule form { margin:0; } .rule button { font:inherit; font-size:14px; font-weight:650; border:1px solid rgba(0,0,0,.15); background:#fff; border-radius:999px; padding:7px 14px; cursor:pointer; }
+  .rule button.yes { background:var(--ink); color:#fff; border-color:var(--ink); }
+  .stepbar { height:10px; border-radius:5px; background:#e3e3e8; overflow:hidden; margin:16px 0 0; }
+  .stepbar i { display:block; height:100%; background:var(--good); border-radius:5px; animation:grow-x var(--t-slow) var(--ease-out) both; transform-origin:left; }
+  @keyframes grow-x { from { transform:scaleX(0); } }
   .coach { margin:36px 0 0; padding:28px 0 0; border-top:1px solid var(--rule); max-width:820px; }
   .coach > h2 { margin:0 0 16px; font-size:17px; font-weight:700; color:var(--ink); }
   .thread { list-style:none; margin:0 0 16px; padding:0; display:flex; flex-direction:column; gap:8px; }
@@ -154,6 +163,13 @@
 <div class="t-coach"><span class="ring" aria-hidden="true"><i></i></span>
   <p>{% if M %}{{ M.word }}. {{ M.head }}{% elif done %}Done for today.{% elif lift and lift.only %}{{ rx.why_story or C.intro }}{% else %}{{ C.intro }}{% endif %}</p></div>
 
+{% if standing or lapsed %}<div class="rules">
+  {% for r, d in standing %}<div class="rule"><span class="rk">{{ r.text }}</span><span class="rd">{{ d }}</span>
+    <form method="post" action="/rules/{{ r.id }}/end"><button type="submit">{{ 'Start lifting again' if 'lift' in (r.bans or []) else 'End' }}</button></form></div>{% endfor %}
+  {% if lapsed %}<div class="rule ask"><span class="rk">Ready to lift again?</span><span class="rd">Your break from lifting ended {{ lapsed_when }}. Strength is what keeps you durable; start back light.</span>
+    <form method="post" action="/rules/{{ lapsed.id }}/again"><input type="hidden" name="again" value="1"><button type="submit" class="yes">Start again</button></form>
+    <form method="post" action="/rules/{{ lapsed.id }}/again"><input type="hidden" name="again" value="0"><button type="submit">Not yet</button></form></div>{% endif %}
+</div>{% endif %}
 <div class="t-cards" id="rx">
 {% if M %}
   <section class="tc" aria-label="Today">
@@ -178,6 +194,33 @@
     {% if after.changed and after.why %}<p class="small">Re-planned {{ after.why }}.{% if after.was %} This morning it was {{ after.was }}.{% endif %}</p>{% endif %}
     <p class="small">Assumes a normal night. Ceiling re-reads it in the morning with your sleep and HRV.</p>
     {% if C.wx_tom %}<p class="small"><b>{{ C.wx_tom }}</b></p>{% endif %}
+    {% if C.tonight %}<p class="foot">{{ C.tonight }}</p>{% endif %}
+  </section>
+{% elif travel %}
+  <section class="tc" aria-label="Today">
+    <h2>Today</h2>
+    <p class="big">Travel day.</p>
+    <p class="lead strong">Get your steps: {{ '{:,}'.format(steps_goal) }}.</p>
+    {% if steps_now is not none %}{% set pc = [100, (100 * steps_now / steps_goal) | round | int] | min %}
+    <div class="stepbar" role="img" aria-label="{{ steps_now }} of {{ steps_goal }} steps"><i style="width:{{ pc }}%"></i></div>
+    <p class="small">{{ '{:,}'.format(steps_now) }} so far.{% if steps_now < steps_goal %} {{ '{:,}'.format(steps_goal - steps_now) }} to go.{% else %} Done.{% endif %}</p>{% endif %}
+    <p class="small">Walk the terminal instead of sitting at the gate. Stairs, not escalators. Twenty minutes outside after you land: daylight resets your clock.</p>
+    <p class="foot">This week the steps are the training.</p>
+  </section>
+  <section class="tc" aria-label="If you get a window">
+    <h2>If you get a window</h2>
+    <p class="big">Short counts.</p>
+    <ul class="ways">
+      <li><b>Hotel gym</b><span class="dur">30–45 min{% if rx.hr_ceiling %}, under {{ rx.hr_ceiling }}{% endif %}</span><span class="rs">Bike or treadmill. Easy: travel is stress your watch doesn't see.</span></li>
+      <li><b>15 minutes in the room</b><span class="dur">No equipment</span><span class="rs">Squats, push-ups, lunges, plank. Three rounds. Keeps the habit, costs nothing.</span></li>
+      <li><b>A walk or run outside</b><span class="dur">Any length</span><span class="rs">The best way to learn a new place, and the best thing for jet lag.</span></li>
+    </ul>
+  </section>
+  <section class="tc" aria-label="While you're away">
+    <h2>While you're away</h2>
+    <p class="big">Sleep first.</p>
+    <p class="lead">Traveling{% if travel_until %} through {{ travel_until }}{% endif %}. Keep your wake time, drink more than you think, go easy on alcohol: it's what travel does to your HRV that sets you back, not the missed sessions.</p>
+    <p class="small">The plan picks back up when you're home.</p>
     {% if C.tonight %}<p class="foot">{{ C.tonight }}</p>{% endif %}
   </section>
 {% elif lift and lift.only %}

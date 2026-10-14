@@ -87,7 +87,8 @@ def _data_version(store: Store) -> tuple:
     jr_tags = tuple(store.get_meta(f"journal:{(local_today() - timedelta(days=k)).isoformat()}") or "" for k in range(3))
     return (store.owner, c["activities"], c["streams"], c["wellness"], hash(recent), store.get_meta("goal") or "",
             store.get_meta("plans") or "", hash(jr_tags), store.get_meta("wake_hour") or "",
-            store.get_meta("strength_settings") or "", store.get_meta(f"lift:{local_today().isoformat()}") or "")
+            store.get_meta("strength_settings") or "", store.get_meta(f"lift:{local_today().isoformat()}") or "",
+            store.get_meta("setup") or "", store.get_meta("rules") or "")
 
 
 def today_rx(store: Store, day: str | None = None):
@@ -130,6 +131,11 @@ def today_rx(store: Store, day: str | None = None):
                 p.journal = _jr.signals(store, day, _jr.hrv_low(p.wellness, day, morning=True), _jr.rhr_up(p.wellness, day))
             except Exception as e:
                 print(f"journal signals failed: {e}")
+            try:                                 # your setup and standing rules (an injury, no lifting, ...)
+                from . import rules as _rl
+                p.journal = _rl.merge(getattr(p, "journal", None), store, day)
+            except Exception as e:
+                print(f"rules failed: {e!r}")
             rx_ = build_rx(p, day)
             try:                                 # power target for road and trainer rides
                 from .analysis import power as _pw
@@ -403,8 +409,9 @@ def _more_today(p, rx, load: float, done_min: int, tomorrow_now: str, nxt: str, 
     v_big = eng._next_verdict(p, rx, load + eng._est_load(p, extra + 45, ceil + 8))
     ideas = [(f"An easy {extra}-minute spin or hike, under {ceil}",
               "Tomorrow " + (f"stays {_aday(tomorrow_now)}." if v_more == tomorrow_now else f"becomes {_aday(v_more)}."), "good"),
+             *([] if (getattr(p, "journal", None) or {}).get("nolift") else [
              ("20–30 minutes of strength", "Squats, lunges, step-ups, core. Doesn't touch tomorrow, and it's what keeps "
-              "legs and back durable for the long haul.", "good"),
+              "legs and back durable for the long haul.", "good")]),
              ("A walk or mobility", "Free: no cost to tomorrow.", "good")]
     if v_big != tomorrow_now:
         ideas.append((f"Not: another long or hard session", f"That turns tomorrow from {_aday(tomorrow_now)} into {_aday(v_big)}.", "bad"))
