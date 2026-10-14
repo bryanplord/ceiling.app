@@ -874,7 +874,8 @@ def choose_activity(verdict: str, p: Profile, day: str, planned: dict | None = N
     if verdict == HARD:
         # Intervals need terrain you control. Never on a mountain bike (or lift-served skiing, or a
         # hike): trail turns every effort into spikes and rests. Road, trainer, run, skin track only.
-        allowed = {k: v for k, v in stats.items() if k in INTERVAL_OK and k not in (ban or set())}
+        allowed = {k: v for k, v in stats.items() if k in INTERVAL_OK and k not in (ban or set())
+                   and (SPORT_OF.get(k) != SKI or skied14)}      # skiing only in ski season: you've skied lately
         if prefer:
             pref = {k: v for k, v in allowed.items() if SPORT_OF.get(k) == prefer}
             allowed = pref or allowed

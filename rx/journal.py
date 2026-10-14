@@ -167,7 +167,7 @@ def effect(tags: dict, hrv_low: bool = False) -> tuple[str | None, str]:
                          "the warm-up, make it steady.")
     pain = impact_pain(tags)
     if pain:
-        notes.append(f"Sore {' and '.join(pain[:2])}: no running for the next few days. Ride, ski or swim instead, "
+        notes.append(f"Sore {' and '.join(pain[:2])}: no running for the next few days. Ride or swim instead, "
                      "same heart rate. If it still hurts after three days, or it's sharp, get it looked at."
                      + (" And it may be the shoes: try another pair before your next run." if tags.get("shoes") else ""))
     elif tags.get("pain"):

@@ -417,9 +417,15 @@ def _sentences(text: str) -> list[str]:
     return [x.strip().rstrip(".") for x in _re.split(r"(?<=[.!?])\s+", text or "") if x.strip()]
 
 
-def _today_cards(p, rx, after) -> dict:
+def _today_cards(p, rx, after, wx_tom=None) -> dict:
     try:
-        return _today_cards_(p, rx, after)
+        out = _today_cards_(p, rx, after)
+        from .. import weather as wxm
+        if wxm.outdoor_bad(wx_tom):
+            out["wx_tom"] = f"{wx_tom['line']} tomorrow: if tomorrow is a ride, it's the trainer."
+        if getattr(rx, "weather_swapped", False) and rx.weather:
+            out["intro"] = f"{rx.weather['line']}: today's ride moves to the trainer. " + out["intro"]
+        return out
     except Exception as e:
         import traceback
         print(f"today cards failed: {e!r}\n{traceback.format_exc()}")
@@ -597,7 +603,15 @@ def today(request: Request, d: str | None = None):
     mins_ago = int((time.time() - float(last)) / 60) if last and float(last) > 0 else None
     lk = _sync_locks.get(current_owner.get())
     syncing = bool(lk and lk.locked())   # only a sync actually in progress; never a stale flag
-    from .. import journal as jr
+    from .. import journal as jr, weather as wxm
+    wx_today = wx_tom = None
+    try:                                             # rain, snow, cold or wind move an outdoor ride inside
+        data = wxm.fetch(store)
+        wx_today = wxm.read(data, rx.date)
+        wx_tom = wxm.read(data, (date.fromisoformat(rx.date) + timedelta(days=1)).isoformat())
+        wxm.adjust(rx, wx_today)
+    except Exception as e:
+        print(f"weather failed: {e!r}")
     entry = jr.load(store, rx.date)
     after = _after(store, p, rx, entry)
     energy = _energy(store, p, rx)
@@ -609,6 +623,8 @@ def today(request: Request, d: str | None = None):
             body.append(f"energy {energy.now}")
         if dash.hrv.value not in ("", "—"):
             body.append(f"HRV {dash.hrv.value.replace(' ms', '')}")
+    if wx_today:
+        body.append(wx_today["line"][:1].lower() + wx_today["line"][1:])
     pats = cached(store, "patterns", rx.date, lambda: jr.patterns(store, p.wellness))
     lift = None
     try:
@@ -624,7 +640,7 @@ def today(request: Request, d: str | None = None):
         print(f"lift today failed: {e!r}\n{traceback.format_exc()}")
     return _page(request, "today.html", lift=lift, rx=rx, waiting=not _have_last_night(store), updated=mins_ago,
                  after=after, entry=entry, timeline=jr.timeline(entry), jnote=jr.effect(entry["tags"], jr.hrv_low(p.wellness, rx.date))[1] if entry else "", patterns=pats,
-                 syncing=syncing, p=p, body=", ".join(body), cards=_today_cards(p, rx, after),
+                 syncing=syncing, p=p, body=", ".join(body), cards=_today_cards(p, rx, after, wx_tom),
                  day_label=when.strftime("%A, %B %-d"))
 
 

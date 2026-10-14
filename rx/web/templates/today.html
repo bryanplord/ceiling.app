@@ -121,6 +121,7 @@
     {% if T.detail %}<p class="lead strong">{{ T.detail }}</p>{% endif %}
     {% if after.changed and after.why %}<p class="small">Re-planned {{ after.why }}.{% if after.was %} This morning it was {{ after.was }}.{% endif %}</p>{% endif %}
     <p class="small">Assumes a normal night. Ceiling re-reads it in the morning with your sleep and HRV.</p>
+    {% if C.wx_tom %}<p class="small"><b>{{ C.wx_tom }}</b></p>{% endif %}
     {% if C.tonight %}<p class="foot">{{ C.tonight }}</p>{% endif %}
   </section>
 {% elif lift and lift.only %}
@@ -184,6 +185,7 @@
     <p class="sub">On how today goes.</p>
     {% if C.tmw %}<dl class="tmw">{% for t in C.tmw %}<div><dt>{{ t.label }}</dt><dd><span class="v"><span class="dotc dot-{{ t.k }}" aria-hidden="true"></span>{{ t.word }}</span>{{ t.detail }}</dd></div>{% endfor %}</dl>{% endif %}
     <p class="small">Ceiling re-reads it in the morning with your sleep and HRV.</p>
+    {% if C.wx_tom %}<p class="small"><b>{{ C.wx_tom }}</b></p>{% endif %}
     {% if C.tonight %}<p class="foot">{{ C.tonight }}</p>{% endif %}
   </section>
 {% endif %}
