@@ -20,12 +20,15 @@ dependencies = [
 [project.optional-dependencies]
 garmin = ["garminconnect>=0.3"]
 dev = ["pytest>=8", "httpx>=0.27"]
+coach = ["claude-agent-sdk>=0.2", "fitparse>=1.2", "garmin-fit-sdk>=21.0"]
+coach-api = ["anthropic>=0.40", "fitparse>=1.2", "garmin-fit-sdk>=21.0"]
 
 [project.scripts]
 rx = "rx.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["rx*"]
+include = ["rx*", "fullrecord*"]
 
 [tool.setuptools.package-data]
 rx = ["web/templates/*.html", "web/static/*"]
+fullrecord = ["templates/*.html", "instructions.md"]

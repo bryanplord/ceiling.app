@@ -96,6 +96,7 @@
   <a href="/" aria-label="Today">{% include "_wordmark.html" %}</a>
   <nav>
     <a href="/" class="{{ 'on' if active=='today' }}">Today</a>
+    <a href="/coach" class="{{ 'on' if active=='coach' }}">Coach</a>
     <a href="/plan" class="{{ 'on' if active=='plan' }}">Plan</a>
     <a href="/calendar" class="{{ 'on' if active in ('calendar', 'history') }}">Calendar</a>
     <a href="/workouts" class="{{ 'on' if active=='workouts' }}">Workouts</a>
