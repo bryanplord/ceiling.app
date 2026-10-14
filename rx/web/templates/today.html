@@ -69,6 +69,57 @@
   .al-k { font-size:15px; font-weight:700; color:#5e5e63; }
   .al-v { flex:1 1 320px; font-size:17px; } .al-v b { margin-right:6px; }
   .al-go { background:var(--ink); color:var(--snow); border-radius:999px; padding:10px 20px; font-weight:650; font-size:15px; }
+  .open-s { margin:14px 0 0; padding:14px 0 0; border:0; border-top:1px solid #dcdce0; background:none; font:inherit; text-align:left; cursor:pointer;
+            display:flex; flex-direction:column; gap:2px; width:100%; color:inherit; }
+  .open-s span { font-size:14px; color:#5e5e63; }
+  .open-s b { font-size:16px; font-weight:700; }
+  .open-s b::after { content:""; display:inline-block; width:7px; height:7px; margin-left:8px; border-right:2px solid currentColor; border-bottom:2px solid currentColor;
+                     transform:translateY(-3px) rotate(45deg); transition:transform var(--t) var(--ease); }
+  .open-s[aria-expanded="true"] b::after { transform:translateY(1px) rotate(-135deg); }
+  .open-s:hover b { color:var(--good); }
+  .session { display:grid; grid-template-rows:0fr; opacity:0; transition:grid-template-rows var(--t-slow) var(--ease-out), opacity var(--t) var(--ease), margin var(--t) var(--ease); margin:0; }
+  .session.on { grid-template-rows:1fr; opacity:1; margin:24px 0 0; }
+  .session > .s-in { overflow:hidden; min-height:0; background:#f5f5f7; border-radius:28px; padding:0 34px; transition:padding var(--t) var(--ease); }
+  .session.on > .s-in { padding:28px 34px 32px; }
+  .s-head { display:flex; justify-content:space-between; align-items:baseline; gap:16px; }
+  .s-head h2 { margin:0; font-size:24px; font-weight:800; font-stretch:112%; color:var(--ink); letter-spacing:-0.01em; }
+  .s-x { background:none; border:0; font:inherit; font-size:15px; color:var(--lichen); cursor:pointer; }
+  .s-x:hover { color:var(--ink); }
+  .session .card { background:#fff; }
+  .s-chart { margin:18px 0 8px; } .s-chart svg { width:100%; height:auto; display:block; overflow:visible; }
+  .coach { margin:36px 0 0; padding:28px 0 0; border-top:1px solid var(--rule); max-width:820px; }
+  .coach > h2 { margin:0 0 16px; font-size:17px; font-weight:700; color:var(--ink); }
+  .thread { list-style:none; margin:0 0 16px; padding:0; display:flex; flex-direction:column; gap:8px; }
+  .thread:empty { display:none; }
+  .thread li { margin:0; display:flex; align-items:flex-end; gap:10px; }
+  .thread .me { flex-direction:column; align-items:flex-end; gap:3px; }
+  .thread .bub { max-width:min(560px, 82%); padding:11px 16px; border-radius:20px; font-size:16px; line-height:1.42; text-wrap:pretty; }
+  .thread .me .bub { background:var(--ink); color:#fff; border-bottom-right-radius:6px; }
+  .thread .co .bub { background:#f2f2f4; border-bottom-left-radius:6px; }
+  .thread .co .ring { width:24px; height:24px; margin-bottom:2px; }
+  .thread .co .ring i { width:15px; height:15px; }
+  .thread .tm { font-size:12px; color:var(--lichen); margin-right:4px; }
+  .chips { display:inline-flex; flex-wrap:wrap; gap:6px; vertical-align:middle; }
+  .chip { display:inline-block; padding:2px 10px; border-radius:999px; background:rgba(255,255,255,.18); font-size:14px; font-weight:600; }
+  .chips + .tx { display:block; margin-top:6px; }
+  .thread li.new { animation:pop-in var(--t) var(--ease-out) both; }
+  .thread .me.new { transform-origin:100% 100%; } .thread .co.new { transform-origin:0 100%; }
+  @keyframes pop-in { from { opacity:0; transform:translateY(10px) scale(.94); } }
+  .thread li.fail .bub { background:#c2321c; cursor:pointer; }
+  .typing .bub { display:inline-flex; gap:5px; padding:15px 16px; }
+  .typing .bub i { width:7px; height:7px; border-radius:50%; background:#8e8e93; animation:blink 1.2s infinite ease-in-out; }
+  .typing .bub i:nth-child(2) { animation-delay:.15s; } .typing .bub i:nth-child(3) { animation-delay:.3s; }
+  @keyframes blink { 0%, 60%, 100% { opacity:.3; transform:none; } 30% { opacity:1; transform:translateY(-3px); } }
+  .jform { display:flex; flex-direction:column; gap:12px; }
+  .jform .pills { display:flex; gap:8px; flex-wrap:wrap; }
+  .compose { display:flex; align-items:center; gap:8px; border:1px solid #d1d1d6; border-radius:24px; padding:5px 5px 5px 18px; background:#fff;
+             transition:border-color var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease); }
+  .compose:focus-within { border-color:var(--ink); box-shadow:0 0 0 4px rgba(0,0,0,.05); }
+  .compose input { flex:1; min-width:0; border:0; outline:0; font:inherit; font-size:16px; background:transparent; padding:8px 0; }
+  .send { width:36px; height:36px; flex:none; border-radius:50%; border:0; background:var(--ink); color:#fff; display:grid; place-items:center; cursor:pointer; padding:0; }
+  .send svg { width:18px; height:18px; }
+  .send:disabled { background:#d1d1d6; cursor:default; }
+  .learned { margin-top:24px; } .learned .lh { margin:0 0 6px; font-size:14px; font-weight:700; color:var(--lichen); }
   .checkin { display:flex; align-items:center; gap:12px 16px; flex-wrap:wrap; margin:32px 0 0; padding:20px 0 0; border-top:1px solid var(--rule); }
   .checkin h2 { margin:0; font-size:17px; font-weight:700; white-space:nowrap; }
   .checkin .pills { display:flex; gap:8px; flex-wrap:wrap; }
@@ -96,7 +147,7 @@
 {% if body %}<p class="bodyl t-body"><a href="/dashboard">{{ body[:1] | upper }}{{ body[1:] }}. Your dashboard</a></p>{% endif %}
 {% if p.program %}<p class="t-meta"><a class="goalline" href="/plan">{{ p.program.title }}{% if p.program.days_left is not none %}: {{ p.program.days_left }} days{% endif %}{% if p.program.phase %}, {{ p.program.phase }} week{% endif %}</a></p>{% endif %}
 <div class="t-coach"><span class="ring" aria-hidden="true"><i></i></span>
-  <p>{% if M %}{{ M.word }}. {{ M.head }}{% if jnote %} {{ jnote }}{% endif %}{% elif done %}Done for today.{% if jnote %} {{ jnote }}{% endif %}{% elif lift and lift.only %}{{ rx.why_story or C.intro }}{% if jnote %} {{ jnote }}{% endif %}{% else %}{{ C.intro }}{% if jnote %} {{ jnote }}{% endif %}{% endif %}</p></div>
+  <p>{% if M %}{{ M.word }}. {{ M.head }}{% elif done %}Done for today.{% elif lift and lift.only %}{{ rx.why_story or C.intro }}{% else %}{{ C.intro }}{% endif %}</p></div>
 
 <div class="t-cards" id="rx">
 {% if M %}
@@ -105,7 +156,7 @@
     <div class="bigrow"><p class="big {{ M.tone }}">{{ M.word }}.</p><span class="pct {{ M.tone }}">{{ M.score }}%</span></div>
     {% if C.under is not none %}<p class="lead strong">{{ C.under }}% under {{ rx.hr_ceiling }}{% if M.zones %}, mostly {{ (M.zones | sort(attribute=3, reverse=True) | first)[0] }}{% endif %}.</p>{% endif %}
     {% if C.trace %}<div class="chart">{{ C.trace | safe }}</div>{% endif %}
-    <p class="small">{{ M.name }}, {{ M.dur }}{% if M.avg %}, average {{ M.avg }}{% endif %}.</p>
+    <button type="button" class="open-s" aria-expanded="false" aria-controls="session"><span>{{ M.name }}, {{ M.dur }}{% if M.avg %}, average {{ M.avg }}{% endif %}</span><b>See the session</b></button>
   </section>
   <section class="tc" aria-label="If you want more">
     <h2>If you want more</h2>
@@ -190,34 +241,12 @@
   </section>
 {% endif %}
 </div>
-{% if lift and lift.s and not lift.only %}
-<a class="alsolift" href="/lift"><span class="al-k">Also today</span><span class="al-v"><b>{{ lift.s.name }}</b> {{ lift.summary }}</span>
-  <span class="al-go">{{ 'Done: ' ~ lift.done ~ ' of ' ~ lift.of ~ ' sets' if lift.finished else ('Keep going' if lift.done else 'Start lifting') }}</span></a>
-{% endif %}
-
-<section class="checkin" id="journal" aria-label="Check in">
-  <h2>{{ 'Tell your coach' if done else 'How do you feel?' }}</h2>
-  <form method="post" action="/journal" class="jform" style="display:contents">
-    <div class="pills">
-      {% for n, v, l in [('feel','good','Feeling good'),('feel','tired','Tired'),('feel','sick','Sick'),('drinks','2','Had a drink'),('food','poor','Ate poorly')] %}
-      <button type="submit" class="pill" name="{{ n }}" value="{{ v }}">{{ l }}</button>{% endfor %}
-    </div>
-    <div class="jnoteRow"><input class="jtext" name="text" id="jtext" value="" autocomplete="off" placeholder="Tell your coach anything: over-caffeinated, feet hurt, headache, slept badly…" aria-label="Tell your coach anything">
-      <button type="submit" class="jsave">Send</button></div>
-  </form>
-</section>
-<div class="jwrap">
-  <p class="jsaved" id="jsaved" role="status" aria-live="polite"></p>
-  <ol class="jtl" id="jtl" aria-label="Today's check-ins">{% for e in timeline %}
-    <li><span class="jt">{{ e.at }}</span><div class="jb">{% for x in e.pills %}<span class="tp tp-{{ x.tone }}">{{ x.label }}</span>{% endfor %}{% if e.text %}<p class="jx">{{ e.text }}</p>{% endif %}</div></li>{% endfor %}
-  </ol>
-  <p class="jnote" id="jnote" hidden></p>
-  {% if patterns %}<ul class="jpat">{% for x in patterns %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
-</div>
-
-<div class="t-more">
 {% if M %}
-  <details><summary>The session<span>{{ M.score }}%, {{ M.word | lower }}</span></summary><div class="body">
+<section class="session" id="session" aria-label="The session" hidden>
+  <div class="s-in">
+    <div class="s-head"><h2>{{ M.name }}, {{ M.dur }}</h2><button type="button" class="s-x" aria-label="Close">Close</button></div>
+    {% if C.trace_big %}<div class="s-chart">{{ C.trace_big | safe }}</div>{% endif %}
+
     {% if M.zones %}<div class="azbar" aria-label="Time in each zone">{% for n, c, mm, sh in M.zones %}{% if sh > 0.5 %}<span class="{{ c }}" style="width:{{ sh }}%"><b>{% if sh > 9 %}{{ n }} {{ mm }}m{% endif %}</b></span>{% endif %}{% endfor %}</div>{% endif %}
     <div class="rf">
       {% if M.right %}<div><p class="dlab">What's good</p><ul class="rfl rgood">{% for x in M.right %}<li>{{ x }}</li>{% endfor %}</ul></div>{% endif %}
@@ -231,7 +260,34 @@
     {% for s2 in after.sessions if s2 is not sameas M and not s2.walk %}
     <p class="also">Also: {{ s2.name }}, {{ s2.dur }}{% if s2.score is not none %}, {{ s2.score }}% ({{ s2.word|lower }}){% endif %}.</p>
     {% endfor %}
-  </div></details>
+    </div>
+</section>
+{% endif %}
+{% if lift and lift.s and not lift.only %}
+<a class="alsolift" href="/lift"><span class="al-k">Also today</span><span class="al-v"><b>{{ lift.s.name }}</b> {{ lift.summary }}</span>
+  <span class="al-go">{{ 'Done: ' ~ lift.done ~ ' of ' ~ lift.of ~ ' sets' if lift.finished else ('Keep going' if lift.done else 'Start lifting') }}</span></a>
+{% endif %}
+
+<section class="coach" id="journal" aria-label="Your coach">
+  <h2>{{ 'Tell your coach' if done else 'How do you feel?' }}</h2>
+  <ol class="thread" id="thread" aria-live="polite">{% for e, r in thread %}
+    <li class="me"><div class="bub">{% if e.pills %}<span class="chips">{% for x in e.pills %}<span class="chip">{{ x.label }}</span>{% endfor %}</span>{% endif %}{% if e.text %}<span class="tx">{{ e.text }}</span>{% endif %}</div>{% if e.at %}<span class="tm">{{ e.at }}</span>{% endif %}</li>
+    <li class="co"><span class="ring" aria-hidden="true"><i></i></span><div class="bub">{{ r }}</div></li>{% endfor %}
+  </ol>
+  <form method="post" action="/journal" class="jform">
+    <div class="pills">
+      {% for n, v, l in [('feel','good','Feeling good'),('feel','tired','Tired'),('feel','sick','Sick'),('drinks','2','Had a drink'),('food','poor','Ate poorly')] %}
+      <button type="submit" class="pill" name="{{ n }}" value="{{ v }}">{{ l }}</button>{% endfor %}
+    </div>
+    <div class="compose"><input class="jtext" name="text" id="jtext" value="" autocomplete="off" enterkeyhint="send" placeholder="Tell your coach anything: over-caffeinated, feet hurt, headache, slept badly…" aria-label="Tell your coach anything">
+      <button type="submit" class="send" aria-label="Send"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 16V4M4.5 9.5 10 4l5.5 5.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
+  </form>
+  {% if patterns %}<div class="learned"><p class="lh">What Ceiling has noticed</p><ul class="jpat">{% for x in patterns %}<li>{{ x }}</li>{% endfor %}</ul></div>{% endif %}
+</section>
+
+<div class="t-more">
+{% if M %}
+
   <details><summary>This morning's plan<span>{{ C.vword | lower }}</span></summary><div class="body">
     <p class="rxv">{{ rx.what or rx.do }}</p><p class="actwhy">{{ rx.how_short }}</p></div></details>
 {% else %}
@@ -249,57 +305,63 @@
 </div>
 
 <script>
+(() => {                                                   // the session opens into the page and closes again
+  const btn = document.querySelector('.open-s'), panel = document.getElementById('session'); if (!btn || !panel) return;
+  const set = on => { btn.setAttribute('aria-expanded', on);
+    if (on) { panel.hidden = false; requestAnimationFrame(() => requestAnimationFrame(() => { panel.classList.add('on');
+                setTimeout(() => panel.scrollIntoView({behavior: 'smooth', block: 'start'}), 120); })); }
+    else { panel.classList.remove('on'); setTimeout(() => { if (!panel.classList.contains('on')) panel.hidden = true; }, 700); } };
+  btn.addEventListener('click', () => set(btn.getAttribute('aria-expanded') !== 'true'));
+  panel.querySelector('.s-x').addEventListener('click', () => { set(false); btn.scrollIntoView({behavior: 'smooth', block: 'center'}); });
+})();
 (() => {
-  const form = document.querySelector('.jform');
-  if (!form) return;
-  const saved = document.getElementById('jsaved'), tl = document.getElementById('jtl'),
-        note = document.getElementById('jnote'), text = document.getElementById('jtext');
-  let timer;
+  const form = document.querySelector('.jform'); if (!form) return;
+  const thread = document.getElementById('thread'), text = document.getElementById('jtext'), send = form.querySelector('.send');
   const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  function drop(e) {
-    const li = document.createElement('li');
-    li.innerHTML = `<span class="jt">${esc(e.at)}</span><div class="jb">` +
-      e.pills.map(p => `<span class="tp tp-${esc(p.tone)}">${esc(p.label)}</span>`).join('') +
-      (e.text ? `<p class="jx">${esc(e.text)}</p>` : '') + '</div>';
-    li.className = 'drop';
-    tl.appendChild(li);
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const show = li => li.scrollIntoView({behavior: calm ? 'auto' : 'smooth', block: 'nearest'});
+  const sync = () => { send.disabled = !text.value.trim(); };
+  text.addEventListener('input', sync); sync();
+  function add(cls, html) {
+    const li = document.createElement('li'); li.className = cls + ' new'; li.innerHTML = html;
+    thread.appendChild(li); show(li); return li;
   }
-  function flash(msg, err) {
-    saved.textContent = msg;
-    saved.classList.toggle('err', !!err);
-    saved.classList.remove('show'); void saved.offsetWidth; saved.classList.add('show');
-    clearTimeout(timer); timer = setTimeout(() => saved.classList.remove('show'), 2400);
-  }
-  async function send(data, pill) {
-    if (pill) pill.classList.add('on');
+  const mine = (label, t) => add('me', '<div class="bub">' + (label ? `<span class="chips"><span class="chip">${esc(label)}</span></span>` : '') +
+                                 (t ? `<span class="tx">${esc(t)}</span>` : '') + '</div>');
+  const ring = '<span class="ring" aria-hidden="true"><i></i></span>';
+  async function post(data, me) {
+    const typing = add('co typing', ring + '<div class="bub" aria-label="Your coach is replying"><i></i><i></i><i></i></div>');
+    const t0 = performance.now();
+    const body = Object.fromEntries(Object.entries(data).filter(([k]) => k[0] !== '_'));
     try {
-      const r = await fetch('/journal', {method: 'POST', body: new URLSearchParams(data), headers: {'Accept': 'application/json'}});
+      const r = await fetch('/journal', {method: 'POST', body: new URLSearchParams(body), headers: {'Accept': 'application/json'}});
+      if (!r.ok) throw new Error(r.status);
       const j = await r.json();
-      if (j.entry) drop(j.entry);
-      note.textContent = j.note || ''; note.hidden = !j.note;
-      flash(`Saved, ${j.at}.`);
+      await wait(Math.max(0, 650 - (performance.now() - t0)));          // a beat, like someone answering
+      if (j.at) me.insertAdjacentHTML('beforeend', `<span class="tm">${esc(j.at)}</span>`);
+      typing.className = 'co new'; typing.innerHTML = ring + `<div class="bub">${esc(j.reply || 'Got it.')}</div>`; show(typing);
     } catch (e) {
-      flash("Couldn't save. Check your connection and try again.", true);
-      return false;
-    } finally {
-      if (pill) setTimeout(() => pill.classList.remove('on'), 350);   // pills are actions, not settings
+      typing.remove(); me.classList.add('fail');
+      me.querySelector('.bub').insertAdjacentHTML('beforeend', '<span class="tx" style="opacity:.85">Not sent. Tap to try again.</span>');
+      me.addEventListener('click', () => { me.remove(); post(data, mine(data._label || '', data.text || '')); }, {once: true});
     }
-    return true;
   }
-  async function saveText() {
-    const v = text.value.trim();
-    if (!v) { text.focus(); return; }
-    text.value = '';
-    if (!(await send({text: v}))) text.value = v;
-  }
-  // Enter in the text field saves the text (the browser would otherwise "click" the first pill).
-  text.addEventListener('keydown', ev => { if (ev.key === 'Enter' && !ev.isComposing) { ev.preventDefault(); saveText(); } });
+  text.addEventListener('keydown', ev => { if (ev.key === 'Enter' && !ev.isComposing) { ev.preventDefault(); if (text.value.trim()) form.requestSubmit(send); } });
   form.addEventListener('submit', ev => {
     ev.preventDefault();
     const b = ev.submitter;
-    if (b && b.classList.contains('pill')) send({[b.name]: b.value}, b);
-    else saveText();
+    if (b && b.classList.contains('pill')) {
+      b.classList.add('on'); setTimeout(() => b.classList.remove('on'), 350);     // pills are actions, not settings
+      const data = {[b.name]: b.value, _label: b.textContent.trim()};
+      post(data, mine(data._label, ''));
+    } else {
+      const v = text.value.trim(); if (!v) { text.focus(); return; }
+      text.value = ''; sync(); text.focus();
+      post({text: v}, mine('', v));
+    }
   });
 })();
 </script>
+
 {% endblock %}

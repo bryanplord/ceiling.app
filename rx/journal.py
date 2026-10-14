@@ -141,14 +141,19 @@ def label(tags: dict) -> list[str]:
 
 
 def effect(tags: dict, hrv_low: bool = False) -> tuple[str | None, str]:
+    cap, notes = _effect(tags, hrv_low)
+    return cap, " ".join(notes)
+
+
+def _effect(tags: dict, hrv_low: bool = False) -> tuple[str | None, list[str]]:
     """(cap for tomorrow, what it means), from today's check-ins.
     `hrv_low`: your HRV has been under your normal this week, which makes "tired" count."""
     d = tags.get("drinks") or 0
     notes, cap = [], None
     if tags.get("sick"):
-        return "easy", ("Feeling sick changes everything: tomorrow is easy at most, and if your resting HR is up "
+        return "easy", ["Feeling sick changes everything: tomorrow is easy at most, and if your resting HR is up "
                         "in the morning, it's a day off. Training through the start of an illness is how a few days "
-                        "off turns into two weeks.")
+                        "off turns into two weeks."]
     if d >= 3 or d < 0 and tags.get("late"):
         cap = "steady"
         notes.append("Alcohol is the single biggest hit to overnight HRV most people take: it raises your heart "
@@ -193,7 +198,7 @@ def effect(tags: dict, hrv_low: bool = False) -> tuple[str | None, str]:
         notes.append("A late night is a short night. Tomorrow depends on how much sleep you actually get.")
     if tags.get("food") == "poor" and not tags.get("hungry"):
         notes.append("A poor eating day matters most before a hard session: eat a real meal tonight and before tomorrow's workout.")
-    return cap, " ".join(notes)
+    return cap, notes
 
 
 def hrv_low(wellness, day: str, morning: bool = False) -> bool:
@@ -262,6 +267,17 @@ def save(store, day: str, text: str, taps: dict | None = None, at: str = "") -> 
     taps = {k: v for k, v in (taps or {}).items() if v}
     if text or taps:
         log.append({"at": at, "text": (text or "").strip()[:500], "taps": taps})
+    tags = build_tags(log)
+    latest = {}
+    for e in log:
+        latest.update(e.get("taps") or {})
+    store.set_meta(f"journal:{day}", json.dumps({"text": "", "tags": tags, "taps": latest, "log": log[-40:]}))
+    return tags
+
+
+
+def build_tags(log: list[dict]) -> dict:
+    """The day's tags from its check-ins, oldest first: later check-ins win."""
     tags: dict = {}
     for e in log:                                     # oldest first: later check-ins win
         t = parse(e.get("text") or "")
@@ -297,11 +313,25 @@ def save(store, day: str, text: str, taps: dict | None = None, at: str = "") -> 
             tags["food"] = tp["food"]
         elif tp.get("food") == "ok":
             tags.pop("food", None)
-    latest = {}
-    for e in log:
-        latest.update(e.get("taps") or {})
-    store.set_meta(f"journal:{day}", json.dumps({"text": "", "tags": tags, "taps": latest, "log": log[-40:]}))
     return tags
+
+
+def replies(entry: dict | None, hrv_low: bool = False) -> list[str]:
+    """What the coach said back to each check-in: only what that check-in changed."""
+    log = [e for e in ((entry or {}).get("log") or []) if e.get("text") or e.get("taps")]
+    out, before = [], []
+    for i in range(len(log)):
+        _, notes = _effect(build_tags(log[:i + 1]), hrv_low)
+        new = [n for n in notes if n not in before]
+        if new:
+            out.append(" ".join(new))
+        else:
+            taps = log[i].get("taps") or {}
+            out.append("Good. Today stands as written." if taps.get("feel") == "good" or parse(log[i].get("text") or "").get("feel") == "good"
+                       else "Got it. Nothing changes today.")
+        before = notes
+    return out
+
 
 
 TAP = {"feel": {"good": ("Energized", "good"), "normal": ("Normal", "plain"), "tired": ("Tired", "warn"),

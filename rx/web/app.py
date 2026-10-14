@@ -480,6 +480,7 @@ def _today_cards_(p, rx, after) -> dict:
     if M:
         tr = M.get("trace") or []
         out["trace"] = charts.trace_svg(tr, p, c)
+        out["trace_big"] = charts.trace_svg(tr, p, c, w=1100, h=300)
         out["under"] = round(100 * sum(1 for _, v in tr if v <= c) / len(tr)) if tr and c else None
     if after and after.get("done"):
         t = after.get("tomorrow") or ""
@@ -639,7 +640,7 @@ def today(request: Request, d: str | None = None):
         import traceback
         print(f"lift today failed: {e!r}\n{traceback.format_exc()}")
     return _page(request, "today.html", lift=lift, rx=rx, waiting=not _have_last_night(store), updated=mins_ago,
-                 after=after, entry=entry, timeline=jr.timeline(entry), jnote=jr.effect(entry["tags"], jr.hrv_low(p.wellness, rx.date))[1] if entry else "", patterns=pats,
+                 after=after, entry=entry, thread=list(zip(jr.timeline(entry), jr.replies(entry, jr.hrv_low(p.wellness, rx.date)))), patterns=pats,
                  syncing=syncing, p=p, body=", ".join(body), cards=_today_cards(p, rx, after, wx_tom),
                  day_label=when.strftime("%A, %B %-d"))
 
@@ -1116,7 +1117,8 @@ async def journal_save(request: Request):
             low = False
         cap, note = jr.effect(entry.get("tags", {}), low)
         log = entry.get("log") or []
-        return JSONResponse({"ok": saved, "at": at, "note": note,
+        reps = jr.replies(entry, low) if saved else []
+        return JSONResponse({"ok": saved, "at": at, "note": note, "reply": reps[-1] if reps else "",
                              "entry": jr.view(log[-1]) if saved and log else None})
     return RedirectResponse("/#journal", status_code=303)
 
