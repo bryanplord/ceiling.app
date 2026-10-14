@@ -33,6 +33,25 @@ def fetch(store) -> dict | None:
         hit = None
     if hit and time.time() - hit.get("t", 0) < (3600 if hit.get("data") else 900):
         return hit.get("data")
+    # Never make a page wait on the forecast: refresh in the background, use what we have meanwhile.
+    import threading
+    if key not in _busy:
+        _busy.add(key)
+        threading.Thread(target=_refresh, args=(store, key, lat, lon), daemon=True).start()
+    return (hit or {}).get("data")
+
+
+_busy: set = set()
+
+
+def _refresh(store, key: str, lat: float, lon: float) -> None:
+    try:
+        _get(store, key, lat, lon)
+    finally:
+        _busy.discard(key)
+
+
+def _get(store, key: str, lat: float, lon: float) -> dict | None:
     url = ("https://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f"
            "&hourly=precipitation_probability,precipitation,temperature_2m,wind_speed_10m,weather_code"
            "&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch"

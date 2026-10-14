@@ -13,7 +13,7 @@ def test_pages_render(tmp_path, monkeypatch):
     demo.seed(Store(tmp_path / "rx.db"), days=90, end=date.today())
     from rx.web.app import app
     c = TestClient(app)
-    for path in ("/", "/dashboard", "/me", "/plan", "/calendar", "/calendar/history", "/workouts", "/yesterday", "/recovery", "/progress", "/zones", "/trends", "/data", "/you", "/profile"):
+    for path in ("/", "/dashboard", "/strength", "/lift", "/me", "/plan", "/calendar", "/calendar/history", "/workouts", "/yesterday", "/recovery", "/progress", "/zones", "/trends", "/data", "/you", "/profile"):
         r = c.get(path)
         assert r.status_code == 200, path
         assert "<h1" in r.text

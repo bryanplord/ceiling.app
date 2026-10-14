@@ -36,23 +36,18 @@
   <a href="/logout"><b>Sign out</b><span></span><i></i></a>
 </nav>
 
-<form class="set2 rise" style="--i:2" method="post" action="/settings/training">
-  <h2>How you train</h2>
-  <p>Ceiling builds every day around this.</p>
-  {% if saved %}<p class="ok" role="status">Saved. Today and your calendar follow it.</p>{% endif %}
-  <div class="fld"><span>What you train</span>
-    <div class="segs" role="radiogroup" aria-label="What you train">{% for k, l in train.items() %}<label><input type="radio" name="train" value="{{ k }}" {{ 'checked' if st.train == k }}><span>{{ l }}</span></label>{% endfor %}</div>
-    <small>Strength makes the lift the main event; both fits two or three lifts around your rides and runs.</small></div>
-  <div class="fld"><span>Equipment</span>
-    <div class="segs" role="radiogroup" aria-label="Equipment">{% for k, l in equip.items() %}<label><input type="radio" name="equip" value="{{ k }}" {{ 'checked' if st.equip == k }}><span>{{ l }}</span></label>{% endfor %}</div>
-    <small>Every move swaps to match.</small></div>
-  <div class="fld"><span>Lifts</span>
-    <div class="segs" role="radiogroup" aria-label="Lift length">{% for k, l in [('full', 'Full, 3 rounds'), ('short', 'Short, 2 rounds')] %}<label><input type="radio" name="length" value="{{ k }}" {{ 'checked' if st.length == k }}><span>{{ l }}</span></label>{% endfor %}</div></div>
-  <div class="fld"><span>Units</span>
-    <div class="segs" role="radiogroup" aria-label="Units">{% for k, l in [('lb', 'Pounds'), ('kg', 'Kilograms')] %}<label><input type="radio" name="units" value="{{ k }}" {{ 'checked' if st.units == k }}><span>{{ l }}</span></label>{% endfor %}</div></div>
+<section class="set2 rise" style="--i:2">
+  <h2>Your day</h2>
   <div class="fld"><span><label for="wake">You wake up at</label></span>
-    <input type="time" id="wake" name="wake" value="{{ wake }}" step="300">
+    <div><input type="time" id="wake" name="wake" value="{{ wake }}" step="300"><span class="ok" id="wsaved" role="status" style="margin-left:12px;opacity:0;transition:opacity var(--t) var(--ease)">Saved</span></div>
     <small>Sets tonight's bedtime and your energy curve.</small></div>
-  <button class="save" type="submit">Save</button>
-</form>
+  <p style="margin-top:18px;color:var(--lichen)">Equipment, units and how lifting fits your week live in <a href="/strength">Strength</a>.</p>
+</section>
+<script>
+(() => { const w = document.getElementById('wake'), s = document.getElementById('wsaved'); let t;
+  w.addEventListener('change', async () => {
+    try { const r = await fetch('/settings/wake', {method: 'POST', body: new URLSearchParams({wake: w.value}), headers: {'Accept': 'application/json'}});
+          s.textContent = r.ok ? 'Saved' : 'Not saved'; } catch (_) { s.textContent = 'Not saved'; }
+    s.style.opacity = 1; clearTimeout(t); t = setTimeout(() => s.style.opacity = 0, 1600); }); })();
+</script>
 {% endblock %}

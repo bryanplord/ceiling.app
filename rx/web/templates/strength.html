@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block head %}
+<style>
+  .sx h1 { margin-bottom:8px; }
+  .lede { margin:0; font-size:19px; color:var(--lichen); max-width:60ch; }
+  .hero2 { margin:32px 0 0; background:#f5f5f7; border-radius:28px; padding:30px 34px 32px; display:grid; grid-template-columns:minmax(0, 1fr) auto; gap:20px 32px; align-items:end; }
+  .hero2 .k { margin:0 0 6px; font-size:16px; font-weight:700; color:#5e5e63; }
+  .hero2 .nm { margin:0; font-size:clamp(36px, 5vw, 52px); line-height:1; font-weight:800; font-stretch:112%; letter-spacing:-0.02em; }
+  .hero2 .sm { margin:12px 0 0; font-size:17px; color:#4a4a4f; max-width:56ch; }
+  .hero2 .why { margin:10px 0 0; font-size:15px; color:var(--warn); font-weight:600; max-width:56ch; }
+  .go { display:inline-block; background:var(--ink); color:#fff; text-decoration:none; border:0; border-radius:999px; padding:15px 28px; font:inherit; font-weight:650; font-size:16px; cursor:pointer; white-space:nowrap; }
+  .go:hover { background:#333; }
+  .start { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .start select { font:inherit; font-size:16px; padding:12px 14px; border-radius:14px; border:1px solid #d1d1d6; background:#fff; }
+  .sec { margin:56px 0 0; }
+  .sec > h2 { font-size:22px; font-weight:750; color:var(--ink); margin:0 0 4px; letter-spacing:-0.01em; }
+  .sec > p.sub { margin:0 0 18px; color:var(--lichen); }
+  .wk7 { list-style:none; padding:0; margin:0; display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:10px; }
+  .wk7 li { margin:0; border-radius:18px; padding:14px 16px; background:#f5f5f7; }
+  .wk7 li.done { background:#eaf5ee; } .wk7 li.today { box-shadow:inset 0 0 0 2px var(--ink); }
+  .wk7 span { display:block; font-size:14px; color:var(--lichen); }
+  .wk7 b { display:block; font-size:17px; margin-top:2px; }
+  .wk7 i { font-style:normal; font-size:13px; font-weight:650; color:var(--good); }
+  .mvs { display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); gap:12px; }
+  .mvc { background:#f5f5f7; border-radius:20px; padding:18px 20px; }
+  .mvc .n { font-size:15px; font-weight:650; }
+  .mvc .w { margin-top:6px; font-size:30px; font-weight:800; font-stretch:112%; letter-spacing:-0.01em; }
+  .mvc .w small { font-size:15px; font-weight:600; color:var(--lichen); margin-left:4px; }
+  .mvc .d { font-size:14px; color:var(--lichen); } .mvc .d.up { color:var(--good); font-weight:650; }
+  .mvc svg { display:block; width:100%; height:34px; margin-top:10px; overflow:visible; }
+  .empty { color:var(--lichen); font-size:17px; margin:0; }
+  .rec { list-style:none; padding:0; margin:0; border-top:1px solid var(--rule); max-width:720px; }
+  .rec li { margin:0; display:grid; grid-template-columns:130px 1fr auto; gap:12px; padding:14px 0; border-bottom:1px solid var(--rule); }
+  .rec span { color:var(--lichen); }
+  .setup { max-width:760px; }
+  .fld { padding:18px 0; border-top:1px solid var(--rule); display:grid; grid-template-columns:180px 1fr; gap:10px 20px; align-items:center; }
+  .fld > span { font-weight:600; }
+  .fld small { grid-column:2; color:var(--lichen); font-size:14px; margin-top:-4px; }
+  .segs { display:inline-flex; flex-wrap:wrap; width:max-content; max-width:100%; background:var(--frost); border-radius:999px; padding:4px; gap:2px; }
+  .segs label { position:relative; }
+  .segs input { position:absolute; opacity:0; inset:0; margin:0; cursor:pointer; }
+  .segs label span { display:block; padding:8px 16px; border-radius:999px; font-size:15px; font-weight:600; color:var(--lichen);
+                     transition:background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease); }
+  .segs input:checked + span { background:#fff; color:var(--ink); box-shadow:0 1px 3px rgba(0,0,0,.1); }
+  .segs input:focus-visible + span { outline:2px solid var(--ceiling); outline-offset:2px; }
+  .saved { font-size:14px; color:var(--good); font-weight:600; opacity:0; transition:opacity var(--t) var(--ease); margin-left:8px; }
+  .saved.on { opacity:1; }
+  @media (max-width:760px) { .hero2 { grid-template-columns:1fr; padding:24px; } .fld { grid-template-columns:1fr; } .fld small { grid-column:1; }
+                             .rec li { grid-template-columns:1fr auto; } .rec li span:first-child { grid-column:1 / -1; } }
+</style>
+{% endblock %}
+{% block body %}
+<div class="sx">
+<h1 class="rise">Strength</h1>
+<p class="lede rise" style="--i:1">{% if plan %}{{ plan.summary.split('. ')[0] }}.{% else %}Lift two to five days a week. Ceiling sets every weight from your log and fits each lift around how you've recovered.{% endif %}</p>
+
+<section class="hero2 rise" style="--i:2" aria-label="{{ 'Today' if sess else 'Next' }}">
+  {% if sess %}
+  <div><p class="k">Today</p><p class="nm">{{ sess.name }}.</p><p class="sm">{{ summary }}</p>{% if sess.why %}<p class="why">{{ sess.why }}</p>{% endif %}</div>
+  <a class="go" href="/lift">{{ 'Done: ' ~ done ~ ' of ' ~ of ~ ' sets' if finished else ('Keep going' if done else 'Start lifting') }}</a>
+  {% elif plan %}
+  <div><p class="k">Today</p><p class="nm">Rest from lifting.</p><p class="sm">{% if nxt %}Next: {{ nxt[1] | lower }}, {{ nxt[0] }}.{% endif %} Muscle is built on the days between.</p></div>
+  <a class="go" href="/lift" style="background:#fff;color:var(--ink)">Lift anyway</a>
+  {% else %}
+  <div><p class="k">Get started</p><p class="nm">Start lifting.</p><p class="sm">Pick how many days. Ceiling builds the week, puts it on your calendar, and starts the weights from your first session.</p></div>
+  <form class="start" method="post" action="/strength/start"><label for="days" style="position:absolute;left:-9999px">Days a week</label>
+    <select id="days" name="days">{% for n in range(2, 6) %}<option value="{{ n }}" {{ 'selected' if n == 3 }}>{{ n }} days a week</option>{% endfor %}</select>
+    <button class="go" type="submit">Start</button></form>
+  {% endif %}
+</section>
+
+{% if plan %}
+<section class="sec rise" style="--i:3">
+  <h2>This week</h2>
+  <p class="sub">{{ plan.goal.lift_days or 3 }} lifts. Change the days or how many in <a href="/plan/{{ plan.goal.id }}">the plan</a>.</p>
+  <ol class="wk7">{% for w in week %}<li class="{{ 'done' if w.done }}{{ ' today' if w.today }}"><span>{{ w.day }}</span><b>{{ w.name }}</b>{% if w.done %}<i>✓ Done</i>{% elif w.past %}<i style="color:var(--lichen)">Missed</i>{% endif %}</li>{% endfor %}</ol>
+</section>
+{% endif %}
+
+<section class="sec">
+  <h2>Your lifts</h2>
+  <p class="sub">The heaviest weight you lifted each session.</p>
+  {% if moves %}
+  <div class="mvs">{% for m in moves %}{% set lo = m.spark | min %}{% set hi = m.spark | max %}
+    <div class="mvc"><div class="n">{{ m.name }}</div>
+      <div class="w">{{ '%g' % m.now }}<small>{{ st.units }}</small></div>
+      <div class="d{{ ' up' if m.change > 0 }}">{% if m.change > 0 %}Up {{ '%g' % m.change }} {{ st.units }} in {{ m.n }} sessions{% elif m.n > 1 %}{{ m.n }} sessions{% else %}First session{% endif %}</div>
+      {% if m.spark | length > 1 %}<svg viewBox="0 0 100 34" preserveAspectRatio="none" aria-hidden="true"><polyline fill="none" stroke="var(--good)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"
+        points="{% for w in m.spark %}{{ (100 * loop.index0 / (m.spark | length - 1)) | round(1) }},{{ (30 - 26 * ((w - lo) / ((hi - lo) or 1))) | round(1) }} {% endfor %}"/></svg>{% endif %}
+    </div>{% endfor %}</div>
+  {% else %}<p class="empty">Nothing logged yet. Your first session sets the starting weights.</p>{% endif %}
+</section>
+
+{% if recent %}
+<section class="sec">
+  <h2>Recent</h2>
+  <ul class="rec">{% for r in recent %}<li><span>{{ r.date }}</span><b>{{ r.name }}</b><span>{{ r.done }} of {{ r.of }} sets</span></li>{% endfor %}</ul>
+</section>
+{% endif %}
+
+<section class="sec setup">
+  <h2>Your setup<span class="saved" id="saved" role="status">Saved</span></h2>
+  <p class="sub">Changes save as you make them.</p>
+  <form id="setup" method="post" action="/strength/settings">
+    <div class="fld"><span>Lifting is</span>
+      <div class="segs" role="radiogroup" aria-label="Lifting is">{% for k, l in [('strength', 'My main training'), ('both', 'Alongside rides and runs')] %}<label><input type="radio" name="train" value="{{ k }}" {{ 'checked' if (st.train == k or (k == 'both' and st.train == 'endurance')) }}><span>{{ l }}</span></label>{% endfor %}</div>
+      <small>Main training puts the lift first on Today. Alongside keeps lifts to two or three a week, never heavy legs before a hard day.</small></div>
+    <div class="fld"><span>Equipment</span>
+      <div class="segs" role="radiogroup" aria-label="Equipment">{% for k, l in equip.items() %}<label><input type="radio" name="equip" value="{{ k }}" {{ 'checked' if st.equip == k }}><span>{{ l }}</span></label>{% endfor %}</div>
+      <small>Every move swaps to match.</small></div>
+    <div class="fld"><span>Length</span>
+      <div class="segs" role="radiogroup" aria-label="Length">{% for k, l in [('full', 'Full, 3 rounds'), ('short', 'Short, 2 rounds')] %}<label><input type="radio" name="length" value="{{ k }}" {{ 'checked' if st.length == k }}><span>{{ l }}</span></label>{% endfor %}</div></div>
+    <div class="fld"><span>Units</span>
+      <div class="segs" role="radiogroup" aria-label="Units">{% for k, l in [('lb', 'Pounds'), ('kg', 'Kilograms')] %}<label><input type="radio" name="units" value="{{ k }}" {{ 'checked' if st.units == k }}><span>{{ l }}</span></label>{% endfor %}</div></div>
+    <noscript><button class="go" type="submit">Save</button></noscript>
+  </form>
+</section>
+</div>
+<script>
+(() => {
+  const f = document.getElementById('setup'), saved = document.getElementById('saved'); let t;
+  f.addEventListener('change', async e => {
+    try {
+      await fetch('/strength/settings', {method: 'POST', body: new URLSearchParams({[e.target.name]: e.target.value}), headers: {'Accept': 'application/json'}});
+      saved.textContent = 'Saved'; saved.classList.add('on'); clearTimeout(t); t = setTimeout(() => saved.classList.remove('on'), 1600);
+    } catch (_) { saved.textContent = 'Not saved'; saved.classList.add('on'); }
+  });
+})();
+</script>
+{% endblock %}

@@ -589,6 +589,107 @@ async def training_settings(request: Request):
     return RedirectResponse("/me?saved=1", status_code=303)
 
 
+@app.get("/strength", response_class=HTMLResponse)
+def strength_page(request: Request):
+    """Everything about lifting in one place: today's or the next lift, this week, how each lift is
+    progressing, recent sessions, and your setup."""
+    from .. import strength as sg, goals as gl
+    store = open_store()
+    p, rx = today_rx(store)
+    sess, lg, st, nxt = _lift_today(store, p, rx)
+    lifts = getattr(p, "lifts", None) or []
+    plan = lifts[0] if lifts else None
+    today = date.fromisoformat(rx.date)
+    mon = today - timedelta(days=today.weekday())
+    logs = sg.all_logs(store)
+    no = [x for pr in lifts for x in (getattr(pr.goal, "no_days", []) or [])]
+    week = []
+    for i in range(7):
+        d = mon + timedelta(days=i)
+        k = sg.scheduled(store, lifts, d, no)
+        lg_ = logs.get(d.isoformat())
+        dn, of = sg.done_sets(lg_)
+        started = (getattr(plan.goal, "committed", None) or "") if plan else ""
+        if k or dn:
+            week.append({"day": gl.DAY_NAMES[i][:3], "name": sg.SESSIONS.get((lg_ or {}).get("session") or k, {}).get("name", "Lift"),
+                         "done": dn > 0, "today": d == today, "past": d < today and d.isoformat() >= started})
+    # each move: the heaviest weight lifted per session, oldest first
+    prog = {}
+    for d, lg_ in logs.items():
+        for ex, sets in (lg_.get("sets") or {}).items():
+            ws = [x[0] for x in sets if x[2] and x[0]]
+            if ws and ex in sg.LIB and sg.LIB[ex]["inc"]:
+                prog.setdefault(ex, []).append((d, max(ws)))
+    moves = []
+    for ex, pts in prog.items():
+        pts.sort()
+        first, last = pts[0][1], pts[-1][1]
+        moves.append({"name": sg.LIB[ex][st["equip"]], "now": last, "change": last - first, "n": len(pts),
+                      "spark": [w for _, w in pts][-12:]})
+    moves.sort(key=lambda m: -m["n"])
+    recent = []
+    for d, lg_ in sorted(logs.items(), reverse=True)[:8]:
+        dn, of = sg.done_sets(lg_)
+        if dn:
+            recent.append({"date": date.fromisoformat(d).strftime("%a %b %-d"),
+                           "name": sg.SESSIONS.get(lg_.get("session"), {}).get("name", "Lift"), "done": dn, "of": of})
+    dn, of = sg.done_sets(lg)
+    return _page(request, "strength.html", sess=sess, summary=sg.summary(sess) if sess else "", done=dn, of=of,
+                 finished=bool(lg and lg.get("done")), nxt=nxt, plan=plan, week=week, moves=moves[:10], recent=recent,
+                 st=st, equip=sg.EQUIP, sessions=sg.SESSIONS)
+
+
+@app.post("/strength/settings")
+async def strength_settings(request: Request):
+    """Autosaved from the Strength page: each choice saves the moment you make it."""
+    from fastapi.responses import JSONResponse
+    from .. import strength as sg
+    form = parse_qs((await request.body()).decode())
+    f = {k: (v[0] if v else "") for k, v in form.items()}
+    store = open_store()
+    sg.save_settings(store, train=f.get("train") if f.get("train") in sg.TRAIN else None,
+                     equip=f.get("equip") if f.get("equip") in sg.EQUIP else None,
+                     units=f.get("units") if f.get("units") in ("lb", "kg") else None,
+                     length=f.get("length") if f.get("length") in ("full", "short") else None)
+    bust(store)
+    if "application/json" in request.headers.get("accept", ""):
+        return JSONResponse({"ok": True})
+    return RedirectResponse("/strength", status_code=303)
+
+
+@app.post("/strength/start")
+async def strength_start(request: Request):
+    """Start lifting in one tap: a committed strength plan, n days a week."""
+    from .. import goals as gl
+    form = parse_qs((await request.body()).decode())
+    n = (form.get("days", ["3"])[0] or "3")
+    today = local_today()
+    g = gl.Goal("strength", created=today.isoformat(), lift_days=max(1, min(5, int(n) if n.isdigit() else 3)))
+    store = open_store()
+    g = gl.save_plan(store, g)
+    gl.commit(store, g.id, today)
+    bust(store)
+    return RedirectResponse("/strength", status_code=303)
+
+
+@app.post("/settings/wake")
+async def wake_setting(request: Request):
+    from fastapi.responses import JSONResponse
+    form = parse_qs((await request.body()).decode())
+    v = (form.get("wake", [""])[0] or "")
+    store = open_store()
+    try:
+        hh, mm = v.split(":")
+        store.set_meta("wake_hour", str(int(hh) + int(mm) / 60))
+        bust(store)
+        ok = True
+    except ValueError:
+        ok = False
+    if "application/json" in request.headers.get("accept", ""):
+        return JSONResponse({"ok": ok})
+    return RedirectResponse("/me", status_code=303)
+
+
 @app.get("/", response_class=HTMLResponse)
 def today(request: Request, d: str | None = None):
     """Today is the prescription (or, after a session, the review) and the check-in. The numbers live
@@ -1007,9 +1108,11 @@ def plan_page(request: Request, m: str | None = None, v: str | None = None):
                     lifts[dd] = (sg.SESSIONS.get(lg.get("session"), {}).get("name", "Lift"), True)
             else:
                 k = sg.scheduled(store, getattr(p, "lifts", None) or [], date.fromisoformat(dd), no)
-                if k:
-                    lg = logs.get(dd)
-                    lifts[dd] = (sg.SESSIONS[k]["name"], bool(lg and lg.get("done")))
+                lg = logs.get(dd)
+                if lg and sg.done_sets(lg)[0]:
+                    lifts[dd] = (sg.SESSIONS.get(lg.get("session"), {}).get("name", "Lift"), bool(lg.get("done")))
+                elif k:
+                    lifts[dd] = (sg.SESSIONS[k]["name"], False)
     except Exception as e:
         print(f"calendar lifts failed: {e!r}")
     return _page(request, "calendar.html", view="month" if v == "month" or m else "upcoming", lifts=lifts, plan=pl, changed=changed, hist=hist, feed=feed, date=date, done=done, past=past,

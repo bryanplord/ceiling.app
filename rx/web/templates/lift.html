@@ -67,7 +67,7 @@
   <p class="lsum rise" style="--i:1">{% if nxt %}Your next lift is {{ nxt[1] | lower }}, {{ nxt[0] }}.{% endif %} Want one anyway? Pick a session; Ceiling sets the weights from your log.</p>
   {% else %}
   <p class="lsum rise" style="--i:1">Start a strength plan and Ceiling puts lifts on your calendar, sets every weight from your log, and fits them around how you've recovered. Or try a session now.</p>
-  <p class="rise" style="--i:2;margin-top:18px"><a class="fin" style="display:inline-block;text-decoration:none" href="/plan/new">Start a strength plan</a></p>
+  <p class="rise" style="--i:2;margin-top:18px"><a class="fin" style="display:inline-block;text-decoration:none" href="/strength">Start lifting</a></p>
   {% endif %}
   <div class="pick rise" style="--i:3">{% for k in ['lower', 'upper', 'full', 'cond'] %}<a href="/lift?s={{ k }}">{{ sessions[k].name }}</a>{% endfor %}</div>
 {% else %}
