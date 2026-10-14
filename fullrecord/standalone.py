@@ -53,7 +53,14 @@ class Store:
         return []
 
     def wellness(self, since=None):
-        return []
+        """Garmin's nightly figures, for an athlete fed from intervals.icu
+        (intervals_pull.py writes them); empty otherwise."""
+        from types import SimpleNamespace
+        p = home() / "wellness.json"
+        if not p.exists():
+            return []
+        rows = json.loads(p.read_text())
+        return [SimpleNamespace(**r) for r in rows if not since or r["date"] > since]
 
     def sync(self):
         self.db.commit()
@@ -70,8 +77,9 @@ def out_dir() -> Path:
 def open_store() -> Store:
     s = Store(home() / "coach.db")
     db.ensure(s)
-    if db.get_meta(s, "source") is None:
-        db.set_meta(s, "source", "garmin")   # new days here only ever come from Garmin Connect
+    want = os.getenv("FULLRECORD_SOURCE", "garmin")   # garmin (Garmin Connect) or intervals
+    if db.get_meta(s, "source") != want:
+        db.set_meta(s, "source", want)
     return s
 
 
@@ -221,6 +229,8 @@ def write_record(store, tz_name: str) -> Path:
         "source": db.get_meta(store, "source"),
         "garmin_last_pull": db.get_meta(store, "garmin_last_pull"),
         "garmin_last_error": db.get_meta(store, "garmin_last_error"),
+        "intervals_last_pull": db.get_meta(store, "intervals_last_pull"),
+        "intervals_last_error": db.get_meta(store, "intervals_last_error"),
         "notes": len(_notes()),
         "characters": len(text),
     }
@@ -230,7 +240,7 @@ def write_record(store, tz_name: str) -> Path:
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("command", choices=["init", "pull", "record"])
+    ap.add_argument("command", choices=["init", "pull", "pull-intervals", "record"])
     ap.add_argument("export", nargs="?", help="for init: the Garmin export zip or folder")
     ap.add_argument("--tz", default=os.getenv("RX_TZ", "America/Los_Angeles"))
     args = ap.parse_args(argv)
@@ -239,6 +249,17 @@ def main(argv=None):
         if not args.export:
             ap.error("init needs the path of a Garmin export")
         ingest.into(store, args.export, ZoneInfo(args.tz))
+    elif args.command == "pull-intervals":
+        from . import intervals_pull
+        try:
+            intervals_pull.pull(store, home(), args.tz)
+        except Exception as e:
+            db.set_meta(store, "intervals_last_error",
+                        f"{datetime.now().isoformat(timespec='minutes')} {type(e).__name__}: {str(e)[:300]}")
+            store.sync()
+            print(f"intervals.icu pull failed: {type(e).__name__}: {e}", file=sys.stderr)
+            write_record(store, args.tz)
+            return 1
     elif args.command == "pull":
         try:
             garmin_live.pull(store, "", args.tz)
