@@ -170,6 +170,10 @@
     .count { gap:24px 36px; }
     .sec { margin-top:56px; }
   }
+  .liftweek { list-style:none; padding:0; margin:20px 0 0; display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px; max-width:780px; }
+  .liftweek li { margin:0; background:var(--frost); border-radius:16px; padding:14px 16px; }
+  .liftweek span { display:block; font-size:14px; color:var(--lichen); }
+  .liftweek b { display:block; font-size:17px; font-weight:700; margin-top:2px; }
 </style>
 {% endblock %}
 {% block body %}
@@ -193,7 +197,7 @@
   <div class="cards rise" style="--i:2">
     {% for c in canned %}
     <label class="gc"><input type="radio" name="canned" value="{{ c.id }}" {{ 'checked' if loop.first }} data-kind="{{ c.kind }}">
-      <span>{{ c.title }}<small>{{ {'best_shape':'Peak fitness by a date','event':'Base, build, peak, taper','weight':'A safe weekly rate','longevity':'Mostly easy, strength twice a week'}[c.kind] }}</small></span></label>
+      <span>{{ c.title }}<small>{{ {'best_shape':'Peak fitness by a date','event':'Base, build, peak, taper','weight':'A safe weekly rate','longevity':'Mostly easy, strength twice a week','strength':'Lift 2 to 5 days a week, weights that go up'}[c.kind] }}</small></span></label>
     {% endfor %}
   </div>
   <p class="or">Or say it your way</p>
@@ -309,10 +313,12 @@
   {% if prog.days_left is not none %}<div><b>{{ prog.days_left }}</b><span>days to go</span></div>{% endif %}
   {% if prog.pace %}<div><b>{{ prog.pace }}</b><span>goal pace a mile</span></div>{% endif %}
   {% if prog.phase %}<div><b>{{ prog.phase }}</b><span>this week</span></div>{% endif %}
-  {% if prog.this_week %}<div><b>{{ prog.this_week.hours }} h</b><span>this week's target</span></div>
+  {% if g.kind == 'strength' %}<div><b>{{ g.lift_days or 3 }}</b><span>lifts a week</span></div>
+  {% elif prog.this_week %}<div><b>{{ prog.this_week.hours }} h</b><span>this week's target</span></div>
   {% if live %}<div><b>{{ done_h }} h</b><span>done this week</span></div>{% endif %}{% endif %}
 </div>
 <p class="lede2">{{ prog.summary }}</p>
+{% if lift_week %}<ol class="liftweek rise" style="--i:3" aria-label="Your lifting week">{% for d, n in lift_week %}<li><span>{{ d }}</span><b>{{ n }}</b></li>{% endfor %}</ol>{% endif %}
 {% for w in prog.warnings %}<p class="warn">{{ w }}</p>{% endfor %}
 
 {% if g.status != 'stopped' %}
@@ -323,13 +329,13 @@
     <label><span>Target{% if g.kind == 'event' and g.event in ('marathon', 'half marathon', '10k') %} <small>A finish time sets your pace</small>{% else %} <small>Optional</small>{% endif %}</span>
       <input type="text" name="target" value="{{ g.target }}" placeholder="{{ '4:20' if g.event in ('marathon', 'half marathon') else 'Finish strong' }}"></label>
   </div>
-  <div class="row2">
+  {% if g.kind != 'strength' %}<div class="row2">
     <label><span>Most hours a week <small>Optional</small></span><input type="number" step="0.5" min="1" max="40" name="max_hours" value="{{ g.max_hours if g.max_hours else '' }}" placeholder="No cap"></label>
     <label>Main sport<select name="sport">
       <option value="" {{ 'selected' if not g.sport }}>Any</option>
       {% for v, l in [('run','Running'),('bike','Riding'),('ski','Skiing')] %}<option value="{{ v }}" {{ 'selected' if g.sport == v }}>{{ l }}</option>{% endfor %}
     </select></label>
-  </div>
+  </div>{% endif %}
   {% if g.kind == 'event' %}
   <div class="row2">
     <label>Long session<select name="long_day">
@@ -341,6 +347,11 @@
   <div class="fl">Days you can't train
     <div class="days">{% for d in days %}<label><input type="checkbox" name="no" value="{{ loop.index0 }}" {{ 'checked' if loop.index0 in g.no_days }}><span>{{ d[:3] }}</span></label>{% endfor %}</div>
   </div>
+  {% if g.kind == 'strength' %}
+  <div class="row2">
+    <label>Lifts a week<select name="lift_days">{% for n in range(1, 6) %}<option value="{{ n }}" {{ 'selected' if (g.lift_days or 3) == n }}>{{ n }}</option>{% endfor %}</select></label>
+  </div>
+  {% endif %}
   {% if g.kind == 'weight' %}
   <div class="row2">
     <label>Weight now (lb)<input type="number" step="0.1" name="w_now" value="{{ g.start_weight or '' }}"></label>

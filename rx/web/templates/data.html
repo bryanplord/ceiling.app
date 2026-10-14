@@ -65,4 +65,8 @@
   {% for d in missing %}<tr><td>{{ d }}</td><td colspan="7" class="no">No row received</td></tr>{% endfor %}
 </table>
 </div>
+{% if err %}
+<details style="margin-top:48px"><summary style="cursor:pointer;font-weight:650">Last error, {{ err.at }} on {{ err.path }}</summary>
+<pre style="white-space:pre-wrap;font-size:12px;background:var(--frost);padding:16px;border-radius:12px;overflow:auto">{{ err.tb }}</pre></details>
+{% endif %}
 {% endblock %}

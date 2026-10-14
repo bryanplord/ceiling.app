@@ -44,6 +44,26 @@ def _signed_in(request: Request) -> bool:
     return auth.enabled() and bool(auth.verify("session", request.cookies.get(auth.COOKIE)))
 
 
+@app.exception_handler(Exception)
+async def _crash(request: Request, exc: Exception):
+    """Never a bare 500. The traceback goes to the log and to the signed-in athlete's own Data page,
+    so a crash someone else hits can be read without access to the server."""
+    import traceback
+    tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))[-6000:]
+    print(f"500 on {request.url.path}:\n{tb}")
+    try:
+        import json as _json
+        open_store().set_meta("last_error", _json.dumps({"at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                                                         "path": request.url.path, "tb": tb}))
+    except Exception:
+        pass
+    return HTMLResponse("<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width'>"
+                        "<title>Ceiling</title><body style=\"font:17px/1.5 -apple-system,Arial;max-width:560px;margin:15vh auto;padding:0 20px\">"
+                        "<h1 style='font-size:28px'>Something broke on this page.</h1>"
+                        "<p>It's been recorded. Try again in a minute, or go to <a href='/data'>Data</a> to see what happened.</p>",
+                        status_code=500)
+
+
 @app.middleware("http")
 async def sign_in_gate(request: Request, call_next):
     """Health data is private. Fails closed: with no accounts configured, nothing opens.
@@ -398,6 +418,17 @@ def _sentences(text: str) -> list[str]:
 
 
 def _today_cards(p, rx, after) -> dict:
+    try:
+        return _today_cards_(p, rx, after)
+    except Exception as e:
+        import traceback
+        print(f"today cards failed: {e!r}\n{traceback.format_exc()}")
+        return {"vword": _VWORD.get(rx.verdict, "Today") + ".", "intro": rx.diagnosis or "", "target": "", "caption": "",
+                "ways": [], "ways_big": "", "ways_sub": "", "tmw": [], "tonight": "", "trace": "", "under": None,
+                "post_tmw": {"k": "easy", "word": "Tomorrow.", "detail": (after or {}).get("tomorrow", "") or ""}}
+
+
+def _today_cards_(p, rx, after) -> dict:
     """Today's three cards, in words the template only has to place: the day, the ways to do it,
     and tomorrow; after a session, the score, what more you could do, and tomorrow re-decided."""
     import re as _re
@@ -450,6 +481,105 @@ def _today_cards(p, rx, after) -> dict:
         k = _kind(head)
         out["post_tmw"] = {"k": k, "word": _VWORD[k] + ".", "detail": (rest.strip()[:1].upper() + rest.strip()[1:] + ".") if rest.strip() else ""}
     return out
+
+
+def _lift_today(store, p, rx, day: str | None = None, length: str | None = None, key: str | None = None):
+    """Today's lift, adjusted for recovery and tomorrow: (Session | None, log, settings, next lift)."""
+    from .. import strength as sg, journal as jr
+    from ..prescribe import engine as eng
+    st = sg.settings(store)
+    d = date.fromisoformat(day or rx.date)
+    lifts = getattr(p, "lifts", None) or []
+    no = []
+    for x in lifts:
+        no += list(getattr(x.goal, "no_days", []) or [])
+    key = key or sg.scheduled(store, lifts, d, no)
+    nxt = None
+    for i in range(1, 8):
+        k2 = sg.scheduled(store, lifts, d + timedelta(days=i), no)
+        if k2:
+            nxt = (gl_day_name(d + timedelta(days=i), d), sg.SESSIONS[k2]["name"])
+            break
+    if not key:
+        return None, None, st, nxt
+    try:
+        tomorrow = eng._next_verdict(p, rx, eng._rx_load(p, rx)) if st["train"] != "strength" else ""
+    except Exception:
+        tomorrow = ""
+    js = getattr(p, "journal", None) or {}
+    low = bool(rx.recovery and rx.recovery.reds >= 1) or jr.hrv_low(p.wellness, d.isoformat(), morning=True)
+    sess = sg.session(store, key, d.isoformat(), rx.verdict, tomorrow, recovery_low=low,
+                      sick=bool(js.get("sick")) or rx.verdict == "rest", length=length)
+    return sess, sg.log_for(store, d.isoformat()), st, nxt
+
+
+def gl_day_name(d: date, today: date) -> str:
+    return "tomorrow" if (d - today).days == 1 else d.strftime("%A")
+
+
+@app.get("/lift", response_class=HTMLResponse)
+def lift_page(request: Request, v: str | None = None, s: str | None = None):
+    from .. import strength as sg
+    store = open_store()
+    p, rx = today_rx(store)
+    sess, lg, st, nxt = _lift_today(store, p, rx, length=v if v in ("full", "short") else None,
+                                    key=s if s in sg.SESSIONS and s != "mobility" else None)
+    has_plan = bool(getattr(p, "lifts", None))
+    return _page(request, "lift.html", sess=sess, log=lg or {}, st=st, nxt=nxt, has_plan=has_plan, day=rx.date,
+                 day_label=date.fromisoformat(rx.date).strftime("%A, %B %-d"), sessions=sg.SESSIONS, equip=sg.EQUIP)
+
+
+@app.post("/lift")
+async def lift_save(request: Request):
+    """Autosave from the lift page: every set as you tick it, and 'done' when you finish."""
+    import json as _json
+    from fastapi.responses import JSONResponse
+    from .. import strength as sg
+    try:
+        body = _json.loads((await request.body()).decode() or "{}")
+    except ValueError:
+        return JSONResponse({"ok": False}, status_code=400)
+    store = open_store()
+    day = local_today().isoformat()
+    sets = {}
+    for ex, rows in (body.get("sets") or {}).items():
+        if ex in sg.LIB and isinstance(rows, list):
+            clean_ = []
+            for r in rows[:6]:
+                try:
+                    w = float(r[0]) if r[0] not in (None, "") else None
+                    n = int(float(r[1])) if r[1] not in (None, "") else None
+                except (TypeError, ValueError, IndexError):
+                    w, n = None, None
+                clean_.append([w, n, bool(r[2]) if len(r) > 2 else False])
+            sets[ex] = clean_
+    lg = {"session": str(body.get("session", ""))[:20], "mode": str(body.get("mode", ""))[:10], "sets": sets,
+          "done": bool(body.get("done")), "mobility": [bool(x) for x in (body.get("mobility") or [])][:12]}
+    sg.save_log(store, day, lg)
+    if lg["done"]:
+        bust(store)
+    d, n = sg.done_sets(lg)
+    return JSONResponse({"ok": True, "done": d, "of": n})
+
+
+@app.post("/settings/training")
+async def training_settings(request: Request):
+    from .. import strength as sg
+    form = parse_qs((await request.body()).decode())
+    f = {k: (v[0] if v else "") for k, v in form.items()}
+    store = open_store()
+    sg.save_settings(store, train=f.get("train") if f.get("train") in sg.TRAIN else None,
+                     equip=f.get("equip") if f.get("equip") in sg.EQUIP else None,
+                     units=f.get("units") if f.get("units") in ("lb", "kg") else None,
+                     length=f.get("length") if f.get("length") in ("full", "short") else None)
+    if f.get("wake"):
+        try:
+            hh, mm = f["wake"].split(":")
+            store.set_meta("wake_hour", str(int(hh) + int(mm) / 60))
+        except ValueError:
+            pass
+    bust(store)
+    return RedirectResponse("/me?saved=1", status_code=303)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -552,6 +682,22 @@ def _plan_apply(g, form: dict, f: dict) -> None:
     if g.kind == "weight":
         g.start_weight = _plan_num(f.get("w_now")) or g.start_weight
         g.target_weight = _plan_num(f.get("w_target")) or g.target_weight
+    if g.kind == "strength" and f.get("lift_days", "").isdigit():
+        g.lift_days = max(1, min(5, int(f["lift_days"])))
+
+
+def _lift_week(store, g) -> list[tuple[str, str]]:
+    """A strength plan's week as the plan page shows it: (weekday, session)."""
+    from .. import strength as sg, goals as gl
+    from types import SimpleNamespace
+    mon = local_today() - timedelta(days=local_today().weekday())
+    out = []
+    for i in range(7):
+        d = mon + timedelta(days=i)
+        k = sg.scheduled(store, [SimpleNamespace(goal=g)], d, g.no_days)
+        if k:
+            out.append((gl.DAY_NAMES[i], sg.SESSIONS[k]["name"]))
+    return out
 
 
 def _plan_row(gl, p, g, today):
@@ -596,7 +742,7 @@ async def plan_create(request: Request):
     else:
         c = next((c for c in gl.CANNED if c["id"] == f.get("canned")), gl.CANNED[0])
         g = gl.Goal(c["kind"], event=c.get("event", ""), sport=gl.EVENT_SPORT.get(c.get("event", ""), ""),
-                    created=today.isoformat(),
+                    created=today.isoformat(), lift_days=3 if c["kind"] == "strength" else None,
                     target_date=(today + timedelta(weeks=c["weeks"])).isoformat() if c.get("weeks") else None)
         if g.kind == "event" and g.target_date:              # events are on weekends: the Sunday of that week
             td = date.fromisoformat(g.target_date)
@@ -629,7 +775,8 @@ def plan_detail(request: Request, pid: str):
     done = sum((a.moving_s or 0) for a in p.activities if a.date >= mon and a.sport != "walk") / 3600
     others = [x for x in gl.active(store, today) if x.id != g.id]
     q = request.query_params
-    return _page(request, "plan.html", mode="detail", r=row, prog=row["prog"], g=g, date=date, today=today,
+    lift_week = _lift_week(store, g) if g.kind == "strength" else []
+    return _page(request, "plan.html", mode="detail", r=row, prog=row["prog"], g=g, date=date, today=today, lift_week=lift_week,
                  done_h=round(done, 1), live=gl.is_live(g, today), others=others, days=gl.DAY_NAMES,
                  just=q.get("ok", ""), changed=q.getlist("c")[:12], notes=q.getlist("n")[:6],
                  said=q.get("said", "")[:400], ask=q.get("ask", ""), example=gl.EXAMPLE)
@@ -874,7 +1021,11 @@ def data_page(request: Request, msg: str | None = None):
     have = {r["date"] for r in rows}
     days = [(local_today() - timedelta(days=i)).isoformat() for i in range(10)]
     last = store.get_meta("last_sync")
-    return _page(request, "data.html", rows=rows, missing=[d for d in days if d not in have],
+    try:
+        err = _json.loads(store.get_meta("last_error") or "null")
+    except ValueError:
+        err = None
+    return _page(request, "data.html", err=err, rows=rows, missing=[d for d in days if d not in have],
                  today=local_today().isoformat(), state=store.get_meta("sync_state") or "",
                  progress=store.get_meta("sync_progress") or "",
                  last=int((time.time() - float(last)) / 60) if last and float(last) > 0 else None,

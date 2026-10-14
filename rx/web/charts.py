@@ -63,6 +63,14 @@ def _zone_layer(o, p, Y, w, ph, lo, hi, fs, ceil):
 
 
 def target_svg(rx, p, w: int = 330, h: int = 290) -> str:
+    try:
+        return _target_svg(rx, p, w, h)
+    except Exception as e:
+        print(f"target chart failed: {e!r}")
+        return ""
+
+
+def _target_svg(rx, p, w: int = 330, h: int = 290) -> str:
     c, lo_ = rx.hr_ceiling, rx.hr_low
     if c is None or not p.zones:
         return ""
@@ -130,6 +138,14 @@ def trace(stream, points: int = 90) -> list[tuple[float, float]]:
 
 
 def trace_svg(tr, p, ceiling: int | None, w: int = 330, h: int = 250) -> str:
+    try:
+        return _trace_svg(tr, p, ceiling, w, h)
+    except Exception as e:
+        print(f"trace chart failed: {e!r}")
+        return ""
+
+
+def _trace_svg(tr, p, ceiling: int | None, w: int = 330, h: int = 250) -> str:
     if not tr or ceiling is None or not p.zones:
         return ""
     vals = [v for _, v in tr]

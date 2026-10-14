@@ -1,0 +1,49 @@
+<style>
+  /* Shared motion parts for the app pages. Tokens live on :root in base.html. */
+
+  /* Loading: the brand ring, turning slowly. Pair it with role="status" text. */
+  .ring { display:inline-block; flex:none; width:22px; height:22px; border-radius:50%; vertical-align:-5px;
+          background:conic-gradient(#8e7cc3, #4a7fd4, #2e9e6a, #e0b030, #ee7a30, #ff3b30, #8e7cc3);
+          -webkit-mask:radial-gradient(circle, transparent 0 7px, #000 7.5px); mask:radial-gradient(circle, transparent 0 7px, #000 7.5px);
+          animation:ring-turn 1.4s linear infinite; }
+  .ring.lg { width:40px; height:40px; -webkit-mask:radial-gradient(circle, transparent 0 14px, #000 14.5px); mask:radial-gradient(circle, transparent 0 14px, #000 14.5px); }
+  @keyframes ring-turn { to { transform:rotate(1turn); } }
+  .loadrow { display:flex; align-items:center; gap:14px; }
+  .sr { position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
+
+  /* Loading: a calm shimmer over placeholder blocks. */
+  .skel { display:block; border-radius:6px; background:var(--frost);
+          background-image:linear-gradient(90deg, transparent 0, rgba(255,255,255,.75) 50%, transparent 100%);
+          background-size:40% 100%; background-repeat:no-repeat; background-position:-60% 0;
+          animation:skel 1.6s var(--ease) infinite; }
+  @keyframes skel { to { background-position:160% 0; } }
+
+  /* Bars that measure something grow in from their start, once. */
+  @keyframes grow-x { from { transform:scaleX(0); } }
+  @keyframes grow-y { from { transform:scaleY(0); } }
+
+  /* Charts: lines wipe in left to right the first time they're seen; column charts rise from the axis. */
+  html.draw-on :is(svg.tr, .chart svg.spark, svg.sbank, svg.hist) { clip-path:inset(0 100% 0 0); }
+  html.draw-on svg.trend { clip-path:inset(100% 0 0 0); }
+  html.draw-on :is(svg.tr, .chart svg.spark, svg.sbank, svg.hist, svg.trend).in { clip-path:inset(0 0 0 0);
+          transition:clip-path calc(var(--t-slow) * 1.6) var(--ease-out); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ring, .skel { animation:none; }
+    html.draw-on :is(svg.tr, .chart svg.spark, svg.sbank, svg.hist, svg.trend) { clip-path:none; }
+  }
+</style>
+<script>
+(() => {
+  if (!('IntersectionObserver' in window) || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const SEL = 'svg.tr, .chart svg.spark, svg.sbank, svg.hist, svg.trend';
+  document.documentElement.classList.add('draw-on');
+  const go = () => {
+    const els = document.querySelectorAll(SEL);
+    const io = new IntersectionObserver(es => es.forEach(e => {
+      if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { rootMargin:'0px 0px -6% 0px' });
+    els.forEach(el => io.observe(el));
+  };
+  document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', go) : go();
+})();
+</script>

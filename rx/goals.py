@@ -30,6 +30,7 @@ KINDS = {
     "event": "Train for an event",
     "weight": "Lose weight",
     "longevity": "Stay fit for life",
+    "strength": "Get stronger",
 }
 EVENT_SPORT = {"marathon": "run", "half marathon": "run", "10k": "run", "trail race": "run",
                "ultra": "run", "gran fondo": "bike", "century ride": "bike", "mtb race": "bike",
@@ -56,6 +57,7 @@ class Goal:
     stopped_on: str | None = None   # from this day on the plan contributes nothing; what you did stays
     max_hours: float | None = None  # weekly hours cap
     no_days: list = field(default_factory=list)   # weekdays you can't train, 0 = Monday
+    lift_days: int | None = None    # strength plans: lifts a week
     long_day: int | None = None     # weekday for the long session; None picks Sunday, or the latest free day
 
 
@@ -275,6 +277,8 @@ def build(p, g: Goal, today: date) -> Program:
         prog = _weight(p, g, today, base_h)
     elif g.kind == "longevity":
         prog = _longevity(p, g, today, base_h)
+    elif g.kind == "strength":
+        prog = _strength(p, g, today, base_h)
     else:
         prog = _best_shape(p, g, today, base_h)
     if g.max_hours:
@@ -455,6 +459,19 @@ def _longevity(p, g: Goal, today: date, base_h: float) -> Program:
                          weeks), today)
 
 
+def _strength(p, g: Goal, today: date, base_h: float) -> Program:
+    n = int(g.lift_days or 3)
+    weeks = _cycle(_monday(today), 12, base_h, hard=2, ramp=0.0)
+    for i, w in enumerate(weeks):
+        w.phase = "Lift"
+        w.note = f"{n} lifts" + (", heavier week" if (_monday(today) + timedelta(weeks=i)).isocalendar()[1] % 2 == 0 else ", lighter week")
+    days = {1: "once", 2: "twice"}.get(n, f"{n} times")
+    return _mark(Program(g, "Get stronger",
+                         f"Lift {days} a week: circuits of five or six moves, a full and a short version, weights that go up "
+                         "when you've earned it. Heavier and lighter weeks alternate. A bad recovery morning makes the lift "
+                         "lighter; a hard ride or run tomorrow keeps heavy legs off today.", weeks), today)
+
+
 def daily(prog: Program | None, day: date) -> dict:
     """What the programme asks of a given day: the cap on hard days, the long session, the sport."""
     if not prog or not prog.weeks:
@@ -521,6 +538,7 @@ CANNED = [
     {"id": "tour", "title": "Big ski-touring season", "kind": "event", "event": "ski tour", "weeks": 10},
     {"id": "weight", "title": "Lose weight", "kind": "weight", "weeks": 12},
     {"id": "life", "title": "Stay fit for life", "kind": "longevity", "weeks": None},
+    {"id": "strength", "title": "Get stronger", "kind": "strength", "weeks": None},
 ]
 
 MONTHS = {m: i for i, m in enumerate(["january", "february", "march", "april", "may", "june", "july", "august",
@@ -557,6 +575,11 @@ def parse_text(text: str, today: date, weight_now: float | None = None) -> Goal:
         tgt = float(to.group(1)) if to else (weight_now - float(lose.group(1)) if (lose and weight_now) else None)
         return Goal("weight", iso or (today + timedelta(weeks=12)).isoformat(), target=text.strip()[:120],
                     start_weight=weight_now, target_weight=tgt, created=today.isoformat())
+    if any(w in t for w in ("strength", "stronger", "lift", "weights", "gym", "muscle", "tone", "toned")):
+        n = re.search(r"(\d|one|two|three|four|five)\s*(?:x|times|days|lifts|sessions)", t)
+        nd = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5}
+        k = (int(n.group(1)) if n.group(1).isdigit() else nd[n.group(1)]) if n else 3
+        return Goal("strength", iso, target=text.strip()[:120], created=today.isoformat(), lift_days=max(1, min(5, k)))
     for ev in sorted(EVENT_SPORT, key=len, reverse=True):
         if ev in t:
             return Goal("event", iso, event=ev, sport=EVENT_SPORT[ev], target=text.strip()[:120], created=today.isoformat())

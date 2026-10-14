@@ -100,6 +100,7 @@ def today_rx(store: Store, day: str | None = None):
         if hit is None:
             p = prof.build(store, day, version=ver)
             p.programs = []
+            p.lifts = []
             try:
                 from . import goals as _gl
                 from datetime import date as _date
@@ -107,9 +108,10 @@ def today_rx(store: Store, day: str | None = None):
                 # Every committed plan live on this day. p.program is the lead one, so older callers
                 # keep working; anything that needs all of them uses goals.daily_all(p.programs, day).
                 # One plan that fails to build must not take the others with it.
+                p.lifts = []                     # strength plans: they don't steer the endurance days
                 for g in _gl.active(store, d_):
                     try:
-                        p.programs.append(_gl.build(p, g, d_))
+                        (p.lifts if g.kind == "strength" else p.programs).append(_gl.build(p, g, d_))
                     except Exception as e:
                         import traceback
                         print(f"goal failed: plan {g.id} ({g.kind} {g.event}): {e!r}\n{traceback.format_exc()}")
@@ -339,8 +341,12 @@ def today_after(store: Store, p, rx) -> dict | None:
             if rv:
                 mins = zone_minutes(p, st[0], st[1])
                 tot = sum(mins) or 1
-                from .web.charts import trace as _trace
-                row["trace"] = _trace(st)
+                try:
+                    from .web.charts import trace as _trace
+                    row["trace"] = _trace(st)
+                except Exception as e:                  # a chart must never take Today down
+                    print(f"trace failed: {e!r}")
+                    row["trace"] = []
                 row.update(ceil_frac=rv.ceil_frac, why=rv.why, tells=rv.tells, target=rv.target, score=rv.score, word=rv.word, tone=rv.tone, head=rv.headline, right=rv.right,
                            fix=rv.fix, stats=rv.stats, parts=rv.parts,
                            zones=[(n, c, round(mm), mm / tot * 100) for (n, c, _, _), mm in zip(bands(p), mins)])

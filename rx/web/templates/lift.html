@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% block head %}
+<style>
+  .lf { max-width:820px; }
+  .back { display:inline-block; color:var(--lichen); text-decoration:none; font-size:15px; margin:8px 0 18px; }
+  .back:hover { color:var(--ink); }
+  .lf h1 { font-size:clamp(40px, 6vw, 64px); text-transform:none; letter-spacing:-0.02em; font-stretch:112%; font-weight:800; }
+  .lsum { margin:12px 0 0; font-size:19px; color:var(--lichen); }
+  .lwhy { margin:16px 0 0; padding:14px 18px; background:#fff6e5; border-radius:14px; font-size:16px; line-height:1.45; max-width:62ch; }
+  .seg { display:inline-flex; margin:22px 0 0; background:var(--frost); border-radius:999px; padding:4px; gap:2px; }
+  .seg a { text-decoration:none; font-size:15px; font-weight:600; color:var(--lichen); padding:8px 18px; border-radius:999px; }
+  .seg a[aria-current] { background:var(--snow); color:var(--ink); box-shadow:0 1px 3px rgba(0,0,0,.08); }
+  .warm { margin:34px 0 0; font-size:16px; color:var(--lichen); max-width:62ch; }
+  .warm b { color:var(--ink); }
+  .circ { margin:36px 0 0; }
+  .circ h2 { display:flex; align-items:baseline; gap:12px; margin:0 0 14px; font-size:22px; font-weight:750; color:var(--ink); letter-spacing:-0.01em; }
+  .circ h2 small { font-size:15px; font-weight:500; color:var(--lichen); }
+  .mv { background:var(--frost); border-radius:22px; padding:20px 22px 16px; margin:0 0 12px; transition:background-color var(--t) var(--ease); }
+  .mv.all { background:#eaf5ee; }
+  .mvh { display:flex; justify-content:space-between; gap:12px; align-items:baseline; flex-wrap:wrap; }
+  .mvh b { font-size:20px; font-weight:700; }
+  .mvh span { font-size:14px; color:var(--lichen); }
+  .cue { margin:6px 0 0; font-size:15px; color:#4a4a4f; line-height:1.4; }
+  .wn { margin:6px 0 0; font-size:14px; font-weight:600; color:var(--good); }
+  .sets { margin:12px 0 0; display:grid; gap:8px; }
+  .set { display:grid; grid-template-columns:72px 1fr 1fr 48px; gap:10px; align-items:center; transition:opacity var(--t) var(--ease); }
+  .set .rn { font-size:14px; color:var(--lichen); }
+  .set label { display:flex; align-items:center; gap:8px; background:var(--snow); border-radius:12px; padding:0 12px; height:44px; border:1px solid transparent; }
+  .set label:focus-within { border-color:var(--ink); }
+  .set input { width:100%; min-width:0; border:0; outline:0; font:inherit; font-size:18px; font-weight:600; background:transparent; font-variant-numeric:tabular-nums; }
+  .set label small { font-size:13px; color:var(--lichen); white-space:nowrap; }
+  .tick { width:44px; height:44px; border-radius:50%; border:2px solid #c7c7cc; background:var(--snow); cursor:pointer; display:grid; place-items:center; padding:0; }
+  .tick svg { width:20px; height:20px; opacity:0; transform:scale(.5); transition:opacity var(--t-fast) var(--ease), transform var(--t) var(--ease-out); }
+  .tick[aria-pressed="true"] { background:var(--good); border-color:var(--good); }
+  .tick[aria-pressed="true"] svg { opacity:1; transform:none; }
+  .set.done label { opacity:.6; }
+  .mob { list-style:none; padding:0; margin:28px 0 0; }
+  .mob li { display:flex; align-items:center; gap:14px; padding:14px 0; border-bottom:1px solid var(--rule); font-size:18px; margin:0; }
+  .dock { position:sticky; bottom:0; margin:40px -32px 0; padding:16px 32px calc(16px + env(safe-area-inset-bottom)); background:rgba(255,255,255,.86);
+          backdrop-filter:saturate(180%) blur(20px); -webkit-backdrop-filter:saturate(180%) blur(20px); border-top:1px solid var(--rule);
+          display:flex; align-items:center; gap:18px; }
+  .prog { flex:1; }
+  .prog p { margin:0 0 8px; font-size:15px; font-weight:600; }
+  .bar3 { height:6px; border-radius:3px; background:var(--frost2); overflow:hidden; }
+  .bar3 i { display:block; height:100%; width:0; background:var(--good); border-radius:3px; transition:width var(--t) var(--ease-out); }
+  .fin { background:var(--ink); color:var(--snow); border:0; border-radius:999px; padding:14px 26px; font:inherit; font-size:16px; font-weight:650; cursor:pointer; }
+  .fin[disabled] { opacity:.35; cursor:default; }
+  .saved { font-size:13px; color:var(--lichen); min-width:56px; text-align:right; opacity:0; transition:opacity var(--t) var(--ease); }
+  .saved.on { opacity:1; }
+  .finished { margin:28px 0 0; padding:22px 24px; border-radius:22px; background:#eaf5ee; }
+  .finished b { display:block; font-size:24px; font-weight:800; font-stretch:112%; }
+  .pick { display:flex; gap:10px; flex-wrap:wrap; margin:22px 0 0; }
+  .pick a { text-decoration:none; padding:12px 18px; border-radius:16px; background:var(--frost); font-weight:600; }
+  .pick a:hover { background:var(--frost2); }
+  @media (max-width: 760px) {
+    .set { grid-template-columns:52px 1fr 1fr 44px; gap:8px; } .mv { padding:16px 16px 12px; }
+    .dock { margin:32px -20px 0; padding:14px 20px calc(14px + env(safe-area-inset-bottom)); }
+  }
+</style>
+{% endblock %}
+{% block body %}
+<div class="lf">
+<a class="back" href="/">&larr; Today</a>
+{% if not sess %}
+  <h1 class="rise">{{ 'No lift today.' if has_plan else 'Lifting.' }}</h1>
+  {% if has_plan %}
+  <p class="lsum rise" style="--i:1">{% if nxt %}Your next lift is {{ nxt[1] | lower }}, {{ nxt[0] }}.{% endif %} Want one anyway? Pick a session; Ceiling sets the weights from your log.</p>
+  {% else %}
+  <p class="lsum rise" style="--i:1">Start a strength plan and Ceiling puts lifts on your calendar, sets every weight from your log, and fits them around how you've recovered. Or try a session now.</p>
+  <p class="rise" style="--i:2;margin-top:18px"><a class="fin" style="display:inline-block;text-decoration:none" href="/plan/new">Start a strength plan</a></p>
+  {% endif %}
+  <div class="pick rise" style="--i:3">{% for k in ['lower', 'upper', 'full', 'cond'] %}<a href="/lift?s={{ k }}">{{ sessions[k].name }}</a>{% endfor %}</div>
+{% else %}
+  <p class="lsum rise" style="margin:0 0 6px">{{ day_label }}</p>
+  <h1 class="rise" style="--i:1">{{ sess.name }}.</h1>
+  <p class="lsum rise" style="--i:2">{% if sess.mode == 'mobility' %}Twenty minutes, easy.{% else %}{{ sess.circuits | length }} circuits, {{ sess.rounds }} rounds each, about {{ sess.minutes }} minutes. {{ 'A heavier week: fewer reps, more weight.' if sess.heavy else 'A lighter week: more reps, less weight.' }}{% endif %}</p>
+  {% if sess.why %}<p class="lwhy rise" style="--i:3">{{ sess.why }}</p>{% endif %}
+  {% if sess.mode in ('full', 'short') %}
+  <nav class="seg rise" style="--i:3" aria-label="Length"><a href="/lift?v=full{{ '&s=' ~ sess.key if request.query_params.get('s') }}"{% if sess.mode == 'full' %} aria-current="true"{% endif %}>Full</a><a href="/lift?v=short{{ '&s=' ~ sess.key if request.query_params.get('s') }}"{% if sess.mode == 'short' %} aria-current="true"{% endif %}>Short, 2 rounds</a></nav>
+  {% endif %}
+
+  {% if sess.mode == 'mobility' %}
+  <ul class="mob" id="mob">{% for m in sess.mobility %}<li><button type="button" class="tick" aria-pressed="{{ 'true' if (log.mobility or [])[loop.index0] else 'false' }}" aria-label="Done: {{ m }}"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5l4 4 8-9" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>{{ m }}</li>{% endfor %}</ul>
+  {% else %}
+  <p class="warm rise" style="--i:4"><b>Warm up, 5 minutes.</b> Easy cardio, then 10 bodyweight squats, 10 hip hinges and 10 arm circles each way. First round of each move a little lighter.</p>
+  <form id="lift" data-session="{{ sess.key }}" data-mode="{{ sess.mode }}" onsubmit="return false">
+  {% for c in sess.circuits %}{% set ci = loop.index %}
+  <section class="circ rise" style="--i:{{ 4 + ci }}">
+    <h2>Circuit {{ ci }}<small>{{ sess.rounds }} rounds. Do one set of each, then repeat.</small></h2>
+    {% for m in c %}{% set prev = (log.sets or {}).get(m.id) or [] %}
+    <article class="mv" data-ex="{{ m.id }}">
+      <div class="mvh"><b>{{ m.name }}</b><span>{{ m.muscles }}</span></div>
+      <p class="cue">{{ m.cue }}</p>
+      {% if m.note %}<p class="wn">{{ m.note }}</p>{% endif %}
+      <div class="sets">{% for r in range(sess.rounds) %}{% set pv = prev[r] if prev | length > r else none %}
+        <div class="set{{ ' done' if pv and pv[2] }}">
+          <span class="rn">Round {{ r + 1 }}</span>
+          {% if m.bodyweight %}<label><span class="sr" style="position:absolute;left:-9999px">Weight</span><input type="text" value="Body" disabled aria-label="Bodyweight"></label>
+          {% else %}<label><input type="number" inputmode="decimal" step="0.5" min="0" name="w" value="{{ (pv[0] if pv and pv[0] is not none else (m.weight if m.weight is not none else '')) }}" placeholder="—" aria-label="{{ m.name }}, round {{ r + 1 }}, weight"><small>{{ st.units }}</small></label>{% endif %}
+          <label><input type="number" inputmode="numeric" min="0" name="r" value="{{ pv[1] if pv and pv[1] is not none else '' }}" placeholder="{{ m.lo if m.lo == m.hi else (m.lo ~ '–' ~ m.hi) }}" aria-label="{{ m.name }}, round {{ r + 1 }}, reps"><small>{{ 'reps' if m.unit == 'reps' else m.unit }}{{ ' a side' if m.side }}</small></label>
+          <button type="button" class="tick" aria-pressed="{{ 'true' if pv and pv[2] else 'false' }}" aria-label="Done: {{ m.name }}, round {{ r + 1 }}"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5l4 4 8-9" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        </div>{% endfor %}
+      </div>
+    </article>
+    {% endfor %}
+  </section>
+  {% endfor %}
+  </form>
+  {% endif %}
+
+  <div class="finished" id="finished"{% if not log.done %} hidden{% endif %} role="status"><b>Done.</b><span id="finsay">Logged. Ceiling sets next time's weights from this.</span></div>
+  <div class="dock">
+    <div class="prog"><p id="count">0 of 0</p><div class="bar3"><i id="fill"></i></div></div>
+    <span class="saved" id="saved">Saved</span>
+    <button class="fin" id="fin" type="button" disabled>Finish</button>
+  </div>
+{% endif %}
+</div>
+{% if sess %}
+<script>
+(() => {
+  const form = document.getElementById('lift'), mob = document.getElementById('mob');
+  const count = document.getElementById('count'), fill = document.getElementById('fill');
+  const fin = document.getElementById('fin'), saved = document.getElementById('saved'), finished = document.getElementById('finished');
+  const ticks = () => [...document.querySelectorAll('.tick')];
+  let timer, savedT;
+  function state(done) {
+    const sets = {};
+    if (form) form.querySelectorAll('.mv').forEach(mv => {
+      sets[mv.dataset.ex] = [...mv.querySelectorAll('.set')].map(s => {
+        const w = s.querySelector('input[name=w]'), r = s.querySelector('input[name=r]');
+        return [w ? w.value : null, r.value, s.querySelector('.tick').getAttribute('aria-pressed') === 'true'];
+      });
+    });
+    const mobility = mob ? ticks().map(t => t.getAttribute('aria-pressed') === 'true') : [];
+    return {session: '{{ sess.key }}', mode: '{{ sess.mode }}', sets, mobility, done: !!done};
+  }
+  function paint() {
+    const t = ticks(), d = t.filter(x => x.getAttribute('aria-pressed') === 'true').length;
+    count.textContent = mob ? `${d} of ${t.length} done` : `${d} of ${t.length} sets`;
+    fill.style.width = t.length ? (100 * d / t.length) + '%' : '0';
+    fin.disabled = d === 0;
+    document.querySelectorAll('.mv').forEach(mv => mv.classList.toggle('all', [...mv.querySelectorAll('.tick')].every(x => x.getAttribute('aria-pressed') === 'true')));
+  }
+  async function save(done) {
+    try {
+      const r = await fetch('/lift', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(state(done))});
+      const j = await r.json();
+      saved.textContent = 'Saved'; saved.classList.add('on'); clearTimeout(savedT); savedT = setTimeout(() => saved.classList.remove('on'), 1400);
+      return j;
+    } catch (e) { saved.textContent = 'Not saved'; saved.classList.add('on'); }
+  }
+  const later = () => { clearTimeout(timer); timer = setTimeout(() => save(false), 600); };
+  document.addEventListener('click', e => {
+    const t = e.target.closest('.tick'); if (!t) return;
+    const on = t.getAttribute('aria-pressed') !== 'true';
+    t.setAttribute('aria-pressed', on);
+    const row = t.closest('.set');
+    if (row) {
+      row.classList.toggle('done', on);
+      const r = row.querySelector('input[name=r]');
+      if (on && r && !r.value) r.value = r.placeholder.split('–').pop();   // ticking means you hit the target
+      // Carry this weight down to the next rounds you haven't touched.
+      const w = row.querySelector('input[name=w]');
+      if (on && w && w.value) row.parentElement.querySelectorAll('.set').forEach(s2 => {
+        const w2 = s2.querySelector('input[name=w]'); if (w2 && !w2.value) w2.value = w.value; });
+    }
+    paint(); later();
+  });
+  if (form) form.addEventListener('input', later);
+  fin.addEventListener('click', async () => {
+    fin.disabled = true;
+    const j = await save(true);
+    if (j) { document.getElementById('finsay').textContent = `${j.done} of ${j.of} sets logged. Ceiling sets next time's weights from this.`;
+      finished.hidden = false; finished.classList.add('rise'); finished.scrollIntoView({behavior: 'smooth', block: 'center'}); }
+    fin.disabled = false;
+  });
+  paint();
+})();
+</script>
+{% endif %}
+{% endblock %}
