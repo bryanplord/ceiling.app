@@ -44,7 +44,7 @@
 
 <section class="set2 rise" style="--i:2" id="setup">
   <div class="shead"><h2>Your setup</h2><a class="chg" href="/setup">Change</a></div>
-  <div class="fld"><span>What you do</span><div>{% set sp = [] %}{% for k in setup.sports or [] %}{% set _ = sp.append(sports[k]) %}{% endfor %}{{ sp | join(', ') or 'Not set' }}</div></div>
+  <div class="fld"><span>What you do</span><div>{{ sports_said or 'Not set' }}</div></div>
   <div class="fld"><span>Working toward</span><div>{{ goals.get(setup.goal, 'Not set') }}</div></div>
   <div class="fld"><span>Days a week</span><div>{{ setup.days or 'Not set' }}</div></div>
   <div class="fld"><span><label for="wake">You wake up at</label></span>

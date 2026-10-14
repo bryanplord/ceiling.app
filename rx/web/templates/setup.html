@@ -20,6 +20,23 @@
   .opt input:checked + span { background:#fff; border-color:var(--ink); }
   .opt input:focus-visible + span { outline:2px solid var(--ceiling); outline-offset:2px; }
   .opt small { display:block; font-size:14px; font-weight:400; color:var(--lichen); margin-top:2px; }
+  .grp { margin:24px 0 10px; font-size:14px; font-weight:700; color:var(--lichen); }
+  .pills { display:flex; flex-wrap:wrap; gap:8px; }
+  .pl { position:relative; }
+  .pl input { position:absolute; opacity:0; inset:0; margin:0; cursor:pointer; }
+  .pl span { display:inline-flex; align-items:center; gap:8px; padding:10px 16px; border-radius:999px; background:var(--frost); font-size:16px; font-weight:600;
+             border:1.5px solid transparent; transition:background-color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease); }
+  .pl span small { font-size:13px; font-weight:600; color:var(--lichen); }
+  .pl:hover span { background:var(--frost2); }
+  .pl input:checked + span { background:var(--ink); color:#fff; }
+  .pl input:checked + span small { color:rgba(255,255,255,.7); }
+  .pl input:focus-visible + span { outline:2px solid var(--ceiling); outline-offset:2px; }
+  .pl.new span { animation:rise var(--t) var(--ease-out) both; }
+  .addany { display:flex; gap:8px; margin:18px 0 0; max-width:520px; }
+  .addany input { flex:1; min-width:0; font:inherit; font-size:16px; padding:11px 16px; border-radius:999px; border:1px solid #d1d1d6; }
+  .addany input:focus { outline:0; border-color:var(--ink); box-shadow:0 0 0 4px rgba(0,0,0,.05); }
+  .addany button { font:inherit; font-weight:650; border:0; border-radius:999px; padding:0 20px; background:var(--frost); cursor:pointer; }
+  .addany button:hover { background:var(--frost2); }
   .su textarea { width:100%; min-height:130px; font:inherit; font-size:18px; line-height:1.45; padding:16px 18px; border-radius:18px; border:1px solid #d1d1d6; resize:vertical;
                  transition:border-color var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease); }
   .su textarea:focus { outline:0; border-color:var(--ink); box-shadow:0 0 0 4px rgba(0,0,0,.05); }
@@ -47,8 +64,15 @@
 
   <section class="step on" data-step="0" aria-label="What you do">
     <h1>{{ 'Welcome. What do you do?' if first else 'What do you do?' }}</h1>
-    <p class="sub">Pick everything. Ceiling only suggests what you choose here.</p>
-    <div class="opts grid">{% for k, l in sports.items() %}<label class="opt"><input type="checkbox" name="sports" value="{{ k }}" {{ 'checked' if k in (s.sports or []) }}><span>{{ l }}</span></label>{% endfor %}</div>
+    <p class="sub">{% if found %}Here's what your watch shows for the last year. Keep what's yours, add anything else.{% else %}Pick everything you do. Ceiling only plans with what you choose.{% endif %}</p>
+    {% if found %}<p class="grp">From your watch</p>
+    <div class="pills" id="found">{% for k, l, c in found %}<label class="pl"><input type="checkbox" name="sports" value="{{ k }}" {{ 'checked' if k in mine }}><span>{{ l }}<small>{{ c }}</small></span></label>{% endfor %}</div>{% endif %}
+    <p class="grp">{{ 'More' if found else 'Popular' }}</p>
+    <div class="pills" id="more">{% for k, l in more %}<label class="pl"><input type="checkbox" name="sports" value="{{ k }}" {{ 'checked' if k in mine }}><span>{{ l }}</span></label>{% endfor %}
+      {% for c in custom %}<label class="pl"><input type="checkbox" name="sports" value="{{ c }}" checked><span>{{ c[7:] }}</span></label>{% endfor %}</div>
+    <div class="addany"><input type="text" id="addany" list="acts" autocomplete="off" placeholder="Add anything: alpine touring, rucking, surfing…" aria-label="Add an activity">
+      <button type="button" id="addbtn">Add</button></div>
+    <datalist id="acts">{% for n in everything %}<option value="{{ n }}">{% endfor %}</datalist>
   </section>
 
   <section class="step" data-step="1" aria-label="What you're working toward">
@@ -89,6 +113,24 @@
     if (i === 0 && !f.querySelector('input[name=sports]:checked')) { f.querySelector('.opts').animate([{transform:'translateX(-6px)'},{transform:'translateX(6px)'},{transform:'none'}], {duration:240}); return; }
     i < steps.length - 1 ? show(i + 1) : f.submit(); });
   back.addEventListener('click', () => show(Math.max(0, i - 1)));
+  const add = document.getElementById('addany'), more = document.getElementById('more');
+  const known = {};
+  f.querySelectorAll('.pl input').forEach(i => known[i.nextElementSibling.firstChild.textContent.trim().toLowerCase()] = i);
+  const alias = {{ aliases | tojson }};          // "alpine touring" is backcountry ski, "zwift" an indoor ride
+  const addOne = () => {
+    const v = add.value.trim(); if (!v) return;
+    const hit = known[v.toLowerCase()] || known[(alias[v.toLowerCase()] || '').toLowerCase()];
+    if (hit) { hit.checked = true; hit.closest('.pl').classList.add('new'); }
+    else {
+      const l = document.createElement('label'); l.className = 'pl new';
+      l.innerHTML = '<input type="checkbox" name="sports" checked><span></span>';
+      l.querySelector('input').value = 'custom:' + v.slice(0, 32); l.querySelector('span').textContent = v.slice(0, 32);
+      more.appendChild(l); known[v.toLowerCase()] = l.querySelector('input');
+    }
+    add.value = ''; add.focus();
+  };
+  document.getElementById('addbtn').addEventListener('click', addOne);
+  add.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); addOne(); } });
   f.querySelectorAll('.ex button').forEach(b => b.addEventListener('click', () => { const t = document.getElementById('limits'); t.value = b.dataset.ex; t.focus(); }));
   f.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') { e.preventDefault(); next.click(); } });
 })();

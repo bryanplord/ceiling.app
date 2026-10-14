@@ -710,7 +710,14 @@ def setup_page(request: Request):
     p, rx = today_rx(store)
     cur = rl.setup(store) or rl.guess(store, p)
     first = not rl.setup(store)
-    return _page(request, "setup.html", s=cur, first=first, sports=rl.SPORTS, goals=rl.GOALS)
+    mine = rl.chosen(cur)
+    found = rl.from_data(p)
+    seen = {k for k, _, _ in found}
+    more = [(k, lbl) for k, lbl in rl.SPORTS.items() if k not in seen]
+    custom = [x for x in mine if x.startswith("custom:")]
+    return _page(request, "setup.html", s=cur, mine=mine, found=found, more=more, custom=custom, first=first,
+                 goals=rl.GOALS, everything=[lbl for lbl in rl.SPORTS.values()] + rl.MORE_NAMES,
+                 aliases={a: rl.label(k) for a, k in rl.ALIASES.items()})
 
 
 @app.post("/setup")
@@ -718,7 +725,12 @@ async def setup_save(request: Request):
     from .. import rules as rl, goals as gl
     form = parse_qs((await request.body()).decode())
     f = {k: (v[0] if v else "") for k, v in form.items()}
-    sports = [x for x in form.get("sports", []) if x in rl.SPORTS] or ["ride"]
+    sports = []
+    for x in form.get("sports", []):
+        x = x.strip()[:40]
+        if (x in rl.SPORTS or x.startswith("custom:")) and x not in sports:
+            sports.append(x)
+    sports = sports or ["road ride"]
     goal = f.get("goal") if f.get("goal") in rl.GOALS else "direct"
     days = max(1, min(7, int(f["days"]) if f.get("days", "").isdigit() else 5))
     limits = (f.get("limits") or "").strip()[:500]
@@ -876,7 +888,7 @@ def me_page(request: Request, saved: str | None = None):
         w = 7.0
     from .. import rules as rl
     rules_ = [(r, rl.describe(r)) for r in rl.active(store, local_today().isoformat())]
-    return _page(request, "me.html", setup=rl.setup(store) or {}, sports=rl.SPORTS, goals=rl.GOALS, rules=rules_,
+    return _page(request, "me.html", setup=rl.setup(store) or {}, sports_said=", ".join(rl.label(k).replace("Custom:", "") if not k.startswith("custom:") else k[7:] for k in rl.chosen(rl.setup(store) or {})), goals=rl.GOALS, rules=rules_,
                  st=sg.settings(store), train=sg.TRAIN, equip=sg.EQUIP, saved=bool(saved),
                  wake=f"{int(w):02d}:{int(round((w - int(w)) * 60)) % 60:02d}")
 

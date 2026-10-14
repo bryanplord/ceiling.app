@@ -15,7 +15,82 @@ import re
 import secrets
 from datetime import date, timedelta
 
-SPORTS = {"ride": "Ride", "run": "Run", "ski": "Ski", "lift": "Lift"}
+# Everything you might do: (key, label, the kinds of session Ceiling plans with it, the watch's activity types).
+ACTIVITIES = [
+    ("road ride", "Road ride", {"road ride"}, {"Ride", "road_biking", "cycling"}),
+    ("mountain bike", "Mountain bike", {"mountain bike"}, {"MountainBikeRide", "EMountainBikeRide", "mountain_biking"}),
+    ("gravel ride", "Gravel ride", {"gravel ride"}, {"GravelRide", "gravel_cycling"}),
+    ("indoor ride", "Indoor ride", {"trainer ride"}, {"VirtualRide", "indoor_cycling", "virtual_ride"}),
+    ("run", "Run", {"run"}, {"Run", "running", "treadmill_running", "VirtualRun"}),
+    ("trail run", "Trail run", {"trail run"}, {"TrailRun", "trail_running"}),
+    ("hike", "Hike", {"hike"}, {"Hike", "hiking"}),
+    ("walk", "Walk", {"walk"}, {"Walk", "walking"}),
+    ("ski tour", "Backcountry ski", {"ski tour"}, {"BackcountrySki", "backcountry_skiing", "backcountry_snowboarding"}),
+    ("resort skiing", "Alpine ski", {"resort skiing"}, {"AlpineSki", "resort_skiing_snowboarding_ws", "resort_skiing", "Snowboard"}),
+    ("nordic ski", "Nordic ski", {"nordic ski"}, {"NordicSki", "cross_country_skiing_ws", "skate_skiing_ws"}),
+    ("strength", "Strength", set(), {"WeightTraining", "strength_training", "Workout", "Crossfit", "hiit"}),
+    ("swim", "Swim", set(), {"Swim", "lap_swimming", "open_water_swimming"}),
+    ("yoga", "Yoga", set(), {"Yoga", "yoga", "Pilates", "pilates"}),
+    ("row", "Row", set(), {"Rowing", "indoor_rowing", "rowing"}),
+    ("climb", "Climb", set(), {"RockClimbing", "indoor_climbing", "bouldering"}),
+    ("paddle", "Paddle", set(), {"StandUpPaddling", "Kayaking", "stand_up_paddleboarding", "kayaking"}),
+    ("tennis", "Tennis or pickleball", set(), {"Tennis", "Pickleball", "tennis", "pickleball", "Badminton"}),
+    ("golf", "Golf", set(), {"Golf", "golf"}),
+    ("snowshoe", "Snowshoe", set(), {"Snowshoe", "snow_shoe_ws"}),
+    ("skate", "Skate", set(), {"IceSkate", "InlineSkate", "skating"}),
+]
+# Names the "add anything" box suggests beyond the list above.
+MORE_NAMES = ["Mountaineering", "Alpine touring", "Ski touring", "Splitboard", "Fat bike", "E-bike", "Bikepacking", "Track cycling",
+              "Ultra running", "Orienteering", "Rucking", "Stair climber", "Elliptical", "Spin class", "HIIT", "CrossFit",
+              "Pilates", "Barre", "Boxing", "Martial arts", "Dance", "Soccer", "Basketball", "Hockey", "Volleyball",
+              "Surfing", "Kitesurfing", "Wakeboarding", "Open-water swim", "Triathlon", "Mobility", "Stretching"]
+ALIASES = {"alpine touring": "ski tour", "ski touring": "ski tour", "skimo": "ski tour", "splitboard": "ski tour",
+           "backcountry skiing": "ski tour", "at skiing": "ski tour", "downhill skiing": "resort skiing", "skiing": "resort skiing",
+           "snowboard": "resort skiing", "snowboarding": "resort skiing", "cross-country skiing": "nordic ski", "xc ski": "nordic ski",
+           "skate skiing": "nordic ski", "spin class": "indoor ride", "zwift": "indoor ride", "peloton": "indoor ride",
+           "trainer": "indoor ride", "mtb": "mountain bike", "mountain biking": "mountain bike", "road cycling": "road ride",
+           "cycling": "road ride", "biking": "road ride", "running": "run", "trail running": "trail run", "hiking": "hike",
+           "walking": "walk", "weights": "strength", "lifting": "strength", "weight lifting": "strength", "gym": "strength",
+           "crossfit": "strength", "hiit": "strength", "swimming": "swim", "open-water swim": "swim", "rowing": "row",
+           "climbing": "climb", "bouldering": "climb", "pickleball": "tennis", "tennis": "tennis", "kayaking": "paddle",
+           "paddleboarding": "paddle", "pilates": "yoga"}
+ACT = {k: (lbl, kinds, raws) for k, lbl, kinds, raws in ACTIVITIES}
+ENGINE_KINDS = set().union(*(v[1] for v in ACT.values())) - {"walk"}
+OLD = {"ride": ["road ride", "mountain bike", "gravel ride", "indoor ride"], "run": ["run", "trail run"],
+       "ski": ["ski tour", "resort skiing", "nordic ski"], "lift": ["strength"]}
+SPORTS = {k: v[0] for k, v in ACT.items()}
+
+
+def chosen(st: dict) -> list[str]:
+    """Your activities, old answers ('ride', 'lift') read the new way."""
+    out = []
+    for x in st.get("sports") or []:
+        for k in OLD.get(x, [x]):
+            if k not in out:
+                out.append(k)
+    return out
+
+
+def label(k: str) -> str:
+    return ACT[k][0] if k in ACT else k[:1].upper() + k[1:]
+
+
+def from_data(p, days: int = 365) -> list[tuple[str, str, int]]:
+    """What your watch says you do: (key, label, sessions in the last year), most first."""
+    cut = (date.today() - timedelta(days=days)).isoformat()
+    by_raw = {r: k for k, (_, _, raws) in ACT.items() for r in raws}
+    n: dict[str, int] = {}
+    for a in p.activities:
+        if a.date < cut:
+            continue
+        k = by_raw.get(a.raw_type or "")
+        if not k and a.sport in ("bike", "run", "ski"):
+            k = {"bike": "road ride", "run": "run", "ski": "ski tour"}[a.sport]
+        if k:
+            n[k] = n.get(k, 0) + 1
+    return sorted(((k, label(k), c) for k, c in n.items()), key=lambda x: -x[2])
+
+
 GOALS = {"direct": "Just tell me what to do each day", "fitter": "Get fitter", "event": "Train for an event",
          "weight": "Lose weight", "stronger": "Get stronger"}
 KINDS = {"ride": {"mountain bike", "road ride", "gravel ride", "trainer ride"},
@@ -43,19 +118,14 @@ def save_setup(store, data: dict) -> dict:
 
 
 def guess(store, p) -> dict:
-    """What Ceiling already knows, to pre-fill setup for someone who's been using it."""
-    from .prescribe import engine as eng
-    sports = []
-    cut = (date.today() - timedelta(days=120)).isoformat()
-    kinds = {eng.SUBTYPE.get(a.raw_type or "") for a in p.activities if a.date >= cut}
-    for s, ks in KINDS.items():
-        if kinds & ks:
-            sports.append(s)
+    """What Ceiling already knows, to pre-fill setup for someone who's been using it: anything you've
+    done at least three times this year."""
+    found = [k for k, _, c in from_data(p) if c >= 3]
     try:
         w = float(store.get_meta("wake_hour") or 7.0)
     except ValueError:
         w = 7.0
-    return {"sports": sports or ["ride"], "goal": "direct", "limits": "", "days": 5,
+    return {"sports": found or ["road ride"], "goal": "direct", "limits": "", "days": 5,
             "wake": f"{int(w):02d}:{int(round((w - int(w)) * 60)) % 60:02d}"}
 
 
@@ -172,11 +242,12 @@ def merge(js: dict | None, store, day: str) -> dict:
     ban = set(js.get("ban") or ())
     notes = []
     st = setup(store) or {}
-    if st.get("sports"):
-        for s, ks in KINDS.items():
-            if s not in st["sports"]:
-                ban |= ks
-    js["nolift"] = bool(st.get("sports")) and "lift" not in st["sports"]
+    mine = chosen(st)
+    if mine:
+        allowed = set().union(*(ACT[k][1] for k in mine if k in ACT))
+        if allowed:                                  # never suggest what you don't do (walking is always fine)
+            ban |= ENGINE_KINDS - allowed
+    js["nolift"] = bool(mine) and "strength" not in mine
     order = ["rest", "light", "easy", "steady", "hard"]
     for r in active(store, day):
         for s in r.get("bans") or []:
