@@ -122,7 +122,15 @@ def today_rx(store: Store, day: str | None = None):
                 p.journal = _jr.signals(store, day, _jr.hrv_low(p.wellness, day, morning=True))
             except Exception as e:
                 print(f"journal signals failed: {e}")
-            hit = (p, build_rx(p, day))
+            rx_ = build_rx(p, day)
+            try:                                 # power target for road and trainer rides
+                from .analysis import power as _pw
+                bikeable = rx_.sport == "bike" or any(o[4] in ("road ride", "trainer ride", "gravel ride") for o in (rx_.options or []))
+                rx_.power = _pw.target(store, p, rx_.verdict, rx_.hr_low, rx_.hr_ceiling) if bikeable else None
+            except Exception as e:
+                print(f"power target failed: {e}")
+                rx_.power = None
+            hit = (p, rx_)
             while len(_built) > 120:                 # drop the oldest, never everything at once
                 _built.pop(next(iter(_built)))
             _built[key] = hit

@@ -79,6 +79,7 @@ class Rx:
     sleep: object = None
     sleep_if: list = field(default_factory=list)
     overdo_short: str = ""
+    power: dict | None = None      # watts for road and trainer rides: {lo, hi, ftp, basis, sentence}
 
 
 @dataclass
@@ -1034,11 +1035,11 @@ def alternatives(p: Profile, rx: Rx, chosen: str | None, include_chosen: bool = 
         ov, climb = over_share(p, k, hi, rx.date) if rx.verdict in (EASY, STEADY) else (None, None)
         if ov is not None and ov > 0.3:
             where = f" and climb {round(climb / 50) * 50:,.0f} ft an hour" if climb else ""
-            note = (f"Your last {noun}s spent {ov * 100:.0f}% of the time over {hi}{where}. "
+            note = (f"Your typical {noun} spends {ov * 100:.0f}% of the time over {hi}{where}. "
                     f"{'Holding easy means walking every climb.' if rx.verdict == EASY else 'Expect to go over on the climbs.'}")
             tone = "bad"
         elif ov is not None and rx.verdict in (EASY, STEADY):
-            note += f" Your recent ones stayed under {hi} {100 - ov * 100:.0f}% of the time."
+            note += f" Your typical one stays under {hi} {100 - ov * 100:.0f}% of the time."
         if k == "mountain bike" and rx.verdict in (EASY, LIGHT) and tone != "bad":
             note += " Climbs spike it: spin, or walk the steep pitches."
         if k == "mountain bike" and deep:
