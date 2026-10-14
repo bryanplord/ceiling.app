@@ -264,6 +264,8 @@ def _warm(store=None) -> None:
         cached(store, "calls", rx.date, lambda: mv.calls(p, store, rx.date))
         cached(store, "patterns", rx.date, lambda: jr.patterns(store, p.wellness))
         cached(store, "hrhist", rx.date, lambda: dist.hr_histogram(store, p))
+        for _k, _l, _d, _c in ROOM_WINDOWS:
+            cached(store, f"hrwin:{_k}", rx.date, lambda d=_d: dist.hr_window(store, p, rx.date, d))
         ym = rx.date[:7]
         cached(store, f"month:{ym}", rx.date, lambda: histmod.month(p, ym, rx.date, _live_rx(store, ym), store))
     except Exception as e:
@@ -375,7 +377,7 @@ def today(request: Request, d: str | None = None):
     return _page(request, "today.html", rx=rx, waiting=not _have_last_night(store), updated=mins_ago,
                  after=after, energy=energy, entry=entry, timeline=jr.timeline(entry), jnote=jr.effect(entry["tags"])[1] if entry else "", patterns=pats,
                  syncing=syncing, d=dash, p=p, recent=recent,
-                 spark=dashboard.spark, room=_room(store, p, rx, after),
+                 spark=dashboard.spark, rooms=_rooms(store, p, rx, after), room=True,
                  st=st, hist=storymod.history_chart(st),
                  sleep_chart=sleepmod.chart(rx.sleep) if rx.sleep else "",
                  base_need=sleepmod._hm(rx.sleep.base) if rx.sleep else "",
@@ -572,23 +574,31 @@ def plan_delete(pid: str):
     return RedirectResponse("/plan", status_code=303)
 
 
-def _room(store, p, rx, after):
-    """The heart chart. In the morning: your zones against where you trained the last 4 weeks.
-    Once you've trained today: against where your heart actually was in today's workout."""
-    import numpy as np
-    from ..analysis.hr import clean
-    if after and after.get("done"):
-        hist = np.zeros(231)
-        for a in p.activities:
-            if a.date == rx.date and a.sport != "walk":
-                st = store.stream(a.id)
-                if st:
-                    h = clean(st[0], st[1])
-                    h = h[~np.isnan(h)].astype(int)
-                    hist += np.bincount(np.clip(h, 0, 230), minlength=231)
-        if hist.sum() > 300:
-            return dashboard.room(rx, p, hist, None, hist_label="where your heart was today")
-    return dashboard.room(rx, p, *cached(store, "hrhist", rx.date, lambda: dist.hr_histogram(store, p)))
+ROOM_WINDOWS = [("today", "Today", 1, "where your heart was today"),
+                ("3d", "3 days", 3, "where you trained, last 3 days"),
+                ("7d", "7 days", 7, "where you trained, last 7 days"),
+                ("30d", "30 days", 30, "where you trained, last 30 days"),
+                ("all", "All time", None, "where you've trained, all time")]
+
+
+def _rooms(store, p, rx, after) -> list[dict]:
+    """The heart chart for each window (today, 3, 7, 30 days, all time), so the toggle
+    switches without a reload. The default: today once you've trained, otherwise 30 days."""
+    out = []
+    for key, label, days, cap in ROOM_WINDOWS:
+        hist = cached(store, f"hrwin:{key}", rx.date, lambda d=days: dist.hr_window(store, p, rx.date, d))
+        if hist.sum() < 300:
+            out.append({"key": key, "label": label, "svg": "", "empty": True})
+            continue
+        out.append({"key": key, "label": label, "empty": False,
+                    "svg": dashboard.room(rx, p, hist, None, hist_label=cap)})
+    trained = after and after.get("done") and not out[0]["empty"]
+    default = "today" if trained else "30d"
+    if next(r for r in out if r["key"] == default)["empty"]:
+        default = next((r["key"] for r in out if not r["empty"]), default)
+    for r in out:
+        r["on"] = r["key"] == default
+    return out
 
 
 def _live_rx(store, ym: str) -> dict:

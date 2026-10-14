@@ -198,6 +198,11 @@
   .room .taim { fill:var(--lichen); font-size:13px; }
   .roomh { font-size:22px; font-weight:750; margin:0 0 2px; text-align:right; }
   .roomsub { color:var(--lichen); font-size:15px; margin:0 0 10px; text-align:right; }
+  .rtog { display:flex; justify-content:flex-end; flex-wrap:wrap; gap:4px; margin:0 0 14px; }
+  .rtog button { font:inherit; font-size:14px; padding:6px 12px; border:1px solid var(--rule); background:#fff; border-radius:999px; cursor:pointer; color:var(--ink); }
+  .rtog button[aria-selected="true"] { background:var(--ink); color:#fff; border-color:var(--ink); }
+  .rtog button:disabled { color:var(--rule); cursor:default; }
+  .rtog button:focus-visible { outline:2px solid var(--ceiling); outline-offset:2px; }
   .roomcap { text-align:right; color:var(--lichen); font-size:15px; margin:6px 0 0; }
   .roomcap b { color:var(--ceiling); font-weight:650; }
 
@@ -294,7 +299,7 @@
     .room .zn { font-size:20px; } .room .zd { font-size:16px; } .room .tick { font-size:17px; }
     .room .tick.strong, .room .bnum { font-size:18px; } .room .reft, .room .small { font-size:16px; }
     .room .trng { font-size:34px; } .room .tlab, .room .taim { font-size:16px; } .room .tick.aim { font-size:22px; } .room .trng2 { font-size:19px; }
-    .roomcap, .roomh, .roomsub { text-align:left; }
+    .roomcap, .roomh, .roomsub { text-align:left; } .rtog { justify-content:flex-start; }
     .split, .trade, .next, .twocol { grid-template-columns:1fr; gap:36px; }
     .hist .lbl, .hist .tick { font-size:30px; } .hist .lbl.strong { font-size:34px; }
     .hist .hline { stroke-width:4; }
@@ -452,8 +457,15 @@
   {% if room %}
   <div>
     <p class="roomh">Your heart today</p>
-    <p class="roomsub">{% if after and after.done %}Where your heart was in today's workout, against where it should have been.{% else %}Your zones, resting to max, and where you should be today.{% endif %}</p>
-    {{ room | safe }}
+    <p class="roomsub">Your zones, and where your heart actually was.</p>
+    <div class="rtog" role="tablist" aria-label="Time window">{% for r in rooms %}<button type="button" role="tab" data-k="{{ r.key }}" aria-selected="{{ 'true' if r.on else 'false' }}"{{ ' disabled' if r.empty }}>{{ r.label }}</button>{% endfor %}</div>
+    {% for r in rooms if not r.empty %}<div class="rwin" data-k="{{ r.key }}"{{ '' if r.on else ' hidden' }}>{{ r.svg | safe }}</div>{% endfor %}
+    <script>
+    (() => { const bs = document.querySelectorAll('.rtog button'), ws = document.querySelectorAll('.rwin');
+      const pick = k => { bs.forEach(b => b.setAttribute('aria-selected', b.dataset.k === k));
+        ws.forEach(w => w.hidden = w.dataset.k !== k); };
+      bs.forEach(b => b.addEventListener('click', () => pick(b.dataset.k))); })();
+    </script>
     <p class="roomcap">Aim for the number. Stay in the range.{% if rx.max_minutes %} {{ rx.max_minutes }} minutes max.{% endif %}</p>
   </div>
   {% endif %}

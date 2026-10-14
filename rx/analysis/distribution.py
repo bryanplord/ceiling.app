@@ -298,3 +298,26 @@ def hr_histogram(store, p, days: int = 28) -> tuple[np.ndarray, float | None]:
         if a.avg_hr:
             avgs.append(a.avg_hr)
     return hist, (float(np.median(avgs)) if avgs else None)
+
+
+def hr_window(store, p, day: str, days: int | None) -> np.ndarray:
+    """Seconds at each bpm across training sessions in the last `days` days INCLUDING `day`
+    (None = all time). Shares the per-session cache with hr_histogram."""
+    cut = (date.fromisoformat(day) - timedelta(days=days - 1)).isoformat() if days else ""
+    hist = np.zeros(231)
+    for a in p.activities:
+        if a.date < cut or a.date > day or a.sport == "walk":
+            continue
+        key = ("hist", a.id)
+        if key not in _cache:
+            st = store.stream(a.id)
+            if not st:
+                _cache[key] = None
+            else:
+                h = clean(st[0], st[1])
+                h = h[~np.isnan(h)].astype(int)
+                _cache[key] = np.bincount(np.clip(h, 0, 230), minlength=231)
+        c = _cache[key]
+        if c is not None:
+            hist += c
+    return hist
