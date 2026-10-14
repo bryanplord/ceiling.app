@@ -27,13 +27,7 @@ def version(store) -> tuple:
             fc["fr_nights"], db.get_meta(store, "ingested"), db.get_meta(store, "source"))
 
 
-def build(store, tz_name, today):
-    """(text, meta) for the record as of `today`."""
-    key = (version(store), today.isoformat())
-    with _lock:
-        if key in _cache:
-            return _cache[key]
-    tz = ZoneInfo(tz_name)
+def _rows(store, tz):
     caps = db.get_meta(store, "caps", {}) or {}
     export_end = db.get_meta(store, "export_end")
     from_garmin = db.get_meta(store, "source") == "garmin"
@@ -41,6 +35,27 @@ def build(store, tz_name, today):
     if not from_garmin:
         have = {r["id"] for r in rows}
         rows += [r for r in store_sessions(store, export_end, tz, caps) if r["id"] not in have]
+    return caps, export_end, from_garmin, rows
+
+
+def lookup_files(store, tz_name, notes=()):
+    """The full record organised for finding things (layers.lookup), as {path: text}."""
+    from .catalogue import prepare
+    from .layers import lookup
+    caps, _, _, rows = _rows(store, ZoneInfo(tz_name))
+    nights = db.nights(store)
+    _, _, _, _, cards, seg_rows = prepare(rows, caps, nights, "")
+    return lookup(cards, seg_rows, nights, notes)
+
+
+def build(store, tz_name, today):
+    """(text, meta) for the record as of `today`."""
+    key = (version(store), today.isoformat())
+    with _lock:
+        if key in _cache:
+            return _cache[key]
+    tz = ZoneInfo(tz_name)
+    caps, export_end, from_garmin, rows = _rows(store, tz)
     night_rows = db.nights(store)
     text, meta = assemble(rows, caps, night_rows, today, datetime.now(tz).isoformat(timespec="minutes"),
                           extra_lines=[] if from_garmin else garmin_nightly_lines(store, export_end))

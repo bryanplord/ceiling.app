@@ -72,6 +72,36 @@ def card_line(c):
     return line
 
 
+def night_line(n):
+    bits = [f"{n['night']} {n['weekday']}"]
+    if n["window"] == "sleep":
+        bits.append(f"{n['start']}-{n['end']} ({n['hours']} h)")
+    else:
+        bits.append("fixed 00-06")
+    if n["hr_mean"]:
+        bits.append(f"HR mean {n['hr_mean']}, low 30-min {n['hr_low_30min']}, min {n['hr_min']} "
+                    f"({n['hr_readings']} readings)")
+    if n["hrv_readings"]:
+        bits.append(f"HRV mean {n['hrv_mean']}, median {n['hrv_median']}, "
+                    f"{n['hrv_low']}-{n['hrv_high']} ({n['hrv_readings']} readings)")
+    if n["breaths_mean"]:
+        bits.append(f"breaths {n['breaths_mean']}")
+    return " | ".join(bits)
+
+
+def segment_line(g):
+    extra = []
+    if g.get("dist_m"):
+        extra.append(f"{mi(g['dist_m'])} mi")
+    if g.get("up_m") or g.get("down_m"):
+        extra.append(f"+{ft(g.get('up_m', 0))}/-{ft(g.get('down_m', 0))} ft")
+    if g.get("spm"):
+        extra.append(f"{g['spm']} spm")
+    if g.get("power"):
+        extra.append(f"{g['power']} W")
+    return f"- at {dur_str(g['start_s'])}: {seg_text(g)}" + (f"; {', '.join(extra)}" if extra else "")
+
+
 def render(meta, env, rel, weekly, cards, seg_rows, today, night_rows=()):
     L = []
     L.append(f"# Training catalogue: {meta['person']}")
@@ -170,20 +200,7 @@ def render(meta, env, rel, weekly, cards, seg_rows, today, night_rows=()):
                  "HRV status and Garmin's resting heart rate are left out. Nights the watch was not worn "
                  "do not appear.")
         for n in night_rows:
-            bits = [f"{n['night']} {n['weekday']}"]
-            if n["window"] == "sleep":
-                bits.append(f"{n['start']}-{n['end']} ({n['hours']} h)")
-            else:
-                bits.append("fixed 00-06")
-            if n["hr_mean"]:
-                bits.append(f"HR mean {n['hr_mean']}, low 30-min {n['hr_low_30min']}, min {n['hr_min']} "
-                            f"({n['hr_readings']} readings)")
-            if n["hrv_readings"]:
-                bits.append(f"HRV mean {n['hrv_mean']}, median {n['hrv_median']}, "
-                            f"{n['hrv_low']}-{n['hrv_high']} ({n['hrv_readings']} readings)")
-            if n["breaths_mean"]:
-                bits.append(f"breaths {n['breaths_mean']}")
-            L.append(" | ".join(bits))
+            L.append(night_line(n))
         L.append("")
 
     cut = (today - timedelta(days=RECENT_DAYS)).isoformat()
@@ -194,15 +211,6 @@ def render(meta, env, rel, weekly, cards, seg_rows, today, night_rows=()):
     for s in recent:
         L.append(f"### {s['date']} {s['id']}")
         for g in s["segments"]:
-            extra = []
-            if g.get("dist_m"):
-                extra.append(f"{mi(g['dist_m'])} mi")
-            if g.get("up_m") or g.get("down_m"):
-                extra.append(f"+{ft(g.get('up_m', 0))}/-{ft(g.get('down_m', 0))} ft")
-            if g.get("spm"):
-                extra.append(f"{g['spm']} spm")
-            if g.get("power"):
-                extra.append(f"{g['power']} W")
-            L.append(f"- at {dur_str(g['start_s'])}: {seg_text(g)}" + (f"; {', '.join(extra)}" if extra else ""))
+            L.append(segment_line(g))
     L.append("")
     return "\n".join(L)

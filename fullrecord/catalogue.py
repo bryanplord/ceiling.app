@@ -338,6 +338,15 @@ def apply_fences(cards):
 def assemble(rows, caps, night_rows, today, built, person="athlete", extra_lines=None):
     """The whole record as text, from stored and fresh session rows."""
     from .render import render
+    meta, env, rel, weekly, cards, seg_rows = prepare(rows, caps, night_rows, built, person)
+    text = render(meta, env, rel, weekly, cards, seg_rows, today, night_rows)
+    if extra_lines:
+        text += "\n" + "\n".join(extra_lines) + "\n"
+    return text, meta
+
+
+def prepare(rows, caps, night_rows, built, person="athlete"):
+    """Everything the record is written from: (meta, env, rel, weekly, cards, seg_rows)."""
     rows = sorted(rows, key=lambda r: r["id"])
     cards = [dict(r["card"]) for r in rows]
     for c in cards:
@@ -362,7 +371,6 @@ def assemble(rows, caps, night_rows, today, built, person="athlete", extra_lines
     meta = {"person": person, "built": built, "sessions": len(cards),
             "history": [cards[0]["date"], cards[-1]["date"]] if cards else ["none", "none"],
             "nights": len(night_rows), "limits": limits}
-    text = render(meta, env, rel, weekly, cards, seg_rows, today, night_rows)
-    if extra_lines:
-        text += "\n" + "\n".join(extra_lines) + "\n"
-    return text, meta
+    for c, r in zip(cards, rows):
+        c["id"] = r["id"]
+    return meta, env, rel, weekly, cards, seg_rows

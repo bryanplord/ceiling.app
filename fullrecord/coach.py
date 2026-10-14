@@ -138,10 +138,10 @@ REPLY_NOTE = ("(Answer in plain prose, in full sentences. If you change the sugg
               "changed and which evidence from the record moved you.)")
 
 
-# Subscription: one call to Claude Code, the instructions (and, for the morning
-# suggestion, the whole record) as the system prompt, and the day's messages as
-# the prompt. For a reply the record is not resent: it is a file in the working
-# folder that Claude can search or read when a question needs it.
+# Subscription: one call to Claude Code, with the instructions and a record as the
+# system prompt and the day's messages as the prompt. The morning suggestion gets
+# the full record. A reply gets the condensed record (every value, labels once)
+# and the lookup files in its working folder, which it can search or read.
 
 def _subscription(system, prompt, files=None) -> str:
     env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}  # it would take precedence
@@ -152,6 +152,7 @@ def _subscription(system, prompt, files=None) -> str:
         tools = ["--tools", ""]
         if files:
             for name, text in files.items():
+                (Path(tmp) / name).parent.mkdir(parents=True, exist_ok=True)
                 (Path(tmp) / name).write_text(text)
             tools = ["--tools", "Read,Grep", "--allowedTools", "Read", "Grep", "--restricted"]
         proc = subprocess.run(
@@ -195,15 +196,15 @@ def suggest(store, day, record_text, goals) -> dict:
     return parse(_ask(_system(record_text, goals), msgs, 16000))
 
 
-RECORD_FILE = "record.md"
-
 LOOKUP_NOTE = """## The record during the conversation
 
-This morning you read the whole record and wrote today's suggestion. The record is not repeated
-here. When a question needs a specific fact you do not have, search the file record.md for a date,
-a word or a number, and read only the lines you need. Do not read the whole file. When a question
-names a day, read every line for that date before answering. Say which lines you looked at when
-they change your answer."""
+This morning you read the full record and wrote today's suggestion. Below is the condensed record:
+the same data with every value kept and the labels stated once. When you need a session or a day in
+full, look in the lookup folder: index.md lists what exists on each date and which month file holds
+it; the month files hold every session with all its segments, the night and the athlete's notes
+under a heading for each day; flags.md lists every reading the checks doubted. Before you state a
+specific fact about a past day, read that day's full entry. When a question names a day, read every
+line for that date. Say which entries you looked at when they change your answer."""
 
 
 def reply(store, day, record_text, goals, suggestion, conversation) -> str:
@@ -215,5 +216,9 @@ def reply(store, day, record_text, goals, suggestion, conversation) -> str:
     if backend() == "api":
         # The API path has no file tools here, so it still sends the whole record.
         return _api(_system(record_text, goals), msgs, 8000).strip()
-    system = _system("", goals)[:1] + [{"type": "text", "text": LOOKUP_NOTE}]
-    return _subscription(system, _flatten(msgs), files={RECORD_FILE: record_text}).strip()
+    from . import layers, record
+    files = {f"lookup/{k}": v for k, v in
+             record.lookup_files(store, os.getenv("RX_TZ", "America/Los_Angeles")).items()}
+    system = (_system("", goals)[:1] + [{"type": "text", "text": LOOKUP_NOTE}]
+              + [{"type": "text", "text": "<record>\n" + layers.condensed(record_text) + "\n</record>"}])
+    return _subscription(system, _flatten(msgs), files=files).strip()
