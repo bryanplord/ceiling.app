@@ -43,6 +43,7 @@ FORMAT = """Reply with one JSON object and nothing else, in a ```json block, wit
   "markers": a list of {"name", "now": its current value, "expect": the direction you expect, "why"}
   "tests": a list of {"assumption", "test": the session that tests it, "when"}
   "sources": a list of {"claim", "basis": "record" or "general", "evidence": dates and numbers from the record, or the general principle}
+  "notebook": {"doubted": a list of {"reading", "why", "probably": your estimate of the true value, only when another reading from the same session supports it, otherwise empty}, "hypotheses": a list of {"statement", "test", "status": "open", "supported" or "dropped", "since": the day it was first made, "result": what the latest test showed, if anything}, "athlete_words": a sentence or two on what the athlete told you since your last suggestion and how much weight you gave it}
 Every sentence is a full English sentence. Use US units throughout: miles, feet, minutes per mile,
 miles per hour and feet climbed per hour, never kilometres or metres. Write times of day in
 12-hour form, such as 10:30 PM."""
@@ -100,6 +101,15 @@ def _system(record_text, goals):
     ]
 
 
+def _ledger(store, day) -> str:
+    """The open hypotheses from the most recent earlier day, carried forward."""
+    for d in db.recent_days(store, day, 14):
+        hyp = ((d["suggestion"] or {}).get("notebook") or {}).get("hypotheses")
+        if hyp:
+            return f"## Hypotheses carried from {d['day']}\n\n" + json.dumps(hyp, indent=1)
+    return ""
+
+
 def _earlier(store, day) -> str:
     lines = []
     for d in reversed(db.recent_days(store, day, 14)):
@@ -112,8 +122,10 @@ def _earlier(store, day) -> str:
 
 
 def _opening(store, day) -> str:
+    ledger = _ledger(store, day)
     return (f"Today is {day}.\n\n## Earlier days\n\n{_earlier(store, day)}\n\n"
-            f"Write today's suggestion.\n\n{FORMAT}")
+            + (ledger + "\n\n" if ledger else "")
+            + f"Write today's suggestion.\n\n{FORMAT}")
 
 
 def parse(text: str) -> dict:
@@ -126,17 +138,24 @@ REPLY_NOTE = ("(Answer in plain prose, in full sentences. If you change the sugg
               "changed and which evidence from the record moved you.)")
 
 
-# Subscription: one call to Claude Code with no tools, the instructions and record as the
-# system prompt, and the day's messages as the prompt.
+# Subscription: one call to Claude Code, the instructions (and, for the morning
+# suggestion, the whole record) as the system prompt, and the day's messages as
+# the prompt. For a reply the record is not resent: it is a file in the working
+# folder that Claude can search or read when a question needs it.
 
-def _subscription(system, prompt) -> str:
+def _subscription(system, prompt, files=None) -> str:
     env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}  # it would take precedence
     env["CLAUDE_CODE_DISABLE_CLAUDE_MDS"] = "1"
     with tempfile.TemporaryDirectory() as tmp:
         sys_file = Path(tmp) / "system.md"
         sys_file.write_text("\n\n".join(b["text"] for b in system))
+        tools = ["--tools", ""]
+        if files:
+            for name, text in files.items():
+                (Path(tmp) / name).write_text(text)
+            tools = ["--tools", "Read,Grep", "--allowedTools", "Read", "Grep", "--restricted"]
         proc = subprocess.run(
-            [_cli(), "-p", "--model", model(), "--tools", "", "--system-prompt-file", str(sys_file),
+            [_cli(), "-p", "--model", model(), *tools, "--system-prompt-file", str(sys_file),
              "--output-format", "json", "--no-session-persistence"],
             input=prompt, capture_output=True, text=True, cwd=tmp, env=env, timeout=900)
     try:
@@ -176,10 +195,25 @@ def suggest(store, day, record_text, goals) -> dict:
     return parse(_ask(_system(record_text, goals), msgs, 16000))
 
 
+RECORD_FILE = "record.md"
+
+LOOKUP_NOTE = """## The record during the conversation
+
+This morning you read the whole record and wrote today's suggestion. The record is not repeated
+here. When a question needs a specific fact you do not have, search the file record.md for a date,
+a word or a number, and read only the lines you need. Do not read the whole file. When a question
+names a day, read every line for that date before answering. Say which lines you looked at when
+they change your answer."""
+
+
 def reply(store, day, record_text, goals, suggestion, conversation) -> str:
     msgs = [{"role": "user", "content": _opening(store, day)},
             {"role": "assistant", "content": "```json\n" + json.dumps(suggestion, indent=1) + "\n```"}]
     for m in conversation:
         msgs.append({"role": m["role"], "content": m["content"]})
     msgs[-1]["content"] = msgs[-1]["content"] + "\n\n" + REPLY_NOTE
-    return _ask(_system(record_text, goals), msgs, 8000).strip()
+    if backend() == "api":
+        # The API path has no file tools here, so it still sends the whole record.
+        return _api(_system(record_text, goals), msgs, 8000).strip()
+    system = _system("", goals)[:1] + [{"type": "text", "text": LOOKUP_NOTE}]
+    return _subscription(system, _flatten(msgs), files={RECORD_FILE: record_text}).strip()

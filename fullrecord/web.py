@@ -6,7 +6,7 @@ from __future__ import annotations
 import os
 import re
 import threading
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from urllib.parse import parse_qs
 
@@ -16,7 +16,7 @@ from fastapi.templating import Jinja2Templates
 from jinja2 import ChoiceLoader, FileSystemLoader
 from markupsafe import Markup, escape
 
-from . import coach, db, record
+from . import coach, db, garmin_live, record
 
 router = APIRouter()
 
@@ -133,6 +133,38 @@ def _answer(day: str):
     threading.Thread(target=run, daemon=True).start()
 
 
+def _garmin_then_generate(day: str):
+    """For an athlete whose data comes straight from Garmin Connect: fetch
+    anything new first, so the suggestion is written with last night and the
+    latest session in the record, then write the suggestion if today has none."""
+    lk = _lock("garmin")
+    if not lk.acquire(blocking=False):
+        return
+
+    def run():
+        try:
+            store = _store()
+            garmin_live.pull(store, getattr(store, "owner", "") or "", _tz(), log=lambda *a: None)
+        except Exception as e:
+            try:
+                db.set_meta(_store(), "garmin_last_error",
+                            f"{datetime.now().isoformat(timespec='minutes')} {type(e).__name__}: {str(e)[:300]}")
+            except Exception:
+                pass
+        finally:
+            lk.release()
+            _generate(day)
+
+    threading.Thread(target=run, daemon=True).start()
+
+
+def _when(iso):
+    try:
+        return datetime.fromisoformat(iso).strftime("%-I:%M %p on %B %-d")
+    except (TypeError, ValueError):
+        return None
+
+
 @router.get("/coach", response_class=HTMLResponse)
 def coach_page(request: Request):
     why_off = coach.configured()
@@ -142,17 +174,24 @@ def coach_page(request: Request):
     d = db.day(store, day)
     if not why_off and counts["fr_sessions"] == 0 and store.counts()["streams"] == 0:
         why_off = "There is no history yet. Run python -m fullrecord.ingest on your Garmin export."
-    if not why_off and (d is None or (d["state"] != "ready" and not d["state"].startswith("failed")
-                                      and not _lock("day:" + day).locked())):
+    owner = getattr(store, "owner", "") or ""
+    from_garmin = garmin_live.has_login(owner)
+    if not why_off and from_garmin and (garmin_live.due(store) or _lock("garmin").locked()):
+        _garmin_then_generate(day)   # the suggestion waits for the newest data
+    elif not why_off and (d is None or (d["state"] != "ready" and not d["state"].startswith("failed")
+                                        and not _lock("day:" + day).locked())):
         _generate(day)
         d = db.day(store, day)
     msgs = db.messages(store, day)
     replying = _lock("chat:" + day).locked()
-    pending = (d is not None and d["state"] == "pending") or _lock("day:" + day).locked()
+    pending = ((d is not None and d["state"] == "pending") or _lock("day:" + day).locked()
+               or (from_garmin and _lock("garmin").locked() and not (d and d["state"] == "ready")))
     ctx = {"active": "coach", "why_off": why_off, "d": d, "s": (d or {}).get("suggestion") or {},
            "pending": pending, "msgs": msgs, "replying": replying,
            "goals": db.get_meta(store, "goals", ""), "day_label": _today().strftime("%A, %B %-d"),
-           "model": coach.model(), "counts": counts, "export_end": db.get_meta(store, "export_end")}
+           "model": coach.model(), "counts": counts, "export_end": db.get_meta(store, "export_end"),
+           "source": db.get_meta(store, "source"), "garmin_last": _when(db.get_meta(store, "garmin_last_pull")),
+           "garmin_error": db.get_meta(store, "garmin_last_error")}
     return templates.TemplateResponse(request, "coach.html", ctx)
 
 

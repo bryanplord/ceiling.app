@@ -65,15 +65,19 @@ def main(argv=None):
     ap.add_argument("--email", default="", help="the Ceiling account the history is for; "
                     "leave out for the primary athlete")
     args = ap.parse_args(argv)
-    tz = ZoneInfo(args.tz)
 
     from rx.service import open_store, owner_of
     store = open_store(owner_of(args.email) if args.email else "")
+    into(store, args.path, ZoneInfo(args.tz))
+
+
+def into(store, path, tz):
+    """Read a Garmin export (zip or folder) into `store`'s Coach page tables."""
     db.ensure(store)
 
     work = tempfile.mkdtemp(prefix="fullrecord-")
     try:
-        roots = _unpack(args.path, work)
+        roots = _unpack(path, work)
         fits = sorted({f for r in roots for pat in ("*.fit", "*.FIT")
                        for f in glob.glob(os.path.join(r, "**", pat), recursive=True)})
         print(f"{len(fits)} FIT files found", flush=True)
@@ -122,6 +126,7 @@ def main(argv=None):
         print(f"  altitude-jump limits from your own data, feet per hour: {dict((k, round(v / 0.3048) if v else None) for k, v in meta['limits']['altitude_jump_caps_m_per_h'].items())}")
     finally:
         shutil.rmtree(work, ignore_errors=True)
+
 
 
 if __name__ == "__main__":

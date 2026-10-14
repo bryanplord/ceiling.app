@@ -99,6 +99,18 @@
   {% for x in s.sources %}<div class="item {{ x.basis }}"><b>{{ x.claim }}<span class="tag {{ x.basis }}">{{ 'your record' if x.basis == 'record' else 'general knowledge' }}</span></b>{{ x.evidence }}</div>{% endfor %}
 </section>
 {% endif %}
+{% set nb = s.notebook or {} %}
+{% if nb %}
+<section class="band">
+  <h2>Notebook</h2>
+  {% if nb.doubted %}<h3>Readings doubted today</h3>
+  {% for d in nb.doubted %}<div class="item"><b>{{ d.reading }}</b>{{ d.why }}{% if d.probably %}<div class="sub">Probably: {{ d.probably }}</div>{% endif %}</div>{% endfor %}{% endif %}
+  {% if nb.hypotheses %}<h3>Hypotheses</h3>
+  {% for h in nb.hypotheses %}<div class="item"><b>{{ h.statement }}<span class="tag">{{ h.status }}{% if h.since %}, since {{ h.since }}{% endif %}</span></b>{{ h.test }}{% if h.result %}<div class="sub">{{ h.result }}</div>{% endif %}</div>{% endfor %}{% endif %}
+  {% if nb.athlete_words %}<h3>What you told me, and the weight it got</h3>
+  <div class="item">{{ nb.athlete_words }}</div>{% endif %}
+</section>
+{% endif %}
 
 <section class="band" id="talk">
   <h2>Talk it through</h2>
@@ -121,7 +133,12 @@
       <textarea name="goals" placeholder="Your goals, in whatever words you like.">{{ goals }}</textarea>
       <div><button class="btn" type="submit">Save goals</button></div>
     </form>
+    {% if source == "garmin" %}
+    <p class="muted">The record holds {{ counts.fr_sessions }} sessions, from your Garmin export{% if export_end %} up to {{ export_end }}{% endif %} and straight from Garmin Connect since then{% if garmin_last %}, last checked at {{ garmin_last }}{% endif %}.</p>
+    {% if garmin_error %}<p class="note">The last check of Garmin Connect failed, so your newest session or last night may be missing. Garmin said: {{ garmin_error }}</p>{% endif %}
+    {% else %}
     <p class="muted">The record holds {{ counts.fr_sessions }} sessions from your Garmin export{% if export_end %} up to {{ export_end }}{% endif %}, with everything since coming from Ceiling's daily pull.</p>
+    {% endif %}
   </details>
 </section>
 {% endif %}
