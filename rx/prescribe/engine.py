@@ -180,12 +180,21 @@ def build_rx(p: Profile, day: str | None = None) -> Rx:
     verdict = cap_verdict(verdict, sb.cap)
     if sb.state in ("owed", "debt", "deep_debt") or verdict != before or sb.no_technical:
         why.insert(1, sb.says)
+    js = getattr(p, "journal", None) or {}
+    if js.get("cap"):                                  # what you told the journal last night or this morning
+        before = verdict
+        verdict = cap_verdict(verdict, js["cap"])
+        if verdict != before:
+            why.insert(0, js["why"])
     cut30 = (date.fromisoformat(day) - timedelta(days=30)).isoformat()
     runs30 = sum(1 for a in p.activities if a.sport == RUN and cut30 <= a.date < day)
     ran_yday = any(a.sport == RUN and a.date == (date.fromisoformat(day) - timedelta(days=1)).isoformat() for a in p.activities)
     # Not a regular runner: running only on easy days, never two days running.
     ban = {"run", "trail run"} if runs30 < 6 and (verdict in (STEADY, HARD) or ran_yday) else None
     # The programme (your goal): phase, hard days allowed this week, the long session, the goal sport.
+    if js.get("ban"):                                  # sore feet or legs: no running for a few days
+        ban = set(ban or ()) | set(js["ban"])
+        why.append(js["note"])
     from .. import goals as gl
     gday = gl.daily_all(getattr(p, "programs", None) or getattr(p, "program", None), date.fromisoformat(day))
     goal_note = ""
@@ -202,7 +211,7 @@ def build_rx(p: Profile, day: str | None = None) -> Rx:
         if gday["phase"] == "Taper" and verdict == HARD:
             goal_note = "Taper: keep the intensity, cut the volume."
     goal_sport = gday.get("sport") if gday else ""
-    if goal_sport == RUN and ban and verdict != HARD and not ran_yday:
+    if goal_sport == RUN and ban and verdict != HARD and not ran_yday and not js.get("ban"):
         ban = None                                   # the goal is a run: easy and steady runs are the plan
     sport, chosen_kind, sport_reason, cap_mins = choose_activity(verdict, p, day, ban=ban,
                                                                  prefer=goal_sport or None)

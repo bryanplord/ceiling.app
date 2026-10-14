@@ -84,8 +84,9 @@ def _data_version(store: Store) -> tuple:
     # pull runs every 10 minutes and must not throw away every cached page when nothing changed.
     since = (local_today() - timedelta(days=3)).isoformat()
     recent = tuple((w.date, w.hrv, w.rhr, w.sleep_score, w.sleep_secs) for w in store.wellness(since))
+    jr_tags = tuple(store.get_meta(f"journal:{(local_today() - timedelta(days=k)).isoformat()}") or "" for k in range(3))
     return (store.owner, c["activities"], c["streams"], c["wellness"], hash(recent), store.get_meta("goal") or "",
-            store.get_meta("plans") or "")
+            store.get_meta("plans") or "", hash(jr_tags))
 
 
 def today_rx(store: Store, day: str | None = None):
@@ -116,6 +117,11 @@ def today_rx(store: Store, day: str | None = None):
             except Exception as e:
                 import traceback
                 print(f"goal failed: {e!r}\n{traceback.format_exc()}")
+            try:                                 # last night's and this morning's check-ins
+                from . import journal as _jr
+                p.journal = _jr.signals(store, day, _jr.hrv_low(p.wellness, day, morning=True))
+            except Exception as e:
+                print(f"journal signals failed: {e}")
             hit = (p, build_rx(p, day))
             while len(_built) > 120:                 # drop the oldest, never everything at once
                 _built.pop(next(iter(_built)))
@@ -301,7 +307,7 @@ def today_after(store: Store, p, rx) -> dict | None:
     from . import journal as jr
     acts = [a for a in p.activities if a.date == rx.date and (a.moving_s or 0) >= 10 * 60]
     entry = jr.load(store, rx.date)
-    cap, note = jr.effect(entry["tags"]) if entry else (None, "")
+    cap, note = jr.effect(entry["tags"], jr.hrv_low(p.wellness, rx.date)) if entry else (None, "")
     if not acts and not cap:
         return None
     out = {"sessions": [], "journal_note": note}

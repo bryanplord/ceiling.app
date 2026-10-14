@@ -409,7 +409,7 @@ def today(request: Request, d: str | None = None):
         energy = None
     pats = cached(store, "patterns", rx.date, lambda: jr.patterns(store, p.wellness))
     return _page(request, "today.html", rx=rx, waiting=not _have_last_night(store), updated=mins_ago,
-                 after=after, energy=energy, entry=entry, timeline=jr.timeline(entry), jnote=jr.effect(entry["tags"])[1] if entry else "", patterns=pats,
+                 after=after, energy=energy, entry=entry, timeline=jr.timeline(entry), jnote=jr.effect(entry["tags"], jr.hrv_low(p.wellness, rx.date))[1] if entry else "", patterns=pats,
                  syncing=syncing, d=dash, p=p, recent=recent,
                  spark=dashboard.spark, room=True,
                  rooms=_rooms_cached(store, p, rx, after),
@@ -803,9 +803,15 @@ async def journal_save(request: Request):
     saved = bool(text or any(taps.values()))
     if saved:
         jr.save(store, day, text, taps, at)
+        bust(store)                                     # tomorrow (and this morning, if early) re-reads it
     if "application/json" in request.headers.get("accept", ""):
         entry = jr.load(store, day) or {}
-        cap, note = jr.effect(entry.get("tags", {}))
+        try:
+            p_, _ = today_rx(store)
+            low = jr.hrv_low(p_.wellness, day)
+        except Exception:
+            low = False
+        cap, note = jr.effect(entry.get("tags", {}), low)
         log = entry.get("log") or []
         return JSONResponse({"ok": saved, "at": at, "note": note,
                              "entry": jr.view(log[-1]) if saved and log else None})

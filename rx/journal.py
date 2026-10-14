@@ -29,6 +29,14 @@ STRESS = ["stressed", "stress", "stressful", "anxious", "slammed", "long day", "
 TIRED = ["tired", "exhausted", "wiped", "drained", "fatigued", "heavy legs", "legs are dead", "sore legs", "legs are sore", "no energy"]
 GREAT = ["great", "fresh", "strong", "awesome", "amazing", "energized", "good legs", "felt good", "feel good"]
 LATE = ["up late", "late night", "stayed up", "bed late", "went to bed at 1", "went to bed at 12", "midnight"]
+# Body parts: pain in the ones running loads is a reason to keep off your feet for a few days.
+IMPACT = ["foot", "feet", "heel", "heels", "arch", "arches", "plantar", "toe", "toes", "shin", "shins", "calf", "calves",
+          "achilles", "ankle", "ankles", "knee", "knees", "hip", "hips", "it band", "itb"]
+OTHER_PARTS = ["back", "lower back", "neck", "shoulder", "shoulders", "wrist", "wrists", "hand", "hands", "hamstring",
+               "hamstrings", "quad", "quads", "groin", "glute", "glutes"]
+HURT = r"(hurts?|hurting|sore|pain|painful|aches?|aching|tweaked|strained|pulled|injured|tender|niggle|twinge|blister(?:s|ed)?)"
+HUNGRY = ["hungry", "starving", "famished", "bonked", "bonk", "hangry", "ravenous", "empty tank"]
+SHOES = re.compile(r"\b(shoes?|trainers|sneakers|insoles?)\b")
 DRANK = re.compile(r"\b(drank|drinking|drunk|hungover|hangover|booze|boozy|wine|beer)\b")
 
 
@@ -58,7 +66,25 @@ def parse(text: str) -> dict:
         tags["feel"] = "good"
     if any(w in t for w in LATE):
         tags["late"] = True
+    pain = []
+    for part in sorted(IMPACT + OTHER_PARTS, key=len, reverse=True):
+        p_ = re.escape(part)
+        if re.search(r"\b" + p_ + r"\b(?:\s+\w+){0,3}?\s+" + HURT + r"\b", t) or \
+           re.search(r"\b" + HURT + r"\s+(?:\w+\s+){0,2}" + p_ + r"\b", t):
+            if not any(part in x for x in pain):
+                pain.append(part)
+    if pain and "no pain" not in t and "doesn't hurt" not in t and "don't hurt" not in t:
+        tags["pain"] = pain
+        if SHOES.search(t):
+            tags["shoes"] = True
+    if any(re.search(r"\b" + re.escape(w) + r"\b", t) for w in HUNGRY):
+        tags["hungry"] = True
     return tags
+
+
+def impact_pain(tags: dict) -> list[str]:
+    """The painful parts that running loads (feet, shins, calves, Achilles, knees, hips)."""
+    return [x for x in (tags.get("pain") or []) if x in IMPACT]
 
 
 def label(tags: dict) -> list[str]:
@@ -81,28 +107,97 @@ def label(tags: dict) -> list[str]:
         out.append("Energized")
     if tags.get("late"):
         out.append("Late night")
+    for x in tags.get("pain") or []:
+        out.append(f"Sore {x}")
+    if tags.get("hungry"):
+        out.append("Hungry")
     return out
 
 
-def effect(tags: dict) -> tuple[str | None, str]:
-    """(cap for tomorrow, what it means), from tonight's entry alone."""
+def effect(tags: dict, hrv_low: bool = False) -> tuple[str | None, str]:
+    """(cap for tomorrow, what it means), from today's check-ins.
+    `hrv_low`: your HRV has been under your normal this week, which makes "tired" count."""
     d = tags.get("drinks") or 0
+    notes, cap = [], None
     if tags.get("sick"):
         return "easy", ("Feeling sick changes everything: tomorrow is easy at most, and if your resting HR is up "
                         "in the morning, it's a day off. Training through the start of an illness is how a few days "
                         "off turns into two weeks.")
     if d >= 3 or d < 0 and tags.get("late"):
-        return "steady", ("Alcohol is the single biggest hit to overnight HRV most people take: it raises your heart "
-                          "rate all night and cuts deep sleep. Tomorrow is capped at steady unless your HRV "
-                          "comes in normal.")
-    if d:
-        return None, ("A drink or two usually shows up as a small HRV dip. Tomorrow stands, but expect the morning "
-                      "numbers to read a little low.")
-    if tags.get("late"):
-        return None, "A late night is a short night. Tomorrow depends on how much sleep you actually get."
-    if tags.get("food") == "poor":
-        return None, "A poor eating day matters most before a hard session: eat a real meal tonight and before tomorrow's workout."
-    return None, ""
+        cap = "steady"
+        notes.append("Alcohol is the single biggest hit to overnight HRV most people take: it raises your heart "
+                     "rate all night and cuts deep sleep. Tomorrow is capped at steady unless your HRV comes in normal.")
+    elif d:
+        notes.append("A drink or two usually shows up as a small HRV dip. Tomorrow stands, but expect the morning "
+                     "numbers to read a little low.")
+    if tags.get("feel") == "tired":
+        if hrv_low:
+            cap = cap or "steady"
+            notes.append("Tired, on top of a week of HRV under your normal: that's two signals saying the same thing. "
+                         "Tomorrow starts as steady, not hard. If your HRV comes back to normal in the morning, "
+                         "the hard day is back on.")
+        else:
+            notes.append("Tired, but your numbers say you're recovering. Tomorrow stands; if you still feel flat in "
+                         "the warm-up, make it steady.")
+    pain = impact_pain(tags)
+    if pain:
+        notes.append(f"Sore {' and '.join(pain[:2])}: no running for the next few days. Ride, ski or swim instead, "
+                     "same heart rate. If it still hurts after three days, or it's sharp, get it looked at."
+                     + (" And it may be the shoes: try another pair before your next run." if tags.get("shoes") else ""))
+    elif tags.get("pain"):
+        notes.append(f"Sore {tags['pain'][0]}: keep tomorrow's session easy on it, and skip anything that makes it worse.")
+    if tags.get("hungry"):
+        notes.append("Hungry on a training day means you're under-fuelled. Eat a real meal now: carbs and protein, "
+                     "about 0.5 g of carbs per pound of body weight in the next couple of hours. Tomorrow's session "
+                     "needs it in the tank.")
+    if tags.get("late") and not notes:
+        notes.append("A late night is a short night. Tomorrow depends on how much sleep you actually get.")
+    if tags.get("food") == "poor" and not tags.get("hungry"):
+        notes.append("A poor eating day matters most before a hard session: eat a real meal tonight and before tomorrow's workout.")
+    return cap, " ".join(notes)
+
+
+def hrv_low(wellness, day: str, morning: bool = False) -> bool:
+    """This week's HRV under 95% of your 60-day normal (the nights up to `day`).
+    morning=True (deciding today's session): also needs last night itself under normal, so a
+    tired evening followed by a normal night puts the hard day back on."""
+    ws = sorted((w for w in wellness if w.hrv and w.date <= day), key=lambda w: w.date)
+    if len(ws) < 21:
+        return False
+    week = [w.hrv for w in ws[-7:]]
+    base = statistics.median([w.hrv for w in ws[-67:-7]])
+    if morning and ws[-1].date == day and ws[-1].hrv >= base * 0.97:
+        return False
+    return statistics.mean(week) < base * 0.95
+
+
+def signals(store, day: str, hrv_low: bool = False) -> dict:
+    """What the journal means for the morning of `day`: last night's check-ins (yesterday's entries)
+    and anything logged so far today. Pain in the feet or legs keeps you off running for 3 days."""
+    from datetime import date as _d
+    d0 = _d.fromisoformat(day)
+    out = {"cap": None, "why": "", "ban": set(), "note": ""}
+    caps = []
+    for back in (1, 0):
+        e = load(store, (d0 - timedelta(days=back)).isoformat())
+        if not e:
+            continue
+        c, n = effect(e.get("tags") or {}, hrv_low)
+        if c:
+            caps.append((c, n))
+    order = ["rest", "light", "easy", "steady", "hard"]
+    if caps:
+        c, n = min(caps, key=lambda x: order.index(x[0]))
+        out["cap"], out["why"] = c, n.split(". ")[0] + "."
+    for back in range(0, 3):
+        e = load(store, (d0 - timedelta(days=back)).isoformat())
+        if e and impact_pain(e.get("tags") or {}):
+            out["ban"] = {"run", "trail run"}
+            out["note"] = (f"You logged a sore {impact_pain(e['tags'])[0]} "
+                           f"{'today' if back == 0 else 'yesterday' if back == 1 else 'two days ago'}: no running "
+                           "until it's settled.")
+            break
+    return out
 
 
 def save(store, day: str, text: str, taps: dict | None = None, at: str = "") -> dict:
@@ -119,9 +214,13 @@ def save(store, day: str, text: str, taps: dict | None = None, at: str = "") -> 
     for e in log:                                     # oldest first: later check-ins win
         t = parse(e.get("text") or "")
         tp = e.get("taps") or {}
-        for k in ("sick", "stress", "late"):
+        for k in ("sick", "stress", "late", "hungry", "shoes"):
             if t.get(k):
                 tags[k] = True
+        for x in t.get("pain") or []:
+            tags.setdefault("pain", [])
+            if x not in tags["pain"]:
+                tags["pain"].append(x)
         if t.get("drinks"):
             tags["drinks"] = max(tags.get("drinks") or 0, t["drinks"]) if t["drinks"] > 0 else (tags.get("drinks") or -1)
         if t.get("food"):
@@ -178,6 +277,10 @@ def view(e: dict) -> dict:
         pills.append(("Stressed", "warn"))
     if t.get("late"):
         pills.append(("Late night", "plain"))
+    for x in t.get("pain") or []:
+        pills.append((f"Sore {x}", "bad" if x in IMPACT else "warn"))
+    if t.get("hungry"):
+        pills.append(("Hungry", "warn"))
     return {"at": e.get("at") or "", "pills": [{"label": l, "tone": c} for l, c in pills],
             "text": (e.get("text") or "").strip()}
 

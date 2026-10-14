@@ -32,3 +32,43 @@ def test_journal_post_returns_new_entry(tmp_path, monkeypatch):
     page = c.get("/").text
     assert 'class="pill on"' not in page and "checked" not in page.split('id="journal"')[1].split("</form>")[0]
     assert at in page
+
+
+def test_pain_hungry_tired_signals(tmp_path):
+    import json
+    from datetime import date, timedelta
+    from rx import journal as jr
+    from rx.store import Store
+    s = Store(str(tmp_path / "rx.db"))
+    t = jr.parse("run was ok. feet hurt. I think I hate my shoes.")
+    assert t["pain"] == ["feet"] and t.get("shoes")
+    assert jr.parse("hungry").get("hungry")
+    assert "no running" in jr.effect(t)[1]
+    cap, note = jr.effect({"feel": "tired"}, hrv_low=True)
+    assert cap == "steady"
+    assert jr.effect({"feel": "tired"}, hrv_low=False)[0] is None
+    today = date.today()
+    y = (today - timedelta(days=1)).isoformat()
+    jr.save(s, y, "feet hurt", {"feel": "tired"}, "5:35 PM")
+    sig = jr.signals(s, today.isoformat(), hrv_low=True)
+    assert sig["cap"] == "steady" and "run" in sig["ban"]
+    v = jr.view({"text": "feet hurt", "taps": {}})
+    assert any(p["label"] == "Sore feet" for p in v["pills"])
+
+
+def test_journal_reaches_morning_prescription(tmp_path, monkeypatch):
+    import os
+    from datetime import date, timedelta
+    monkeypatch.setenv("RX_DATA_DIR", str(tmp_path))
+    from rx import demo, journal as jr, profile as prof
+    from rx.store import Store
+    from rx.prescribe.engine import build_rx
+    s = Store(os.path.join(str(tmp_path), "rx.db"))
+    demo.seed(s, days=90, end=date.today())
+    day = date.today().isoformat()
+    y = (date.today() - timedelta(days=1)).isoformat()
+    jr.save(s, y, "my shins are sore", {}, "8:00 PM")
+    p = prof.build(s, day)
+    p.journal = jr.signals(s, day, False)
+    rx = build_rx(p, day)
+    assert rx.sport != "run"
