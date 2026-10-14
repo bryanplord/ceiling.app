@@ -745,7 +745,7 @@ def today(request: Request, d: str | None = None):
         from .. import strength as sg
         ls, lg, lst, nxt = _lift_today(store, p, rx)
         dn, of = sg.done_sets(lg)
-        if ls or lst["train"] == "strength" or getattr(p, "lifts", None):
+        if getattr(p, "lifts", None):          # lifting appears only once you've committed to a strength plan
             lift = {"s": ls, "rest": sg.rest_reason(store, getattr(p, "lifts", None) or [], date.fromisoformat(rx.date)), "summary": sg.summary(ls) if ls else "", "done": dn, "of": of,
                     "finished": bool(lg and lg.get("done")), "only": lst["train"] == "strength", "next": nxt,
                     "moves": [m.name for c in (ls.circuits if ls else []) for m in c]}
