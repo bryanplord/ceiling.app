@@ -9,8 +9,8 @@
   .heart h3 { font-size:20px; font-weight:700; margin:0; }
   .heart p.s { color:var(--lichen); font-size:15px; margin:4px 0 0; }
   .heart .rail { margin-top:28px; }
-  .rail.go .rail-win { animation:win 1.1s cubic-bezier(.2,.8,.2,1) .35s backwards; }
-  .rail.go .rail-aim { animation:aim 1.1s cubic-bezier(.2,.8,.2,1) .35s backwards; }
+  .rail.go .rail-win { animation:win calc(var(--t-slow) * 1.4) var(--ease-out) .45s backwards; }
+  .rail.go .rail-aim { animation:aim calc(var(--t-slow) * 1.4) var(--ease-out) .45s backwards; }
   @keyframes win { from { left:0; width:0; opacity:0; } }
   @keyframes aim { from { left:0; opacity:0; } }
   @media (prefers-reduced-motion: reduce) { .rail.go .rail-win, .rail.go .rail-aim { animation:none; } }
@@ -30,6 +30,7 @@
   .chap::before { content:""; position:absolute; left:0; top:34px; bottom:34px; width:6px; }
   .chap:nth-child(1)::before { background:var(--s-end); } .chap:nth-child(2)::before { background:var(--s-aer); }
   .chap:nth-child(3)::before { background:var(--s-tem); } .chap:nth-child(4)::before { background:var(--s-thr); }
+  .chap span { transition:color var(--t-fast) var(--ease); }
   .chap span { font-size:clamp(28px, 3.6vw, 46px); font-weight:600; letter-spacing:-0.02em; line-height:1.05; }
   .chap p { margin:0; font-size:18px; line-height:1.45; color:var(--lichen); max-width:40ch; }
   .chap:hover span { color:var(--ceiling); }
@@ -49,7 +50,7 @@
   <div class="ctas"><a class="btn dark" href="/join">Join the waitlist</a><a class="btn light" href="/morning">See a morning</a></div>
 </section>
 
-<section class="stage frost bleed" aria-label="An example morning">
+<section class="stage frost bleed rise" style="--i:3" aria-label="An example morning">
   <div class="sheet today">
     <div>
       <p class="meta">Tuesday, October 13. Updated 4 min ago.</p>

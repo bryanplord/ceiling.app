@@ -1,15 +1,19 @@
 {% extends "base.html" %}
 {% block body %}
-<h1>{{ p.max_hr.bpm or '—' }} max.</h1>
-<p class="big">{{ 'Confirmed.' if p.max_hr.confirmed else 'Provisional.' }} <span class="muted">{{ p.max_hr.note }}</span></p>
+<h1 class="rise" style="--i:0">{{ p.max_hr.bpm or '—' }} max.</h1>
+<p class="big rise" style="--i:1">{{ 'Confirmed.' if p.max_hr.confirmed else 'Provisional.' }} <span class="muted">{{ p.max_hr.note }}</span></p>
 
+<div class="rise" style="--i:2">
 <h2>Threshold</h2>
 <p class="big">{{ p.threshold.bpm or '—' }} bpm</p>
 <p class="muted">From {{ p.threshold.source }}. Rises as harder sustained efforts are recorded.</p>
+</div>
 
+<div class="rise" style="--i:3">
 <h2>Aerobic threshold</h2>
 <p class="big">{{ p.aerobic.bpm or '—' }} bpm</p>
 <p class="muted">{{ p.aerobic.evidence }}</p>
+</div>
 
 {% if p.zones %}
 <h2>Your zones</h2>

@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block head %}
+{% include "_motion.html" %}
 <style>
   .wk-h { font-size:clamp(40px, 6vw, 72px); margin:12px 0 0; }
   .sub2 { color:var(--lichen); font-size:18px; margin:16px 0 0; max-width:62ch; }
@@ -9,6 +10,11 @@
   .ztrack { position:relative; height:16px; background:var(--frost); }
   .zfill { position:absolute; left:0; top:0; bottom:0; }
   .ztarget { position:absolute; top:-4px; bottom:-4px; width:2px; background:var(--ink); }
+  .zfill { transform-origin:left; animation:grow-x var(--t-slow) var(--ease-out) .25s both; }
+  .wload { margin-top:40px; }
+  .wload .loadrow { color:var(--lichen); font-size:18px; }
+  .wload .skel.h { width:min(420px, 70%); height:22px; margin:28px 0 14px; }
+  .wload .skel.r { height:16px; margin:14px 0; }
   .znum { font-variant-numeric:tabular-nums; color:var(--lichen); font-size:14px; }
   .znum b { color:var(--ink); }
   .z0 { background:#b3a6dc; } .z1 { background:#7fa7d9; } .z2 { background:#46b07f; }
@@ -61,12 +67,15 @@
 </style>
 {% endblock %}
 {% block body %}
-<h1 class="wk-h">Workouts</h1>
-<p class="sub2">Each session against what that morning prescribed, graded, and whether you recovered from it.</p>
+<h1 class="wk-h rise" style="--i:0">Workouts</h1>
+<p class="sub2 rise" style="--i:1">Each session against what that morning prescribed, graded, and whether you recovered from it.</p>
 {% if rows is none %}
-<p class="sub2">Working it out from the last two weeks. Refresh in a minute.</p>
+<div class="wload rise" style="--i:2" role="status" aria-live="polite">
+  <p class="loadrow"><span class="ring" aria-hidden="true"></span>Working it out from the last two weeks. Refresh in a minute.</p>
+  <div aria-hidden="true"><span class="skel h"></span>{% for w in [92, 64, 48, 30, 18, 10] %}<span class="skel r" style="width:{{ w }}%"></span>{% endfor %}</div>
+</div>
 {% else %}
-<section class="agg">
+<section class="agg rise" style="--i:2">
   <h2>Where your time went, last 14 days</h2>
   <p class="sub2" style="margin-top:4px;font-size:15px">Bar: your share of time in each zone. Black mark: where it should be for someone training 1–3 hours a day.</p>
   {% for n, c, mins, share, target in agg %}

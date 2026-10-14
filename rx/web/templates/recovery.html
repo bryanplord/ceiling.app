@@ -2,12 +2,14 @@
 {% block body %}
 {% include "_dashnav.html" %}
 {% set last = days[-1] %}
-<h1>{% if last.reds %}Not recovered.{% elif last.ambers %}Partly recovered.{% elif last.known %}Recovered.{% else %}No data yet.{% endif %}</h1>
+<h1 class="rise" style="--i:0">{% if last.reds %}Not recovered.{% elif last.ambers %}Partly recovered.{% elif last.known %}Recovered.{% else %}No data yet.{% endif %}</h1>
 
+<div class="rise" style="--i:1">
 <h2>Last night</h2>
 {% for s in last.signals %}
 <div class="row"><span><span class="dot {{ s.status }}"></span>{{ s.name }}</span><span class="muted">{{ s.detail }}</span></div>
 {% endfor %}
+</div>
 
 <h2>Last 30 days</h2>
 {% for r in days | reverse %}

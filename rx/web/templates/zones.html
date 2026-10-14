@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block head %}
+{% include "_motion.html" %}
 <style>
   main.narrow { max-width:1100px; }
   .zh1 { font-size:clamp(36px, 6vw, 84px); margin:24px 0 20px; }
@@ -17,6 +18,7 @@
   .zl span { color:var(--lichen); font-size:14px; }
   .zbars { display:grid; gap:6px; justify-items:start; }
   .zb { height:18px; border-radius:4px; min-width:3px; }
+  .zb:not(.t) { transform-origin:left; animation:grow-x var(--t-slow) var(--ease-out) .3s both; }
   .zb.t { background:transparent !important; border:2px dashed; height:14px; }
   .c1 { background:var(--z1); border-color:var(--z1); } .c2 { background:var(--z2); border-color:var(--z2); }
   .c3 { background:var(--z3); border-color:var(--z3); } .c4 { background:var(--z4); border-color:var(--z4); }
@@ -51,9 +53,9 @@
 {% endblock %}
 {% block body %}
 {% include "_dashnav.html" %}
-<h1 class="zh1">Where your time goes.</h1>
-{% if hr %}<p class="zverdict">{{ hr.verdict }}</p>
-<p class="muted">Last 4 weeks, {{ '%.1f' % hr.weekly_h }} hours a week with heart rate.</p>{% endif %}
+<h1 class="zh1 rise" style="--i:0">Where your time goes.</h1>
+{% if hr %}<p class="zverdict rise" style="--i:1">{{ hr.verdict }}</p>
+<p class="muted rise" style="--i:2">Last 4 weeks, {{ '%.1f' % hr.weekly_h }} hours a week with heart rate.</p>{% endif %}
 
 {% macro block(d, title) %}
 <section class="zsec">
@@ -85,7 +87,7 @@
 </section>
 {% endmacro %}
 
-{% if hr %}{{ block(hr, "Heart rate") }}{% else %}<p class="nopower">Your heart-rate zones aren't built yet. Sync more history.</p>{% endif %}
+<div class="rise" style="--i:3">{% if hr %}{{ block(hr, "Heart rate") }}{% else %}<p class="nopower">Your heart-rate zones aren't built yet. Sync more history.</p>{% endif %}</div>
 {% if pw %}{{ block(pw, "Power") }}
 {% else %}
 <section class="zsec"><h2>Power</h2>

@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block head %}
+{% include "_motion.html" %}
 <style>
   main.narrow { max-width:1100px; }
   .dt { width:100%; border-collapse:collapse; font-size:15px; font-variant-numeric:tabular-nums; }
@@ -15,15 +16,19 @@
   .steps { font-size:17px; max-width:64ch; line-height:1.5; }
   .cform { display:grid; gap:14px; max-width:420px; margin-top:20px; }
   .cform label { display:grid; gap:6px; font-size:14px; font-weight:600; }
-  .cform input { font:inherit; font-size:17px; padding:12px 14px; border:1px solid #d4d4d8; border-radius:8px; }
+  .cform input { font:inherit; font-size:17px; padding:12px 14px; border:1px solid #d4d4d8; border-radius:8px;
+                 transition:border-color var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease); }
+  .cform input:focus { outline:none; border-color:var(--ink); box-shadow:0 0 0 3px rgba(0,0,0,0.06); }
+  .cform button:hover { background:#333; }
+  .note .ring { margin-right:10px; }
   .cform button { font:inherit; font-weight:600; font-size:15px; padding:14px; border:0; border-radius:8px; background:var(--ink); color:#fff; cursor:pointer; }
 </style>
 {% endblock %}
 {% block body %}
-<h1>Data</h1>
+<h1 class="rise" style="--i:0">Data</h1>
 {% if owner %}
-<section class="conn">
-  {% if msg == 'ok' %}<p class="note ok">Connected. Pulling your last year now: this takes a few minutes. Refresh this page to watch it fill in.</p>
+<section class="conn rise" style="--i:1">
+  {% if msg == 'ok' %}<p class="note ok" role="status"><span class="ring" aria-hidden="true"></span>Connected. Pulling your last year now: this takes a few minutes. Refresh this page to watch it fill in.</p>
   {% elif msg == 'bad' %}<p class="note no">intervals.icu didn't accept that athlete ID and API key. Check both and try again.</p>
   {% elif msg == 'missing' %}<p class="note no">Both the athlete ID and the API key are needed.</p>{% endif %}
   {% if empty and not connected %}

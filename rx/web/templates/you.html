@@ -35,13 +35,13 @@
 {% endblock %}
 {% block body %}
 {% include "_dashnav.html" %}
-<h1 class="yh1">You vs your age.</h1>
-<p class="lede">Every number against men in their 40s, and against endurance athletes your age.</p>
-<p class="sub">Men 40–49 from large published datasets; athletes from masters endurance studies. Sources are listed under each row.</p>
-<p class="key"><span><i style="background:var(--frost2)"></i>Middle half of men your age</span><span><i style="background:var(--z2);opacity:.45"></i>Endurance athletes your age</span><span><i style="background:var(--ink);border-radius:50%"></i>You</span></p>
+<h1 class="yh1 rise" style="--i:0">You vs your age.</h1>
+<p class="lede rise" style="--i:1">Every number against men in their 40s, and against endurance athletes your age.</p>
+<p class="sub rise" style="--i:2">Men 40–49 from large published datasets; athletes from masters endurance studies. Sources are listed under each row.</p>
+<p class="key rise" style="--i:3"><span><i style="background:var(--frost2)"></i>Middle half of men your age</span><span><i style="background:var(--z2);opacity:.45"></i>Endurance athletes your age</span><span><i style="background:var(--ink);border-radius:50%"></i>You</span></p>
 
 {% if vo2 %}
-<section class="vo2">
+<section class="vo2 rise" style="--i:4">
   <div><h3 style="margin:0;font-size:17px">VO2max, estimated</h3>
     <span class="big">{{ '%.0f' % vo2 }}<small>ml/kg/min</small></span></div>
   <ul class="est">{% for name, v, how in est %}<li><b>{{ '%.0f' % v }}</b> {{ name }}<span>{{ how }}</span></li>{% endfor %}</ul>

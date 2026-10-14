@@ -47,7 +47,8 @@
   .planned { display:block; font-size:12px; color:var(--lichen); padding-top:10px; border-top:1px solid rgba(0,0,0,.08); margin-bottom:4px; }
   .day.today.did-good { background:#e6f4ec; } .day.today.did-ok { background:#fbf1dc; } .day.today.did-bad { background:#fde8e5; }
   .day.today.did-good .db > .kind, .day.today.did-ok .db > .kind, .day.today.did-bad .db > .kind { color:var(--lichen); }
-  .tabs { display:flex; gap:24px; margin-top:24px; font-size:17px; }
+  .plan-h { view-transition-name:calh; }
+  .tabs { display:flex; gap:24px; margin-top:24px; font-size:17px; view-transition-name:caltabs; }
   .tabs a { text-decoration:none; color:var(--lichen); padding-bottom:4px; }
   .tabs a.on { color:var(--ink); box-shadow:inset 0 -2px 0 var(--ink); }
   .rowh { color:var(--ink); font-size:20px; margin:56px 0 4px; }
@@ -93,14 +94,16 @@
   .mnav h3 { font-size:clamp(24px, 3vw, 32px); font-weight:600; margin:0; min-width:9em; text-align:center; color:var(--ink); }
   .arr { display:inline-flex; align-items:center; justify-content:center; width:44px; height:44px; border-radius:50%;
          border:1px solid var(--rule); color:var(--ink); text-decoration:none; font-size:26px; line-height:1; padding-bottom:3px; }
-  .arr:hover { background:var(--frost); } .arr.off { color:var(--rule); }
+  .arr:hover { background:var(--frost); border-color:#cfcfd4; } .arr.off { color:var(--rule); }
   .wcal { border-top:2px solid var(--ink); }
   .wrow { display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)) 120px; }
   .wrow .dow { font-size:13px; font-weight:600; color:var(--lichen); padding:10px 8px; border-bottom:1px solid var(--rule); }
   .c { position:relative; min-height:112px; padding:8px; border:0; border-bottom:1px solid var(--rule); border-right:1px solid var(--rule);
        display:flex; flex-direction:column; gap:4px; min-width:0; background:none; font:inherit; color:inherit; text-align:left; }
   button.c { cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  button.c { transition:background-color var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease); }
   button.c:hover { background:#f7f7f8; }
+  button.c:active { transform:none; }
   button.c:focus-visible { outline:2px solid var(--ink); outline-offset:-2px; }
   button.c.sel { background:var(--frost); }
   .c.out { background:#fafafa; }
@@ -134,9 +137,13 @@
   .ph-Base { background:#7fa7d9; } .ph-Build { background:#46b07f; } .ph-Peak { background:#ec9550; }
   .ph-Taper { background:#e3bd52; } .ph-Recover { background:#c9d8ea; } .ph-Race { background:#de5f55; } .ph-none { background:#c9c9cd; }
   /* a day's details: a drawer from the right (a bottom sheet on a phone) */
-  .dscrim { position:fixed; inset:0; z-index:40; background:rgba(242,242,243,.82); opacity:0; transition:opacity .2s ease; }
-  .dscrim.on { opacity:1; }
-  .wcal { transition:transform .2s ease, width .2s ease, background-color .2s ease; }
+  /* Opening eases out over --t; closing is quicker (--t-fast), and the script waits for it before hiding. */
+  .dscrim { position:fixed; inset:0; z-index:40; background:rgba(242,242,243,.82); opacity:0; transition:opacity var(--t-fast) var(--ease); }
+  .dscrim.on { opacity:1; transition-duration:var(--t); }
+  .wcal { transition:transform var(--t) var(--ease-out), width var(--t) var(--ease-out), background-color var(--t) var(--ease); }
+  .wcal .wkrow > * { transition:opacity var(--t) var(--ease), background-color var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease); }
+  .wcal .wkrow { transition:background-color var(--t) var(--ease); }
+  .dconn { transition:opacity var(--t-fast) var(--ease); }
   .wcal.shift { position:relative; z-index:41; background:var(--frost); }
   .wcal.shift .wkrow:not(.on) > * { opacity:.6; }
   .wcal.shift .wkrow.on { background:#fff; }
@@ -148,8 +155,11 @@
   .drawer { position:fixed; z-index:43; top:0; right:0; bottom:0; width:480px; max-width:100%; background:#fff;
             border-left:1px solid var(--rule); box-shadow:-24px 0 48px rgba(10,10,10,.06);
             padding:28px 40px 40px; overflow-y:auto; overscroll-behavior:contain;
-            transform:translateX(100%); transition:transform .2s ease-out; }
-  .drawer.on { transform:none; }
+            transform:translateX(100%); transition:transform var(--t-fast) var(--ease); }
+  .drawer.on { transform:none; transition:transform var(--t) var(--ease-out); }
+  /* Stepping day to day inside the open drawer: the new day settles in. */
+  .drawer.on .dd.swap { animation:dd-in var(--t) var(--ease-out); }
+  @keyframes dd-in { from { opacity:0; transform:translateY(6px); } }
   .drawer:focus { outline:none; }
   .dnotch { position:fixed; z-index:44; width:0; height:0; border-top:9px solid transparent; border-bottom:9px solid transparent;
             border-right:9px solid var(--ink); pointer-events:none; }
@@ -229,9 +239,9 @@
 <nav class="tabs"><a class="on" href="/calendar">Upcoming</a><a href="/calendar/history">History</a></nav>
 
 {% set K = {'rest':'Day off','light':'Walk','easy':'Easy','steady':'Steady','hard':'Hard'} %}
-<h2 class="rowh">The next {{ plan.horizon }} days</h2>
-<p class="rowsub">{{ plan.note }}</p>
-<div class="week">
+<h2 class="rowh rise" style="--i:0">The next {{ plan.horizon }} days</h2>
+<p class="rowsub rise" style="--i:1">{{ plan.note }}</p>
+<div class="week rise" style="--i:2">
 {% for d in plan.days %}{% set dd = date.fromisoformat(d.date) %}
   {% set dt = (done|selectattr('score','ne',none)|list or done)[0].tone if (d.confidence == 'Today' and done) else none %}
   <div class="day{{ ' today' if d.confidence == 'Today' }}{{ ' did-' ~ dt if dt }}">
@@ -436,7 +446,8 @@
       sel = b;
       b.classList.add('sel'); b.setAttribute('aria-expanded', 'true'); b.closest('.wkrow').classList.add('on');
       var d = b.getAttribute('data-d'), art = null;
-      dr.querySelectorAll('.dd').forEach(function (x) { var on = x.getAttribute('data-d') === d; x.hidden = !on; if (on) art = x; });
+      var was = !dr.hidden;
+      dr.querySelectorAll('.dd').forEach(function (x) { var on = x.getAttribute('data-d') === d; x.hidden = !on; x.classList.toggle('swap', on && was); if (on) art = x; });
       if (art) dr.setAttribute('aria-labelledby', 'ddt-' + d);
       var i = days.indexOf(b);
       prevB.disabled = i <= 0; nextB.disabled = i >= days.length - 1;
@@ -463,7 +474,7 @@
       dr.classList.remove('on'); scrim.classList.remove('on');
       cal.classList.remove('open', 'shift'); dr.classList.remove('shift');
       cal.style.transform = ''; cal.style.width = ''; conn.hidden = notch.hidden = true;
-      timer = setTimeout(function () { dr.hidden = true; scrim.hidden = true; timer = null; }, still.matches ? 0 : 200);
+      timer = setTimeout(function () { dr.hidden = true; scrim.hidden = true; timer = null; }, still.matches ? 0 : 220);
       b.focus({ preventScroll: true });
     }
     function step(n) {

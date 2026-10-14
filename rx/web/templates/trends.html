@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block head %}
+{% include "_motion.html" %}
 <style>
   main.narrow { max-width:1200px; }
   .th1 { font-size:clamp(44px, 7vw, 96px); margin:24px 0 18px; }
@@ -42,12 +43,12 @@
 {% endblock %}
 {% block body %}
 {% include "_dashnav.html" %}
-<h1 class="th1">Trends.</h1>
-<p class="thead {{ t.tone }}">{{ t.headline }}</p>
-<p class="twhy">{{ t.why }}</p>
-<p class="tsub">Last 14 weeks on one timeline. Shaded bands are your normal range; lines are 7-day averages; dots are single nights.</p>
+<h1 class="th1 rise" style="--i:0">Trends.</h1>
+<p class="thead {{ t.tone }} rise" style="--i:1">{{ t.headline }}</p>
+<p class="twhy rise" style="--i:2">{{ t.why }}</p>
+<p class="tsub rise" style="--i:3">Last 14 weeks on one timeline. Shaded bands are your normal range; lines are 7-day averages; dots are single nights.</p>
 {% for r in t.rows %}
-<div class="trow">
+<div class="trow{{ ' rise' if loop.first }}"{% if loop.first %} style="--i:4"{% endif %}>
   <div class="tl"><b>{{ r.name }}</b><span class="now">{{ r.now }}</span><p class="{{ r.tone }}">{{ r.says }}</p>
     {% if r.key == 'load' %}<div class="key"><span><i style="background:var(--ink)"></i>Fitness</span><span><i style="background:var(--z4)"></i>Fatigue</span><span><i style="background:var(--lichen)"></i>Daily load</span></div>{% endif %}
     {% if r.key == 'form' %}<div class="key"><span><i style="background:var(--z2)"></i>Fresh</span><span><i style="background:var(--z4)"></i>Carrying fatigue</span></div>{% endif %}

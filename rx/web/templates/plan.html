@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block head %}
+{% include "_motion.html" %}
 <style>
   .pg { max-width:880px; }
   .ph { font-size:clamp(44px, 7.4vw, 88px); font-weight:700; font-stretch:100%; text-transform:none; letter-spacing:-0.035em;
@@ -20,6 +21,19 @@
   .btn.danger { background:var(--bad); } .btn.danger:hover { background:#9e2615; }
   .btn.sm { font-size:15px; padding:10px 18px; }
   .acts { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+  /* A submitted button says it heard you: the label dims and the brand ring turns in its place. */
+  .btn.busy { position:relative; pointer-events:none; color:transparent !important; }
+  .btn.busy::after { content:""; position:absolute; left:50%; top:50%; width:18px; height:18px; margin:-9px 0 0 -9px; border-radius:50%;
+                     background:conic-gradient(#8e7cc3, #4a7fd4, #2e9e6a, #e0b030, #ee7a30, #ff3b30, #8e7cc3);
+                     -webkit-mask:radial-gradient(circle, transparent 0 5.5px, #000 6px); mask:radial-gradient(circle, transparent 0 5.5px, #000 6px);
+                     animation:ring-turn 1.4s linear infinite; }
+  /* Inline confirms open with a soft settle. */
+  details.cf[open] .cfbox, .askstop .cfbox { animation:rise var(--t) var(--ease-out) both; }
+  .changed, .heard, .flash { animation:rise var(--t) var(--ease-out) both; }
+  .pc { transition:border-color var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease); }
+  .pc:hover { border-color:#cfcfd4; box-shadow:0 6px 20px rgba(10,10,10,.05); }
+  .pc.on:hover { border-color:#a9d3bd; }
+  .bar2 i { transform-origin:left; animation:grow-x var(--t-slow) var(--ease-out) .3s both; }
 
   /* status */
   .pill { display:inline-flex; align-items:center; gap:7px; font-size:14px; font-weight:600; padding:5px 12px 5px 10px;
@@ -55,7 +69,10 @@
   /* picker */
   .cards { display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); gap:12px; margin-top:40px; }
   .gc input { position:absolute; opacity:0; pointer-events:none; }
-  .gc span { display:block; padding:22px; border:1.5px solid var(--rule); border-radius:16px; font-size:18px; font-weight:600; cursor:pointer; min-height:96px; }
+  .gc span { display:block; padding:22px; border:1.5px solid var(--rule); border-radius:16px; font-size:18px; font-weight:600; cursor:pointer; min-height:96px;
+            transition:border-color var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease), transform var(--t-fast) var(--ease); }
+  .gc:hover span { border-color:#bdbdc2; transform:translateY(-1px); }
+  .gc input:checked + span { transform:none; }
   .gc span small { display:block; font-weight:400; font-size:14px; color:var(--lichen); margin-top:6px; }
   .gc input:checked + span { border-color:var(--ink); box-shadow:inset 0 0 0 1px var(--ink); }
   .gc input:focus-visible + span { outline:2px solid var(--ceiling); outline-offset:2px; }
@@ -63,15 +80,19 @@
   .gform label, .fl { display:grid; gap:6px; font-size:15px; font-weight:600; }
   .gform label small, .fl small { font-weight:400; color:var(--lichen); font-size:14px; }
   .gform input[type=text], .gform input[type=date], .gform input[type=number], .gform select {
-    font:inherit; font-size:17px; padding:12px 14px; border:1px solid #d4d4d8; border-radius:10px; background:#fff; width:100%; min-width:0; height:50px; -webkit-appearance:none; appearance:none; }
+    font:inherit; font-size:17px; padding:12px 14px; border:1px solid #d4d4d8; border-radius:10px; background:#fff; width:100%; min-width:0; height:50px; -webkit-appearance:none; appearance:none;
+    transition:border-color var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease); }
+  .gform input:focus, .gform select:focus { outline:none; border-color:var(--ink); box-shadow:0 0 0 3px rgba(0,0,0,0.06); }
   .gform select { background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%236b6b6f' stroke-width='1.6'/%3E%3C/svg%3E") no-repeat right 14px center; padding-right:36px; }
   .row2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
   .or { color:var(--lichen); font-size:16px; margin:36px 0 0; }
-  .wfields { display:none; } .wfields.on { display:grid; }
+  .wfields { display:none; } .wfields.on { display:grid; animation:rise var(--t) var(--ease-out) both; }
   .days { display:flex; flex-wrap:wrap; gap:8px; }
   .days label { display:block; }
   .days input { position:absolute; opacity:0; pointer-events:none; }
-  .days span { display:block; padding:9px 14px; border:1px solid #d4d4d8; border-radius:999px; font-weight:500; font-size:15px; cursor:pointer; }
+  .days span { display:block; padding:9px 14px; border:1px solid #d4d4d8; border-radius:999px; font-weight:500; font-size:15px; cursor:pointer;
+               transition:color var(--t-fast) var(--ease), background-color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease); }
+  .days label:hover input:not(:checked) + span { border-color:var(--ink); }
   .days input:checked + span { background:var(--ink); color:#fff; border-color:var(--ink); }
   .days input:focus-visible + span { outline:2px solid var(--ceiling); outline-offset:2px; }
 
@@ -113,7 +134,8 @@
   .adjust .sub { margin:10px 0 0; font-size:17px; color:var(--lichen); max-width:56ch; text-wrap:pretty; }
   .sayf { margin-top:24px; display:grid; gap:14px; max-width:720px; }
   .sayf textarea { font:inherit; font-size:19px; line-height:1.45; padding:18px 20px; border:1px solid #d4d4d8; border-radius:18px;
-                   background:#fff; color:var(--ink); width:100%; min-width:0; resize:vertical; min-height:120px; box-sizing:border-box; }
+                   background:#fff; color:var(--ink); width:100%; min-width:0; resize:vertical; min-height:120px; box-sizing:border-box;
+                   transition:border-color var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease); }
   .sayf textarea::placeholder { color:#9a9aa0; }
   .sayf textarea:focus { outline:none; border-color:var(--ink); box-shadow:0 0 0 3px rgba(0,0,0,0.06); }
   .heard { margin-top:4px; max-width:720px; padding:16px 18px; border-radius:14px; background:#fbf3e4; font-size:16px; }
@@ -122,7 +144,7 @@
   details.more > summary { cursor:pointer; list-style:none; display:inline-flex; align-items:center; gap:8px; font-size:16px; font-weight:600; color:var(--ink); }
   details.more > summary::-webkit-details-marker { display:none; }
   details.more > summary::after { content:""; width:7px; height:7px; border-right:1.6px solid currentColor; border-bottom:1.6px solid currentColor;
-                                  transform:rotate(45deg) translate(-2px, -2px); transition:transform .15s; }
+                                  transform:rotate(45deg) translate(-2px, -2px); transition:transform var(--t) var(--ease); }
   details.more[open] > summary::after { transform:rotate(225deg) translate(-2px, -2px); }
   .commitrow { margin-top:40px; }
   .changed { margin-top:24px; padding:22px 24px; border-radius:18px; background:#eef7f2; max-width:720px; }
@@ -165,10 +187,10 @@
 {% if mode == 'new' %}
 {# ---------- pick a goal ---------- #}
 {% if has_plans %}<a class="back" href="/plan">&larr; Your plans</a>{% endif %}
-<h1 class="ph">What are you training for?</h1>
-<p class="lede2">Pick a goal or say it your way. You'll see the plan before you commit to it.</p>
+<h1 class="ph rise" style="--i:0">What are you training for?</h1>
+<p class="lede2 rise" style="--i:1">Pick a goal or say it your way. You'll see the plan before you commit to it.</p>
 <form method="post" action="/plan" class="gform" style="max-width:none">
-  <div class="cards">
+  <div class="cards rise" style="--i:2">
     {% for c in canned %}
     <label class="gc"><input type="radio" name="canned" value="{{ c.id }}" {{ 'checked' if loop.first }} data-kind="{{ c.kind }}">
       <span>{{ c.title }}<small>{{ {'best_shape':'Peak fitness by a date','event':'Base, build, peak, taper','weight':'A safe weekly rate','longevity':'Mostly easy, strength twice a week'}[c.kind] }}</small></span></label>
@@ -199,9 +221,10 @@
 
 {% elif mode == 'list' %}
 {# ---------- every plan ---------- #}
-<h1 class="ph">Your plans</h1>
-<p class="lede2">Plans you commit to set Today and your calendar. Drafts don't until you commit.</p>
-<div class="acts" style="margin-top:32px"><a class="btn" href="/plan/new">New plan</a></div>
+<h1 class="ph rise" style="--i:0">Your plans</h1>
+<p class="lede2 rise" style="--i:1">Plans you commit to set Today and your calendar. Drafts don't until you commit.</p>
+<div class="acts rise" style="margin-top:32px;--i:2"><a class="btn" href="/plan/new">New plan</a></div>
+<div class="rise" style="--i:3">
 
 {% for name, rows in groups %}{% if rows or name == 'Active' %}
 <h2 class="sec">{{ name }}{% if rows %}<small>{{ rows|length }}</small>{% endif %}</h2>
@@ -236,11 +259,12 @@
 {% endfor %}
 </div>
 {% endif %}{% endfor %}
+</div>
 
 {% else %}
 {# ---------- one plan ---------- #}
 <a class="back" href="/plan">&larr; Your plans</a>
-<h1 class="ph">{{ prog.title }}</h1>
+<h1 class="ph rise" style="--i:0">{{ prog.title }}</h1>
 {% if just == 'committed' %}<p class="flash">Committed. Today and your calendar now follow this plan.</p>
 {% elif just == 'said' and changed %}
 <div class="changed" role="status">
@@ -261,27 +285,27 @@
 {% endif %}
 
 {% if g.status == 'draft' %}
-<div class="commitbox">
+<div class="commitbox rise" style="--i:1">
   <span class="pill draft">Draft</span>
   <h2 style="margin-top:14px">This is a preview. Nothing changes until you commit.</h2>
   <p>Change anything below, in your own words or field by field, then commit. From then on, every morning's prescription and your calendar follow it.</p>
 </div>
 {% elif live %}
-<div class="commitbox on">
+<div class="commitbox on rise" style="--i:1">
   <span class="pill active">Committed</span>
   <h2 style="margin-top:14px">You're committed.</h2>
   <p>Since {{ date.fromisoformat(g.committed).strftime('%B %-d') }}. Week {{ r.week }}{% if r.of %} of {{ r.of }}{% endif %}.{% if others %} Running alongside {{ others|length }} other plan{{ 's' if others|length > 1 }}.{% endif %}</p>
   {% if r.of %}<div class="bar2" role="img" aria-label="Week {{ r.week }} of {{ r.of }}"><i style="width:{{ (100 * r.week / r.of)|round(1) }}%"></i></div>{% endif %}
 </div>
 {% else %}
-<div class="commitbox">
+<div class="commitbox rise" style="--i:1">
   <span class="pill">Stopped</span>
   <h2 style="margin-top:14px">Stopped {{ date.fromisoformat(g.stopped_on).strftime('%B %-d') if g.stopped_on }}.</h2>
   <p>It sets nothing from that day on. What you did while on it stays in your history.</p>
 </div>
 {% endif %}
 
-<div class="count">
+<div class="count rise" style="--i:2">
   {% if prog.days_left is not none %}<div><b>{{ prog.days_left }}</b><span>days to go</span></div>{% endif %}
   {% if prog.pace %}<div><b>{{ prog.pace }}</b><span>goal pace a mile</span></div>{% endif %}
   {% if prog.phase %}<div><b>{{ prog.phase }}</b><span>this week</span></div>{% endif %}
@@ -376,4 +400,9 @@
 </div>
 {% endif %}
 </div>
+<script>
+(() => { document.addEventListener('submit', e => { const b = e.submitter || e.target.querySelector('button[type=submit]');
+  if (b && b.classList.contains('btn')) { b.classList.add('busy'); b.setAttribute('aria-busy', 'true'); } }); })();
+addEventListener('pageshow', () => document.querySelectorAll('.btn.busy').forEach(b => { b.classList.remove('busy'); b.removeAttribute('aria-busy'); }));
+</script>
 {% endblock %}

@@ -4,6 +4,8 @@
   .me { margin-top:28px; border-top:2px solid var(--ink); }
   .me a { display:grid; grid-template-columns:200px 1fr 20px; gap:20px; align-items:center; padding:22px 0; border-bottom:1px solid var(--rule); text-decoration:none; }
   .me a:hover b { color:var(--ceiling); }
+  .me b, .me i { transition:color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease), transform var(--t-fast) var(--ease); }
+  .me a:hover i { border-color:var(--ink); transform:translateX(2px) rotate(45deg); }
   .me b { font-size:22px; font-weight:600; }
   .me span { color:var(--lichen); font-size:17px; }
   .me i { justify-self:end; width:9px; height:9px; border-right:1.5px solid #b9b9be; border-top:1.5px solid #b9b9be; transform:rotate(45deg); }
@@ -11,8 +13,8 @@
 </style>
 {% endblock %}
 {% block body %}
-<h1>Profile</h1>
-<nav class="me">
+<h1 class="rise" style="--i:0">Profile</h1>
+<nav class="me rise" style="--i:1">
   <a href="/profile"><b>Your numbers</b><span>Your thresholds, max heart rate and how they were measured.</span><i></i></a>
   <a href="/data"><b>Data</b><span>What came in from your watch, and your connection.</span><i></i></a>
   <a href="/logout"><b>Sign out</b><span></span><i></i></a>

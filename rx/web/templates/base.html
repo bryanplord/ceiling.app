@@ -40,6 +40,35 @@
     --s-rec:#8e7cc3; --s-end:#4a7fd4; --s-aer:#2e9e6a; --s-tem:#e0b030; --s-thr:#ee7a30; --s-max:#ff3b30;
     --spectrum:linear-gradient(90deg, var(--s-rec) 0 16.66%, var(--s-end) 0 33.33%, var(--s-aer) 0 50%, var(--s-tem) 0 66.66%, var(--s-thr) 0 83.33%, var(--s-max) 0);
     --face:"Archivo", -apple-system, "Helvetica Neue", Arial, sans-serif;
+    /* Motion, after apple.com: one easing, short durations, nothing bounces. */
+    --ease:cubic-bezier(.28, .11, .32, 1);      /* apple.com's standard curve */
+    --ease-out:cubic-bezier(.16, 1, .3, 1);     /* things arriving */
+    --t-fast:.2s; --t:.4s; --t-slow:.7s;
+  }
+  /* Page to page: the bar stays put, the page cross-fades (Safari 18.2+, Chrome 126+). */
+  @view-transition { navigation:auto; }
+  ::view-transition-old(root) { animation:var(--t-fast) var(--ease) both vt-out; }
+  ::view-transition-new(root) { animation:var(--t) var(--ease-out) both vt-in; }
+  @keyframes vt-out { to { opacity:0; } }
+  @keyframes vt-in { from { opacity:0; transform:translateY(8px); } }
+  .bar { view-transition-name:bar; }
+  .spec { view-transition-name:spec; }
+  /* First paint: the page settles in once. Pages mark their own pieces with .rise (and --i for order). */
+  @keyframes rise { from { opacity:0; transform:translateY(14px); } }
+  .rise { animation:rise var(--t-slow) var(--ease-out) both; animation-delay:calc(var(--i, 0) * 70ms); }
+  /* Controls answer the finger: colour eases, a press sinks a little. */
+  a, button, .pill, summary { transition:color var(--t-fast) var(--ease), background-color var(--t-fast) var(--ease),
+                              border-color var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease),
+                              opacity var(--t-fast) var(--ease), transform var(--t-fast) var(--ease); }
+  button:active, .pill:active { transform:scale(.97); }
+  /* Disclosures open and close smoothly where the browser can animate to auto height. */
+  :root { interpolate-size:allow-keywords; }
+  details::details-content { height:0; overflow:clip; opacity:0;
+                             transition:height var(--t) var(--ease), opacity var(--t) var(--ease), content-visibility var(--t) allow-discrete; }
+  details[open]::details-content { height:auto; opacity:1; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after, ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) {
+      animation-duration:.01ms !important; animation-delay:0s !important; transition-duration:.01ms !important; }
   }
   * { box-sizing:border-box; }
   html { -webkit-text-size-adjust:100%; }
@@ -59,6 +88,8 @@
   .bar .wordmark { font-size:21px; flex:none; }
   .bar nav { display:flex; gap:24px; overflow-x:auto; font-size:15px; margin-left:auto; scrollbar-width:none; }
   .bar nav a { text-decoration:none; color:var(--lichen); white-space:nowrap; padding:4px 0; }
+  .bar nav a { box-shadow:inset 0 0 0 var(--ceiling); }
+  .bar nav a:hover { color:var(--ink); }
   .bar nav a.on { color:var(--ink); box-shadow:inset 0 -2px 0 var(--ceiling); }
 
   main { max-width:1200px; margin:0 auto; padding:24px 32px 120px; }

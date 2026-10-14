@@ -2,13 +2,15 @@
 {% block body %}
 {% if sessions %}
   {% set best = sessions | selectattr(1) | map(attribute=1) | map(attribute='score') | list %}
-  <h1>{{ best | max if best else '—' }}%</h1>
+  <h1 class="rise" style="--i:0">{{ best | max if best else '—' }}%</h1>
 {% else %}
-  <h1>No sessions.</h1>
+  <h1 class="rise" style="--i:0">No sessions.</h1>
 {% endif %}
 
+<div class="rise" style="--i:1">
 <h2>Prescribed</h2>
 <p class="big">{{ rx.do }}</p>
+</div>
 
 {% for a, s in sessions %}
 <h2>{{ a.name or a.sport }}</h2>

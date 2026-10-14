@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block head %}
 {% include "_daystyle.html" %}
+{% include "_motion.html" %}
 <style>
   .dhead { display:flex; justify-content:space-between; align-items:baseline; gap:24px; flex-wrap:wrap; margin-bottom:28px; }
   .dh1 { font-size:clamp(36px, 7vw, 72px); margin:0; }
@@ -9,14 +10,30 @@
   .dtop h2 { font-size:22px; font-weight:750; margin:0 0 10px; }
   .dtop .en { margin-top:0; }
   .dtop .roomh, .dtop .roomsub { text-align:right; }
+  /* Tiles answer the pointer quietly: a lift of a pixel and a soft shadow. */
+  .tile { transition:transform var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease), background-color var(--t-fast) var(--ease); }
+  .tile:hover { transform:translateY(-1px); box-shadow:0 6px 18px rgba(10,10,10,.07); }
+  .tile:active { transform:translateY(0); box-shadow:none; }
+  .tile .batt i { transform-origin:left; animation:grow-x var(--t-slow) var(--ease-out) .35s both; }
+  .card { transition:background-color var(--t-fast) var(--ease); }
+  /* The heart chart's time window: the old one fades out as the new one fades in, in the same place. */
+  .rwins { display:grid; }
+  .rwins > .rwin { grid-area:1 / 1; min-width:0; }
+  .rwin.leaving { display:block; pointer-events:none; animation:rwin-out var(--t-fast) var(--ease) both; }
+  .rwin.entering { animation:rwin-in var(--t) var(--ease-out) both; }
+  @keyframes rwin-out { to { opacity:0; } }
+  @keyframes rwin-in { from { opacity:0; } }
+  .rtog button { transition:color var(--t-fast) var(--ease), background-color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease), transform var(--t-fast) var(--ease); }
+  .rtog button:not(:disabled):not([aria-selected="true"]):hover { border-color:var(--ink); }
+  .loading-h { display:flex; align-items:center; gap:14px; }
   @media (max-width: 900px) { .dtop { grid-template-columns:1fr; gap:40px; } .dtop .roomh, .dtop .roomsub { text-align:left; } }
 </style>
 {% endblock %}
 {% from "_metric.html" import metric with context %}
 {% block body %}
 {% include "_dashnav.html" %}
-<div class="dhead"><h1 class="dh1">Dashboard.</h1><p>{{ day_label }}. Everything Ceiling reads, and what it means.</p></div>
-<nav class="tiles" aria-label="Your status">
+<div class="dhead rise" style="--i:0"><h1 class="dh1">Dashboard.</h1><p>{{ day_label }}. Everything Ceiling reads, and what it means.</p></div>
+<nav class="tiles rise" style="--i:1" aria-label="Your status">
   <a class="tile day v-{{ rx.verdict }}" href="/"><span class="tn">Today</span><span class="tv">{{ {'rest':'Day off','light':'Walk','easy':'Easy','steady':'Steady','hard':'Hard'}[rx.verdict] }}</span><span class="ts {{ d.recovery.tone }}">{{ d.recovery.state }}</span></a>
   {% if energy %}{% set et = 'good' if energy.now >= 60 else 'ok' if energy.now >= 35 else 'bad' %}<a class="tile t-{{ et }}" href="#energy"><span class="tn">Energy</span><span class="tv">{{ energy.now }}</span><span class="ts {{ et }}">{{ energy.wake }} when you woke</span><span class="batt"><i style="width:{{ energy.now }}%;background:{{ 'var(--s-aer)' if energy.now >= 60 else 'var(--s-tem)' if energy.now >= 35 else 'var(--ceiling)' }}"></i></span></a>{% endif %}
   {% set T = [(d.hrv, '/trends#hrv'), (d.rhr, '/trends#rhr'), (d.sleep, '/trends#sleep'), (d.freshness, '/trends#load'), (d.fitness, '/progress')] %}
@@ -30,7 +47,7 @@
   {% endfor %}
   {% if p.program %}<a class="tile t-none" href="/plan"><span class="tn">Goal</span><span class="tv">{{ p.program.days_left if p.program.days_left is not none else '∞' }}</span><span class="ts none">{{ 'days to go' if p.program.days_left is not none else p.program.phase }}</span></a>{% endif %}
 </nav>
-<div class="dtop">
+<div class="dtop rise" style="--i:2">
   <div>
     {% if energy %}<section class="en" id="energy">
       <h2>Energy</h2>
@@ -45,11 +62,15 @@
     <h2 class="roomh">Your heart</h2>
     <p class="roomsub">Your zones, and where your heart actually was.</p>
     <div class="rtog" role="tablist" aria-label="Time window">{% for r in rooms %}<button type="button" role="tab" data-k="{{ r.key }}" aria-selected="{{ 'true' if r.on else 'false' }}"{{ ' disabled' if r.empty }}>{{ r.label }}</button>{% endfor %}</div>
-    {% for r in rooms if not r.empty %}<div class="rwin" data-k="{{ r.key }}"{{ '' if r.on else ' hidden' }}>{{ r.svg | safe }}</div>{% endfor %}
+    <div class="rwins">{% for r in rooms if not r.empty %}<div class="rwin" data-k="{{ r.key }}"{{ '' if r.on else ' hidden' }}>{{ r.svg | safe }}</div>{% endfor %}</div>
     <script>
     (() => { const bs = document.querySelectorAll('.rtog button'), ws = document.querySelectorAll('.rwin');
+      const done = e => e.currentTarget.classList.remove('leaving', 'entering');
+      ws.forEach(w => w.addEventListener('animationend', done));
       const pick = k => { bs.forEach(b => b.setAttribute('aria-selected', b.dataset.k === k));
-        ws.forEach(w => w.hidden = w.dataset.k !== k); };
+        ws.forEach(w => { const on = w.dataset.k === k;
+          if (on && w.hidden) { w.classList.remove('leaving'); w.hidden = false; w.classList.add('entering'); }
+          else if (!on && !w.hidden) { w.classList.remove('entering'); w.hidden = true; w.classList.add('leaving'); } }); };
       bs.forEach(b => b.addEventListener('click', () => pick(b.dataset.k))); })();
     </script>
     <p class="roomcap">Aim for the number. Stay in the range.{% if rx.max_minutes %} {{ rx.max_minutes }} minutes max.{% endif %}</p>
@@ -57,8 +78,8 @@
 {% endif %}
 </div>
 {% if not d.has_data %}
-<section class="band empty">
-  <h2>Your history is loading.</h2>
+<section class="band empty" role="status">
+  <h2 class="loading-h"><span class="ring" aria-hidden="true"></span>Your history is loading.</h2>
   <p class="muted">Ceiling is pulling your activities and nights from intervals.icu. Refresh in a few minutes.</p>
 </section>
 {% else %}

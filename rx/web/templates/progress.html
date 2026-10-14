@@ -22,17 +22,17 @@
 {% block body %}
 {% include "_dashnav.html" %}
 <div class="pg">
-<h1>{{ p.progress.headline }}</h1>
-{% if m.earned %}<p class="earned">{{ m.earned }}</p>{% endif %}
+<h1 class="rise" style="--i:0">{{ p.progress.headline }}</h1>
+{% if m.earned %}<p class="earned rise" style="--i:1">{{ m.earned }}</p>{% endif %}
 
 {% if m.wins or m.milestones %}
-<section class="blk"><h2>What's getting better</h2>
+<section class="blk rise" style="--i:2"><h2>What's getting better</h2>
   <ul class="wins">{% for x in m.milestones %}<li><b>{{ x }}</b></li>{% endfor %}{% for x in m.wins %}<li>{{ x }}</li>{% endfor %}</ul>
 </section>
 {% endif %}
 
 {% if m.markers %}
-<section class="blk"><h2>What we're watching</h2>
+<section class="blk rise" style="--i:3"><h2>What we're watching</h2>
   <p class="sub">The few numbers that say whether this is working, and which way they should go.</p>
   <div class="mk">{% for name, val, why, tone in m.markers %}<div><b>{{ name }}</b><strong class="{{ tone }}">{{ val }}</strong><p>{{ why }}</p></div>{% endfor %}</div>
 </section>
