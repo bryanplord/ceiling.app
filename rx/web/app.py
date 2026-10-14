@@ -952,7 +952,7 @@ def history_page(request: Request, m: str | None = None):
 
 
 @app.get("/calendar", response_class=HTMLResponse)
-def plan_page(request: Request, m: str | None = None):
+def plan_page(request: Request, m: str | None = None, v: str | None = None):
     from ..prescribe import plan as planmod
     store = open_store()
     p, rx = today_rx(store)
@@ -1011,7 +1011,7 @@ def plan_page(request: Request, m: str | None = None):
                     lifts[dd] = (sg.SESSIONS[k]["name"], bool(lg and lg.get("done")))
     except Exception as e:
         print(f"calendar lifts failed: {e!r}")
-    return _page(request, "calendar.html", lifts=lifts, plan=pl, changed=changed, hist=hist, feed=feed, date=date, done=done, past=past,
+    return _page(request, "calendar.html", view="month" if v == "month" or m else "upcoming", lifts=lifts, plan=pl, changed=changed, hist=hist, feed=feed, date=date, done=done, past=past,
                  cal=cal[mi] if cal else None, cal_prev=yms[mi - 1] if mi > 0 else None,
                  cal_next=yms[mi + 1] if mi + 1 < len(yms) else None, cal_end=date.fromisoformat(cal[-1]["end"]).strftime("%B %-d, %Y") if cal else "",
                  has_plan=bool(getattr(p, "programs", None) or getattr(p, "program", None)))
