@@ -5,9 +5,15 @@
 <style>
   .t-top { display:flex; justify-content:space-between; align-items:baseline; gap:12px 32px; flex-wrap:wrap; padding-top:20px; }
   .t-when { margin:0; font-size:clamp(24px, 2.6vw, 30px); line-height:1.1; font-weight:800; font-stretch:118%; letter-spacing:-0.01em; }
-  .t-top .bodyl { margin:0; text-wrap:balance; }
+  .t-body { margin:8px 0 0; font-size:15px; }
   .t-left { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
-  .t-left .syncf { margin:0; }
+  .t-left .syncf { margin:0; display:inline-flex; }
+  .syncf .syncspin { display:none; } .syncf.busy .syncspin { display:inline-flex; } .syncf.busy button { display:none; }
+  .syncspin { width:24px; height:24px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center;
+              background:conic-gradient(#8e7cc3, #4a7fd4, #2e9e6a, #e0b030, #ee7a30, #ff3b30, #8e7cc3); animation:spin 1.1s linear infinite; }
+  .syncspin i { width:15px; height:15px; border-radius:50%; background:var(--snow); }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .syncspin { animation:pulse 1.6s ease-in-out infinite; } @keyframes pulse { 50% { opacity:.35; } } }
   .t-meta { display:flex; align-items:center; flex-wrap:wrap; gap:6px 14px; margin:10px 0 0; font-size:15px; color:var(--lichen); }
   .t-meta .goalline { margin:0; font-size:15px; }
   .t-meta .syncf { margin:0; }
@@ -76,10 +82,10 @@
 {% endif %}
 <div class="t-top">
   <div class="t-left"><h1 class="t-when">{{ day_label }}</h1>
-  {% if syncing %}<span class="syncing">Syncing your Garmin data… this page refreshes itself.</span>
-  {% else %}<form method="post" action="/sync" class="syncf"><button type="submit" title="{% if updated is not none %}Updated {{ 'just now' if updated < 2 else (updated ~ ' min ago' if updated < 120 else (updated // 60) ~ ' hours ago') }}{% endif %}">Sync now</button></form>{% endif %}</div>
-  {% if body %}<p class="bodyl"><a href="/dashboard">Your body today: {{ body }}</a></p>{% endif %}
+  {% if syncing %}<span class="syncspin" role="status" aria-label="Syncing your Garmin data" title="Syncing your Garmin data"><i></i></span>
+  {% else %}<form method="post" action="/sync" class="syncf" onsubmit="this.classList.add('busy')"><span class="syncspin" role="status" aria-label="Syncing"><i></i></span><button type="submit" title="{% if updated is not none %}Updated {{ 'just now' if updated < 2 else (updated ~ ' min ago' if updated < 120 else (updated // 60) ~ ' hours ago') }}{% endif %}">Sync now</button></form>{% endif %}</div>
 </div>
+{% if body %}<p class="bodyl t-body"><a href="/dashboard">{{ body[:1] | upper }}{{ body[1:] }}. Your dashboard</a></p>{% endif %}
 {% if p.program %}<p class="t-meta"><a class="goalline" href="/plan">{{ p.program.title }}{% if p.program.days_left is not none %}: {{ p.program.days_left }} days{% endif %}{% if p.program.phase %}, {{ p.program.phase }} week{% endif %}</a></p>{% endif %}
 <div class="t-coach"><span class="ring" aria-hidden="true"><i></i></span>
   <p>{% if M %}{{ M.word }}. {{ M.head }}{% if jnote %} {{ jnote }}{% endif %}{% elif done %}Done for today.{% if jnote %} {{ jnote }}{% endif %}{% else %}{{ C.intro }}{% if jnote %} {{ jnote }}{% endif %}{% endif %}</p></div>
