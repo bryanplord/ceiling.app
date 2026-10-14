@@ -9,3 +9,43 @@
   .dnav a[aria-current] { background:var(--ink); border-color:var(--ink); color:var(--snow); }
   @media (max-width:760px) { .dnav { flex-wrap:nowrap; overflow-x:auto; margin:0 -20px 24px; padding:0 20px; scrollbar-width:none; } .dnav a { flex:0 0 auto; } }
 </style>
+<script>
+/* Dashboard sub-pages switch in place: the page behind fetches while the pill moves, the content
+   cross-fades, the address bar updates, Back works. Hovering a tab fetches it ahead of the click. */
+(() => {
+  if (window.__dnav) return; window.__dnav = true;
+  const cache = new Map();
+  const get = href => { if (!cache.has(href)) cache.set(href, fetch(href, {credentials: 'same-origin'}).then(r => r.ok ? r.text() : Promise.reject(r.status))); return cache.get(href); };
+  const swap = async (href, push) => {
+    let html;
+    try { html = await get(href); } catch (e) { location.href = href; return; }
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const nm = doc.querySelector('main'); if (!nm) { location.href = href; return; }
+    const apply = () => {
+      document.querySelectorAll('style[data-sub]').forEach(s => s.remove());
+      document.querySelectorAll('head style:not([data-base])').forEach(s => { if (!s.dataset.kept) s.remove(); });
+      doc.querySelectorAll('head style').forEach((s, i) => { if (i === 0) return; const n = document.createElement('style'); n.dataset.sub = '1'; n.textContent = s.textContent; document.head.appendChild(n); });
+      const m = document.querySelector('main'); m.className = nm.className; m.innerHTML = nm.innerHTML;
+      m.querySelectorAll('script').forEach(old => { const s = document.createElement('script'); s.textContent = old.textContent; old.replaceWith(s); });
+      document.title = doc.title;
+      if (window.__draw) window.__draw();
+      else document.querySelectorAll('svg').forEach(x => x.classList.add('in'));
+      if (push) { history.pushState({dnav: 1}, '', href); window.scrollTo({top: 0}); }
+    };
+    if (document.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches) document.startViewTransition(apply);
+    else apply();
+  };
+  document.querySelectorAll('head style').forEach((s, i) => { if (i === 0) s.dataset.base = '1'; });
+  document.addEventListener('click', e => {
+    const a = e.target.closest('.dnav a'); if (!a || e.metaKey || e.ctrlKey || e.shiftKey) return;
+    e.preventDefault();
+    if (a.getAttribute('aria-current')) return;
+    document.querySelectorAll('.dnav a').forEach(x => x.removeAttribute('aria-current')); a.setAttribute('aria-current', 'page');
+    swap(a.getAttribute('href'), true);
+  });
+  ['pointerenter', 'touchstart', 'focusin'].forEach(ev => document.addEventListener(ev, e => {
+    const a = e.target.closest && e.target.closest('.dnav a'); if (a && !a.getAttribute('aria-current')) get(a.getAttribute('href'));
+  }, {capture: true, passive: true}));
+  window.addEventListener('popstate', () => { if (/^\/(dashboard|trends|recovery|zones|progress|you)$/.test(location.pathname)) swap(location.pathname, false); });
+})();
+</script>

@@ -44,6 +44,7 @@
       if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { rootMargin:'0px 0px -6% 0px' });
     els.forEach(el => io.observe(el));
   };
+  window.__draw = go;                                   // dashboard tabs swap content in place and call this again
   document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', go) : go();
 })();
 </script>
