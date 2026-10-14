@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block head %}
+{% include "_daystyle.html" %}
+<style>
+  .dhead { display:flex; justify-content:space-between; align-items:baseline; gap:24px; flex-wrap:wrap; margin-bottom:28px; }
+  .dh1 { font-size:clamp(36px, 7vw, 72px); margin:0; }
+  .dhead p { margin:0; color:var(--lichen); font-size:17px; }
+  .dtop { display:grid; grid-template-columns:minmax(0, 6fr) minmax(0, 5fr); gap:56px; align-items:start; padding:8px 0 56px; }
+  .dtop h2 { font-size:22px; font-weight:750; margin:0 0 10px; }
+  .dtop .en { margin-top:0; }
+  .dtop .roomh, .dtop .roomsub { text-align:right; }
+  @media (max-width: 900px) { .dtop { grid-template-columns:1fr; gap:40px; } .dtop .roomh, .dtop .roomsub { text-align:left; } }
+</style>
+{% endblock %}
+{% from "_metric.html" import metric with context %}
+{% block body %}
+{% include "_dashnav.html" %}
+<div class="dhead"><h1 class="dh1">Dashboard.</h1><p>{{ day_label }}. Everything Ceiling reads, and what it means.</p></div>
+<nav class="tiles" aria-label="Your status">
+  <a class="tile day v-{{ rx.verdict }}" href="/"><span class="tn">Today</span><span class="tv">{{ {'rest':'Day off','light':'Walk','easy':'Easy','steady':'Steady','hard':'Hard'}[rx.verdict] }}</span><span class="ts {{ d.recovery.tone }}">{{ d.recovery.state }}</span></a>
+  {% if energy %}{% set et = 'good' if energy.now >= 60 else 'ok' if energy.now >= 35 else 'bad' %}<a class="tile t-{{ et }}" href="#energy"><span class="tn">Energy</span><span class="tv">{{ energy.now }}</span><span class="ts {{ et }}">{{ energy.wake }} when you woke</span><span class="batt"><i style="width:{{ energy.now }}%;background:{{ 'var(--s-aer)' if energy.now >= 60 else 'var(--s-tem)' if energy.now >= 35 else 'var(--ceiling)' }}"></i></span></a>{% endif %}
+  {% set T = [(d.hrv, '/trends#hrv'), (d.rhr, '/trends#rhr'), (d.sleep, '/trends#sleep'), (d.freshness, '/trends#load'), (d.fitness, '/progress')] %}
+  {% for m, href in T %}
+  <a class="tile t-{{ m.tone }}" href="{{ href }}">
+    <span class="tn">{{ m.name }}</span>
+    <span class="tv">{{ m.value }}</span>
+    <span class="ts {{ m.tone }}">{{ m.state }}</span>
+    {% if m.series %}<span class="tsp">{{ spark(m.series[-30:], 120, 26, m.band) | safe }}</span>{% endif %}
+  </a>
+  {% endfor %}
+  {% if p.program %}<a class="tile t-none" href="/plan"><span class="tn">Goal</span><span class="tv">{{ p.program.days_left if p.program.days_left is not none else '∞' }}</span><span class="ts none">{{ 'days to go' if p.program.days_left is not none else p.program.phase }}</span></a>{% endif %}
+</nav>
+<div class="dtop">
+  <div>
+    {% if energy %}<section class="en" id="energy">
+      <h2>Energy</h2>
+      <p class="env"><b>{{ energy.now }}</b> now, {{ energy.wake }} when you woke. {{ energy.say }}</p>
+      <div class="cards">{% for n, pt, of, note in energy.parts %}<div class="card t-{{ 'good' if pt >= of * 0.8 else 'ok' if pt >= of * 0.55 else 'bad' }}"><span class="cl">{{ n }}</span><span class="cv">{{ pt }}<small>/{{ of }}</small></span><span class="cn">{{ note }}</span></div>{% endfor %}
+      {% for n, c in energy.drain if c > 0 %}<div class="card dr"><span class="cl">Drain: {{ n }}</span><span class="cv">−{{ c }}</span></div>{% endfor %}</div>
+      <p class="parts">Ceiling's formula: sleep, HRV, resting HR and freshness charge it. Each hour awake costs 2.5. Each session costs 0.3 × its load × how hard it was.</p>
+    </section>{% endif %}
+  </div>
+{% if rooms %}
+  <div>
+    <h2 class="roomh">Your heart</h2>
+    <p class="roomsub">Your zones, and where your heart actually was.</p>
+    <div class="rtog" role="tablist" aria-label="Time window">{% for r in rooms %}<button type="button" role="tab" data-k="{{ r.key }}" aria-selected="{{ 'true' if r.on else 'false' }}"{{ ' disabled' if r.empty }}>{{ r.label }}</button>{% endfor %}</div>
+    {% for r in rooms if not r.empty %}<div class="rwin" data-k="{{ r.key }}"{{ '' if r.on else ' hidden' }}>{{ r.svg | safe }}</div>{% endfor %}
+    <script>
+    (() => { const bs = document.querySelectorAll('.rtog button'), ws = document.querySelectorAll('.rwin');
+      const pick = k => { bs.forEach(b => b.setAttribute('aria-selected', b.dataset.k === k));
+        ws.forEach(w => w.hidden = w.dataset.k !== k); };
+      bs.forEach(b => b.addEventListener('click', () => pick(b.dataset.k))); })();
+    </script>
+    <p class="roomcap">Aim for the number. Stay in the range.{% if rx.max_minutes %} {{ rx.max_minutes }} minutes max.{% endif %}</p>
+  </div>
+{% endif %}
+</div>
+{% if not d.has_data %}
+<section class="band empty">
+  <h2>Your history is loading.</h2>
+  <p class="muted">Ceiling is pulling your activities and nights from intervals.icu. Refresh in a few minutes.</p>
+</section>
+{% else %}
+
+{% if rx.reading %}
+<section class="band reading">
+  <h2>Last night, read</h2>
+  <p class="rtitle {{ rx.reading.tone }}">{{ rx.reading.title }}</p>
+  <p class="rsays">{{ rx.reading.says }}</p>
+  <ul class="evidence">
+    {% for e in rx.reading.evidence %}<li class="{{ e.tone }}"><b>{{ e.name }}</b>{{ e.line }}</li>{% endfor %}
+  </ul>
+  {% if rx.reading.ask %}<p class="ask">{{ rx.reading.ask }}</p>{% endif %}
+  <p class="conf">{{ rx.reading.confidence }} Today: {{ rx.reading.action | lower }}</p>
+</section>
+{% endif %}
+
+{% if rx.sleep and rx.sleep.nights %}
+<section class="band sleepb">
+  <h2>Sleep bank</h2>
+  <p class="rtitle {{ rx.sleep.tone }}">{{ rx.sleep.title }}</p>
+  <p class="rsays">{{ rx.sleep.says }}</p>
+  <div class="sbwrap">{{ sleep_chart | safe }}</div>
+  <p class="legend"><span><i class="k plusk"></i>Slept more than you needed</span><span><i class="k minusk"></i>Short of what you needed</span><span>Need is {{ base_need }} a night, plus extra after big days. Poor sleep scores count for less.</span></p>
+  <div class="twocol">
+    <div><h3>Tonight</h3><p class="tonight">{{ rx.tonight }}</p></div>
+    <div><h3>What tonight decides</h3>
+      <ul class="evidence">{% for label, cap, words in rx.sleep_if %}<li class="{{ 'good' if cap == 'hard' else 'ok' if cap == 'steady' else 'bad' }}"><b>{{ label }}</b>{{ words[:1] | upper }}{{ words[1:] }}.</li>{% endfor %}</ul>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% if st.standing %}
+<section class="band cycle">
+  <h2>Where you are in your cycle</h2>
+  <p class="rsays">{{ st.standing }}</p>
+  {% if hist %}<div class="histwrap">{{ hist | safe }}</div>
+  <p class="legend"><span><i class="k best"></i>Your best 3 weeks</span><span><i class="k norm"></i>Your normal range now</span><span><i class="k nowk"></i>Now</span></p>{% endif %}
+  {% if st.best_says %}<p class="rsays">{{ st.best_says }}</p>{% endif %}
+  {% if st.differences %}
+  <div class="twocol">
+    <div><h3>Then vs now</h3><ul class="evidence">{% for l in st.differences %}<li class="{{ l.tone }}">{{ l.text }}</li>{% endfor %}</ul></div>
+    <div><h3>How to get back there</h3><ol class="getback">{% for g in st.get_back %}<li>{{ g }}</li>{% endfor %}</ol></div>
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if st.good or st.work_on %}
+<section class="band you">
+  <h2>You, right now</h2>
+  <div class="twocol">
+    <div><h3>What you're good at</h3>
+      {% for l in st.good %}<p class="yl good">{{ l.text }}{% if l.trend %} <em class="tr {{ l.trend }}">{{ {'better':'Getting better','worse':'Slipping','flat':'Holding'}[l.trend] }}</em>{% endif %}</p>{% else %}<p class="muted">Not enough history yet.</p>{% endfor %}
+    </div>
+    <div><h3>What to work on</h3>
+      {% for l in st.work_on %}<p class="yl {{ l.tone }}">{{ l.text }}{% if l.trend %} <em class="tr {{ l.trend }}">{{ {'better':'Getting better','worse':'Getting worse','flat':'No change'}[l.trend] }}</em>{% endif %}</p>{% else %}<p class="muted">Nothing stands out. Keep going.</p>{% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+
+<section class="band split">
+  <div>
+    <h2><b>Activity</b>what you've put in</h2>
+    {% for m in [d.load, d.fitness, d.freshness] %}{{ metric(m) }}{% endfor %}
+    {% if d.mix %}
+    <div class="metric">
+      <div class="mtop"><span class="mname">Intensity, last 4 weeks</span><span class="state none">{{ '%.1f' % d.weekly_hours }} h a week</span></div>
+      <div class="chart" style="grid-column:1 / -1">
+        <div class="mix" role="img" aria-label="Easy {{ (d.mix.easy*100)|round|int }}%, middle {{ (d.mix.middle*100)|round|int }}%, hard {{ (d.mix.hard*100)|round|int }}%">
+          <span class="easy" style="flex: {{ d.mix.easy }}"></span><span class="middle" style="flex: {{ d.mix.middle }}"></span><span class="hard" style="flex: {{ d.mix.hard }}"></span>
+        </div>
+      </div>
+      <p class="mdetail mixkey">
+        <span><i class="k easy"></i>Easy {{ (d.mix.easy*100)|round|int }}%</span>
+        <span><i class="k middle"></i>Middle {{ (d.mix.middle*100)|round|int }}%</span>
+        <span><i class="k hard"></i>Hard {{ (d.mix.hard*100)|round|int }}%</span>
+      </p>
+    </div>
+    {% endif %}
+    {% if recent %}
+    <div class="recent">
+      {% for a in recent %}<div><span>{{ a.when }}</span><span>{{ a.what }}</span><span class="num">{{ a.stats }}</span></div>{% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  <div>
+    <h2><b>Recovery</b>how you're absorbing it</h2>
+    {% for m in [d.hrv, d.rhr] %}{{ metric(m, band=True) }}{% endfor %}
+    {{ metric(d.sleep, bars=True) }}
+  </div>
+</section>
+
+<section class="band">
+  <h2>What matters most this week</h2>
+  <p class="call">{{ d.priority.headline }}</p>
+  <p class="callwhy">{{ d.priority.why }}</p>
+  <ul class="todo">{% for t in d.priority.this_week %}<li>{{ t }}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+
+{% endblock %}

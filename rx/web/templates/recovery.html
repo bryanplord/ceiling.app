@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block body %}
+{% include "_dashnav.html" %}
 {% set last = days[-1] %}
 <h1>{% if last.reds %}Not recovered.{% elif last.ambers %}Partly recovered.{% elif last.known %}Recovered.{% else %}No data yet.{% endif %}</h1>
 

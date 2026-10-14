@@ -366,13 +366,61 @@ def _page(request: Request, name: str, **ctx):
     return templates.TemplateResponse(request, name, {"active": name.split(".")[0], **ctx})
 
 
+def _energy(store, p, rx):
+    from ..analysis import energy as en
+    from zoneinfo import ZoneInfo
+    try:
+        wk = float(store.get_meta("wake_hour") or 7.0)
+    except ValueError:
+        wk = 7.0
+    try:
+        from ..config import settings as _st
+        return en.build(p, rx.date, datetime.now(ZoneInfo(_st().tz)).replace(tzinfo=None), wk)
+    except Exception as e:
+        print(f"energy failed: {e}")
+        return None
+
+
 @app.get("/", response_class=HTMLResponse)
 def today(request: Request, d: str | None = None):
+    """Today is the prescription (or, after a session, the review) and the check-in. The numbers live
+    in the Dashboard; one quiet line links there."""
     if not _signed_in(request):
         return _site(request, "site_home.html")
     _refresh_in_background()
     store = open_store()
     p, rx = today_rx(store, d)
+    dash = cached(store, "dash", rx.date, lambda: dashboard.build(store, p, rx))
+    when = date.fromisoformat(rx.date)
+    last = store.get_meta("last_sync")
+    mins_ago = int((time.time() - float(last)) / 60) if last and float(last) > 0 else None
+    lk = _sync_locks.get(current_owner.get())
+    syncing = bool(lk and lk.locked())   # only a sync actually in progress; never a stale flag
+    from .. import journal as jr
+    entry = jr.load(store, rx.date)
+    after = _after(store, p, rx, entry)
+    energy = _energy(store, p, rx)
+    body = []
+    if dash.has_data:
+        if dash.sleep.value not in ("", "—"):
+            body.append(f"slept {dash.sleep.value}")
+        if energy:
+            body.append(f"energy {energy.now}")
+        if dash.hrv.value not in ("", "—"):
+            body.append(f"HRV {dash.hrv.value}")
+    pats = cached(store, "patterns", rx.date, lambda: jr.patterns(store, p.wellness))
+    return _page(request, "today.html", rx=rx, waiting=not _have_last_night(store), updated=mins_ago,
+                 after=after, entry=entry, timeline=jr.timeline(entry), jnote=jr.effect(entry["tags"], jr.hrv_low(p.wellness, rx.date))[1] if entry else "", patterns=pats,
+                 syncing=syncing, p=p, body=", ".join(body),
+                 day_label=when.strftime("%A, %B %-d"))
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+def dashboard_page(request: Request):
+    """Where you dig in: status tiles, energy, your heart over any window, last night read, sleep bank,
+    your cycle, what you're good at, activity and recovery, and what matters this week."""
+    store = open_store()
+    p, rx = today_rx(store)
     dash = cached(store, "dash", rx.date, lambda: dashboard.build(store, p, rx))
     st = cached(store, "story", rx.date, lambda: storymod.build(store, p))
     when = date.fromisoformat(rx.date)
@@ -388,31 +436,10 @@ def today(request: Request, d: str | None = None):
         recent.append({"when": label, "what": a.name or a.sport.capitalize(), "stats": dur + hr})
         if len(recent) == 5:
             break
-    last = store.get_meta("last_sync")
-    mins_ago = int((time.time() - float(last)) / 60) if last and float(last) > 0 else None
-    lk = _sync_locks.get(current_owner.get())
-    syncing = bool(lk and lk.locked())   # only a sync actually in progress; never a stale flag
     from .. import journal as jr
-    entry = jr.load(store, rx.date)
-    after = _after(store, p, rx, entry)
-    from ..analysis import energy as en
-    from zoneinfo import ZoneInfo
-    try:
-        wk = float(store.get_meta("wake_hour") or 7.0)
-    except ValueError:
-        wk = 7.0
-    try:
-        from ..config import settings as _st
-        energy = en.build(p, rx.date, datetime.now(ZoneInfo(_st().tz)).replace(tzinfo=None), wk)
-    except Exception as e:
-        print(f"energy failed: {e}")
-        energy = None
-    pats = cached(store, "patterns", rx.date, lambda: jr.patterns(store, p.wellness))
-    return _page(request, "today.html", rx=rx, waiting=not _have_last_night(store), updated=mins_ago,
-                 after=after, energy=energy, entry=entry, timeline=jr.timeline(entry), jnote=jr.effect(entry["tags"], jr.hrv_low(p.wellness, rx.date))[1] if entry else "", patterns=pats,
-                 syncing=syncing, d=dash, p=p, recent=recent,
-                 spark=dashboard.spark, room=True,
-                 rooms=_rooms_cached(store, p, rx, after),
+    after = _after(store, p, rx, jr.load(store, rx.date))
+    return _page(request, "dashboard.html", rx=rx, d=dash, p=p, recent=recent, energy=_energy(store, p, rx),
+                 spark=dashboard.spark, rooms=_rooms_cached(store, p, rx, after),
                  st=st, hist=storymod.history_chart(st),
                  sleep_chart=sleepmod.chart(rx.sleep) if rx.sleep else "",
                  base_need=sleepmod._hm(rx.sleep.base) if rx.sleep else "",

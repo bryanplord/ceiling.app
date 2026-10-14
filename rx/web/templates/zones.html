@@ -50,6 +50,7 @@
 </style>
 {% endblock %}
 {% block body %}
+{% include "_dashnav.html" %}
 <h1 class="zh1">Where your time goes.</h1>
 {% if hr %}<p class="zverdict">{{ hr.verdict }}</p>
 <p class="muted">Last 4 weeks, {{ '%.1f' % hr.weekly_h }} hours a week with heart rate.</p>{% endif %}

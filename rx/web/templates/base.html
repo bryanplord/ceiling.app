@@ -99,11 +99,11 @@
     <a href="/plan" class="{{ 'on' if active=='plan' }}">Plan</a>
     <a href="/calendar" class="{{ 'on' if active in ('calendar', 'history') }}">Calendar</a>
     <a href="/workouts" class="{{ 'on' if active=='workouts' }}">Workouts</a>
-    <a href="/progress" class="{{ 'on' if active=='progress' }}">Progress</a>
-    <a href="/me" class="{{ 'on' if active in ('me', 'trends', 'zones', 'you', 'recovery', 'profile', 'data', 'yesterday') }}">You</a>
+    <a href="/dashboard" class="{{ 'on' if active in ('dashboard', 'progress', 'trends', 'zones', 'you', 'recovery') }}">Dashboard</a>
+    <a href="/me" class="{{ 'on' if active in ('me', 'profile', 'data', 'yesterday') }}">Profile</a>
   </nav>
 </header>
 {% endblock %}
-<main class="{{ 'narrow' if active not in ('today', 'login', 'calendar', 'workouts', 'plan') }}">{% block body %}{% endblock %}</main>
+<main class="{{ 'narrow' if active not in ('today', 'dashboard', 'login', 'calendar', 'workouts', 'plan') }}">{% block body %}{% endblock %}</main>
 </body>
 </html>

@@ -20,6 +20,7 @@
 </style>
 {% endblock %}
 {% block body %}
+{% include "_dashnav.html" %}
 <div class="pg">
 <h1>{{ p.progress.headline }}</h1>
 {% if m.earned %}<p class="earned">{{ m.earned }}</p>{% endif %}

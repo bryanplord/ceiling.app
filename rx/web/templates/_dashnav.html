@@ -1,0 +1,11 @@
+<nav class="dnav" aria-label="Dashboard">
+  {% for href, key, label in [('/dashboard','dashboard','Overview'),('/trends','trends','Trends'),('/recovery','recovery','Recovery'),('/zones','zones','Zones'),('/progress','progress','Progress'),('/you','you','You vs your age')] %}
+  <a href="{{ href }}"{% if active == key %} aria-current="page"{% endif %}>{{ label }}</a>{% endfor %}
+</nav>
+<style>
+  .dnav { display:flex; gap:8px; flex-wrap:wrap; margin:0 0 32px; }
+  .dnav a { padding:8px 16px; border-radius:999px; border:1px solid var(--rule); text-decoration:none; color:var(--ink); font-size:15px; font-weight:550; }
+  .dnav a:hover { border-color:var(--ink); }
+  .dnav a[aria-current] { background:var(--ink); border-color:var(--ink); color:var(--snow); }
+  @media (max-width:760px) { .dnav { flex-wrap:nowrap; overflow-x:auto; margin:0 -20px 24px; padding:0 20px; scrollbar-width:none; } .dnav a { flex:0 0 auto; } }
+</style>

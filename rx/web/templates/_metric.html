@@ -1,0 +1,8 @@
+{% macro metric(m, band=False, bars=False) %}
+<div class="metric">
+  <div class="mtop"><span class="mname">{{ m.name }}</span><span class="mdata num">{{ m.value }}</span></div>
+  <p class="say {{ m.tone }}">{{ m.say or m.state }}</p>
+  <div class="chart">{{ spark(m.series, band=m.band if band else None, bars=bars) | safe }}</div>
+  <p class="mdetail">{{ m.detail }}</p>
+</div>
+{% endmacro %}
