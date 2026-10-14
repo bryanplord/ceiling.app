@@ -61,6 +61,14 @@
   .t-more summary::-webkit-details-marker { display:none; }
   .t-more summary span { font-weight:400; color:var(--lichen); font-size:16px; margin-left:12px; }
   .t-more .body { padding:0 0 28px; }
+  .tc a.go { display:inline-block; background:var(--ink); color:var(--snow); text-decoration:none; border-radius:999px; padding:12px 22px; font-weight:650; }
+  .tc a.go:hover { background:#333; }
+  .ways a { color:inherit; }
+  .alsolift { display:flex; align-items:center; gap:12px 20px; flex-wrap:wrap; margin:24px 0 0; padding:20px 26px; border-radius:22px; background:#f5f5f7; text-decoration:none; }
+  .alsolift:hover { background:#ececef; }
+  .al-k { font-size:15px; font-weight:700; color:#5e5e63; }
+  .al-v { flex:1 1 320px; font-size:17px; } .al-v b { margin-right:6px; }
+  .al-go { background:var(--ink); color:var(--snow); border-radius:999px; padding:10px 20px; font-weight:650; font-size:15px; }
   .checkin { display:flex; align-items:center; gap:12px 16px; flex-wrap:wrap; margin:32px 0 0; padding:20px 0 0; border-top:1px solid var(--rule); }
   .checkin h2 { margin:0; font-size:17px; font-weight:700; white-space:nowrap; }
   .checkin .pills { display:flex; gap:8px; flex-wrap:wrap; }
@@ -88,7 +96,7 @@
 {% if body %}<p class="bodyl t-body"><a href="/dashboard">{{ body[:1] | upper }}{{ body[1:] }}. Your dashboard</a></p>{% endif %}
 {% if p.program %}<p class="t-meta"><a class="goalline" href="/plan">{{ p.program.title }}{% if p.program.days_left is not none %}: {{ p.program.days_left }} days{% endif %}{% if p.program.phase %}, {{ p.program.phase }} week{% endif %}</a></p>{% endif %}
 <div class="t-coach"><span class="ring" aria-hidden="true"><i></i></span>
-  <p>{% if M %}{{ M.word }}. {{ M.head }}{% if jnote %} {{ jnote }}{% endif %}{% elif done %}Done for today.{% if jnote %} {{ jnote }}{% endif %}{% else %}{{ C.intro }}{% if jnote %} {{ jnote }}{% endif %}{% endif %}</p></div>
+  <p>{% if M %}{{ M.word }}. {{ M.head }}{% if jnote %} {{ jnote }}{% endif %}{% elif done %}Done for today.{% if jnote %} {{ jnote }}{% endif %}{% elif lift and lift.only %}{{ rx.why_story or C.intro }}{% if jnote %} {{ jnote }}{% endif %}{% else %}{{ C.intro }}{% if jnote %} {{ jnote }}{% endif %}{% endif %}</p></div>
 
 <div class="t-cards" id="rx">
 {% if M %}
@@ -113,6 +121,46 @@
     {% if T.detail %}<p class="lead strong">{{ T.detail }}</p>{% endif %}
     {% if after.changed and after.why %}<p class="small">Re-planned {{ after.why }}.{% if after.was %} This morning it was {{ after.was }}.{% endif %}</p>{% endif %}
     <p class="small">Assumes a normal night. Ceiling re-reads it in the morning with your sleep and HRV.</p>
+    {% if C.tonight %}<p class="foot">{{ C.tonight }}</p>{% endif %}
+  </section>
+{% elif lift and lift.only %}
+  {% set L = lift.s %}
+  <section class="tc" aria-label="Today">
+    <h2>Today</h2>
+    {% if L %}
+    <p class="big">{{ L.name }}.</p>
+    <p class="lead">{{ lift.summary }}</p>
+    {% if L.why %}<p class="small">{{ L.why }}</p>{% endif %}
+    {% if lift.moves %}<ul class="ways">{% for m in lift.moves %}<li><b>{{ m }}</b></li>{% endfor %}</ul>{% endif %}
+    <p class="foot"><a class="go" href="/lift">{{ 'Done: ' ~ lift.done ~ ' of ' ~ lift.of ~ ' sets' if lift.finished else ('Keep going: ' ~ lift.done ~ ' of ' ~ lift.of ~ ' sets' if lift.done else 'Start lifting') }}</a></p>
+    {% else %}
+    <p class="big">Rest from lifting.</p>
+    <p class="lead">Muscle is built on the days between lifts. A walk of 30 minutes or more keeps you moving without costing the next one.</p>
+    {% if lift.next %}<p class="foot">Next lift: {{ lift.next[1] | lower }}, {{ lift.next[0] }}.</p>{% endif %}
+    {% endif %}
+  </section>
+  <section class="tc" aria-label="Ways to do it">
+    <h2>Ways to do it</h2>
+    {% if L and L.mode in ('full', 'short') %}
+    <p class="big">Two ways.</p>
+    <p class="sub">Same moves, same weights.</p>
+    <ul class="ways"><li><b><a href="/lift?v=full">Full</a>{% if L.mode == 'full' %}<span class="pk">Your default</span>{% endif %}</b><span class="dur">3 rounds</span><span class="rs">The whole session. Builds the most.</span></li>
+      <li><b><a href="/lift?v=short">Short</a>{% if L.mode == 'short' %}<span class="pk">Your default</span>{% endif %}</b><span class="dur">2 rounds, two circuits</span><span class="rs">About half the time. Still counts: the weights still go up.</span></li></ul>
+    {% elif L %}
+    <p class="big">This.</p>
+    <p class="sub">Recovery decides today's version.</p>
+    {% else %}
+    <p class="big">Move anyway.</p>
+    <ul class="ways"><li><b>A walk</b><span class="dur">30 minutes or more</span><span class="rs">The best thing to do between lifts.</span></li>
+      <li><b>Mobility</b><span class="dur">15 minutes</span><span class="rs">Hips, upper back, calves. Lifts feel better for it.</span></li>
+      <li><b>An easy ride or hike</b><span class="dur">Under {{ rx.hr_ceiling or 'conversation pace' }}</span><span class="rs">Easy enough to talk the whole way.</span></li></ul>
+    {% endif %}
+  </section>
+  <section class="tc" aria-label="Tomorrow">
+    <h2>Tomorrow</h2>
+    {% if lift.next and lift.next[0] == 'tomorrow' %}<p class="big">{{ lift.next[1] }}.</p><p class="sub">Ceiling sets the weights from today's log.</p>
+    {% else %}<p class="big">Rest from lifting.</p>{% if lift.next %}<p class="sub">Next lift: {{ lift.next[1] | lower }}, {{ lift.next[0] }}.</p>{% endif %}{% endif %}
+    <p class="small">Ceiling re-reads your sleep and HRV in the morning. A rough night makes the lift lighter, not skipped.</p>
     {% if C.tonight %}<p class="foot">{{ C.tonight }}</p>{% endif %}
   </section>
 {% else %}
@@ -140,6 +188,10 @@
   </section>
 {% endif %}
 </div>
+{% if lift and lift.s and not lift.only %}
+<a class="alsolift" href="/lift"><span class="al-k">Also today</span><span class="al-v"><b>{{ lift.s.name }}</b> {{ lift.summary }}</span>
+  <span class="al-go">{{ 'Done: ' ~ lift.done ~ ' of ' ~ lift.of ~ ' sets' if lift.finished else ('Keep going' if lift.done else 'Start lifting') }}</span></a>
+{% endif %}
 
 <section class="checkin" id="journal" aria-label="Check in">
   <h2>{{ 'Tell your coach' if done else 'How do you feel?' }}</h2>
@@ -184,11 +236,12 @@
   {% if rx.reading %}<details><summary>Why<span>{{ rx.why_title }}</span></summary><div class="body">
     <p class="whyhead"><b class="{{ rx.why_tone }}">{{ rx.why_title }}.</b> {{ rx.why_says }}</p>
     <ul class="rxlist facts">{% for e in rx.reading.evidence[:5] %}<li><b>{{ e.name }}</b> {{ e.line.split('. ')[0].rstrip('.') }}.</li>{% endfor %}</ul></div></details>{% endif %}
-  <details><summary>How<span>{{ rx.how_short | truncate(60) }}</span></summary><div class="body"><ul class="rxlist">{% for h in rx.how_more %}<li>{{ h }}</li>{% endfor %}</ul></div></details>
+  {% if not (lift and lift.only) %}<details><summary>How<span>{{ rx.how_short | truncate(60) }}</span></summary><div class="body"><ul class="rxlist">{% for h in rx.how_more %}<li>{{ h }}</li>{% endfor %}</ul></div></details>
   {% if rx.minimum or rx.maximum %}<details><summary>Minimum and maximum</summary><div class="body">
     {% if rx.minimum %}<p class="rxv"><b>Minimum.</b> {{ rx.minimum }}</p>{% endif %}
     {% if rx.maximum %}<p class="rxv" style="margin-top:10px"><b>Maximum.</b> {{ rx.maximum }}</p>{% endif %}</div></details>{% endif %}
   {% if rx.tomorrow %}<details><summary>Tomorrow, in full</summary><div class="body"><dl class="tmr">{% for label, tone, text in rx.tomorrow %}<div class="t-{{ tone }}"><dt>{{ label }}</dt><dd>{{ text }}</dd></div>{% endfor %}</dl></div></details>{% endif %}
+  {% endif %}
   {% if p.program and p.program.nutrition %}<details><summary>Fuel</summary><div class="body"><ul class="rxlist">{% for n in p.program.nutrition %}<li>{{ n }}</li>{% endfor %}</ul></div></details>{% endif %}
 {% endif %}
 </div>

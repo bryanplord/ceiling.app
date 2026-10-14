@@ -97,7 +97,15 @@ def _training_add(load: float, avg: float) -> float:
     return 0.0 if r < 0.5 else 0.25 if r < 1.2 else 0.5 if r < 1.8 else 0.75
 
 
+from contextvars import ContextVar
+WAKE: ContextVar[float | None] = ContextVar("wake_hour", default=None)   # set per athlete from Profile
+
+
 def _wake() -> tuple[int, int, str]:
+    w = WAKE.get()
+    if w:
+        hh, mm = int(w), int(round((w - int(w)) * 60)) % 60
+        return hh, mm, datetime(2000, 1, 1, hh, mm).strftime("%-I:%M %p")
     raw = os.getenv("RX_WAKE", "7:00 AM").strip().upper()
     try:
         t = datetime.strptime(raw, "%I:%M %p")

@@ -610,7 +610,19 @@ def today(request: Request, d: str | None = None):
         if dash.hrv.value not in ("", "—"):
             body.append(f"HRV {dash.hrv.value.replace(' ms', '')}")
     pats = cached(store, "patterns", rx.date, lambda: jr.patterns(store, p.wellness))
-    return _page(request, "today.html", rx=rx, waiting=not _have_last_night(store), updated=mins_ago,
+    lift = None
+    try:
+        from .. import strength as sg
+        ls, lg, lst, nxt = _lift_today(store, p, rx)
+        dn, of = sg.done_sets(lg)
+        if ls or lst["train"] == "strength" or getattr(p, "lifts", None):
+            lift = {"s": ls, "summary": sg.summary(ls) if ls else "", "done": dn, "of": of,
+                    "finished": bool(lg and lg.get("done")), "only": lst["train"] == "strength", "next": nxt,
+                    "moves": [m.name for c in (ls.circuits if ls else []) for m in c]}
+    except Exception as e:
+        import traceback
+        print(f"lift today failed: {e!r}\n{traceback.format_exc()}")
+    return _page(request, "today.html", lift=lift, rx=rx, waiting=not _have_last_night(store), updated=mins_ago,
                  after=after, entry=entry, timeline=jr.timeline(entry), jnote=jr.effect(entry["tags"], jr.hrv_low(p.wellness, rx.date))[1] if entry else "", patterns=pats,
                  syncing=syncing, p=p, body=", ".join(body), cards=_today_cards(p, rx, after),
                  day_label=when.strftime("%A, %B %-d"))
@@ -648,8 +660,15 @@ def dashboard_page(request: Request):
 
 
 @app.get("/me", response_class=HTMLResponse)
-def me_page(request: Request):
-    return _page(request, "me.html")
+def me_page(request: Request, saved: str | None = None):
+    from .. import strength as sg
+    store = open_store()
+    try:
+        w = float(store.get_meta("wake_hour") or 7.0)
+    except ValueError:
+        w = 7.0
+    return _page(request, "me.html", st=sg.settings(store), train=sg.TRAIN, equip=sg.EQUIP, saved=bool(saved),
+                 wake=f"{int(w):02d}:{int(round((w - int(w)) * 60)) % 60:02d}")
 
 
 def _plan_num(x):
@@ -957,7 +976,26 @@ def plan_page(request: Request, m: str | None = None):
     if email:
         tok = auth.sign("cal", email, 10 * 365 * 24 * 3600)
         feed = f"{request.url.netloc}/plan.ics?k={tok}"
-    return _page(request, "calendar.html", plan=pl, changed=changed, hist=hist, feed=feed, date=date, done=done, past=past,
+    lifts = {}
+    try:                                              # lifts: the plan's schedule ahead, your log behind
+        from .. import strength as sg
+        logs = sg.all_logs(store)
+        no = [x for pr in (getattr(p, "lifts", None) or []) for x in (getattr(pr.goal, "no_days", []) or [])]
+        dates = [c["date"] for w in (cal[mi]["weeks"] if cal else []) for c in w["cells"] if c and c.get("date")]
+        dates += [d.date for d in (getattr(pl, "days", None) or [])]
+        for dd in dates:
+            if dd < rx.date:
+                lg = logs.get(dd)
+                if lg and sg.done_sets(lg)[0]:
+                    lifts[dd] = (sg.SESSIONS.get(lg.get("session"), {}).get("name", "Lift"), True)
+            else:
+                k = sg.scheduled(store, getattr(p, "lifts", None) or [], date.fromisoformat(dd), no)
+                if k:
+                    lg = logs.get(dd)
+                    lifts[dd] = (sg.SESSIONS[k]["name"], bool(lg and lg.get("done")))
+    except Exception as e:
+        print(f"calendar lifts failed: {e!r}")
+    return _page(request, "calendar.html", lifts=lifts, plan=pl, changed=changed, hist=hist, feed=feed, date=date, done=done, past=past,
                  cal=cal[mi] if cal else None, cal_prev=yms[mi - 1] if mi > 0 else None,
                  cal_next=yms[mi + 1] if mi + 1 < len(yms) else None, cal_end=date.fromisoformat(cal[-1]["end"]).strftime("%B %-d, %Y") if cal else "",
                  has_plan=bool(getattr(p, "programs", None) or getattr(p, "program", None)))

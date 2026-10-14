@@ -86,7 +86,8 @@ def _data_version(store: Store) -> tuple:
     recent = tuple((w.date, w.hrv, w.rhr, w.sleep_score, w.sleep_secs) for w in store.wellness(since))
     jr_tags = tuple(store.get_meta(f"journal:{(local_today() - timedelta(days=k)).isoformat()}") or "" for k in range(3))
     return (store.owner, c["activities"], c["streams"], c["wellness"], hash(recent), store.get_meta("goal") or "",
-            store.get_meta("plans") or "", hash(jr_tags))
+            store.get_meta("plans") or "", hash(jr_tags), store.get_meta("wake_hour") or "",
+            store.get_meta("strength_settings") or "", store.get_meta(f"lift:{local_today().isoformat()}") or "")
 
 
 def today_rx(store: Store, day: str | None = None):
@@ -95,6 +96,11 @@ def today_rx(store: Store, day: str | None = None):
     day = day or local_today().isoformat()
     ver = data_version(store)
     key = (day, ver)
+    try:                                     # your wake time sets tonight's bedtime
+        from .analysis import sleep as _sl
+        _sl.WAKE.set(float(store.get_meta("wake_hour") or 0) or None)
+    except (ValueError, TypeError):
+        pass
     with _build_lock:
         hit = _built.get(key)
         if hit is None:
