@@ -23,6 +23,8 @@ import secrets
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
+from .clock import local_today
+
 KINDS = {
     "best_shape": "Get into the best shape of my life",
     "event": "Train for an event",
@@ -110,7 +112,7 @@ def all_plans(store) -> list[Goal]:
                 g = None
             if g:
                 g.id = g.id or secrets.token_hex(4)
-                g.status, g.committed = "active", g.committed or g.created or date.today().isoformat()
+                g.status, g.committed = "active", g.committed or g.created or local_today().isoformat()
                 plans.append(g)
         _write(store, plans)
         if old:
@@ -127,9 +129,14 @@ def get(store, pid: str) -> Goal | None:
 
 
 def is_live(g: Goal, day: date) -> bool:
-    """Committed on or before the day, and not stopped on or before it."""
+    """Committed on or before the day, and not stopped on or before it.
+
+    A commit stamped the day after counts: older saves used the server's UTC date, which is already
+    tomorrow after 5:00 PM Pacific, and a plan you just committed must not vanish for the evening."""
     d = day.isoformat()
-    if g.status not in ("active", "stopped") or not g.committed or g.committed > d:
+    if g.status not in ("active", "stopped") or not g.committed:
+        return False
+    if g.committed > (day + timedelta(days=1)).isoformat():
         return False
     return not (g.status == "stopped" and g.stopped_on and g.stopped_on <= d)
 
@@ -143,7 +150,7 @@ def save_plan(store, g: Goal) -> Goal:
     plans = all_plans(store)
     if not g.id:
         g.id = secrets.token_hex(4)
-    g.created = g.created or date.today().isoformat()
+    g.created = g.created or local_today().isoformat()
     for i, x in enumerate(plans):
         if x.id == g.id:
             plans[i] = g
@@ -177,7 +184,7 @@ def delete(store, pid: str) -> None:
 
 def load(store) -> Goal | None:
     """The first active plan (kept for older callers)."""
-    act = active(store, date.today())
+    act = active(store, local_today())
     return act[0] if act else None
 
 
@@ -190,6 +197,12 @@ def _recent_hours(p, day: date, sport: str | None = None, weeks: int = 4) -> flo
     secs = sum(a.moving_s or 0 for a in p.activities if cut <= a.date < day.isoformat() and a.sport != "walk"
                and (sport is None or a.sport == sport))
     return secs / 3600 / weeks
+
+
+def baseline_hours(p, day: date) -> float:
+    """Your usual training week, every sport but walks: the last 4 weeks, or 85% of the last 12 if
+    the last month was unusually quiet (a trip, a cold, a wet spell), never under 3 hours."""
+    return max(3.0, _recent_hours(p, day), 0.85 * _recent_hours(p, day, weeks=12))
 
 
 def _longest(p, day: date, sport: str, weeks: int = 6) -> int:
@@ -255,7 +268,7 @@ def _days_text(days: list[int]) -> str:
 
 
 def build(p, g: Goal, today: date) -> Program:
-    base_h = max(3.0, _recent_hours(p, today))
+    base_h = baseline_hours(p, today)        # total training, all sports: the plan's sport grows inside it
     if g.kind == "event":
         prog = _event(p, g, today, base_h)
     elif g.kind == "weight":

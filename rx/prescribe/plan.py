@@ -345,6 +345,46 @@ def _weekday_share(p: Profile, day: str) -> list[float]:
     return out
 
 
+def _sport_share(p: Profile, day: str) -> dict[str, list[float]]:
+    """For each sport, how often you do it on each weekday (Mon=0), over the last 12 weeks."""
+    d0 = date.fromisoformat(day)
+    by: dict[str, set] = {}
+    for a in p.activities:
+        if a.sport != WALK and (a.moving_s or 0) >= 10 * 60:
+            by.setdefault(a.sport, set()).add(a.date)
+    out = {}
+    for sp, ds in by.items():
+        row = []
+        for wd in range(7):
+            days = [d0 - timedelta(days=n) for n in range(1, 85) if (d0 - timedelta(days=n)).weekday() == wd]
+            row.append(sum(x.isoformat() in ds for x in days) / len(days) if days else 0.0)
+        out[sp] = row
+    return out
+
+
+def _top_days(share: list[float], n: int = 2) -> set[int]:
+    """The weekdays you train most: never a pencilled-in rest day."""
+    return {wd for wd in sorted(range(7), key=lambda wd: (-share[wd], -wd))[:n] if share[wd] > 0}
+
+
+NOUN = {eng.RUN: "run", eng.BIKE: "ride", eng.SKI: "ski tour"}
+
+
+def _sketch_noun(kind: str, wd: int, plan_sport: str | None, phase: str, sports: dict[str, list[float]]) -> str:
+    """What a sketched session is likely to be, from the plan and what you usually do that weekday.
+    A run plan doesn't turn your Saturday ride into a run: easy and steady days can be either,
+    until the plan's run-specific weeks."""
+    habit = max(sports, key=lambda sp: sports[sp][wd]) if sports else None
+    habit = habit if habit and sports[habit][wd] >= 0.25 else None
+    if plan_sport:
+        if kind == HARD or habit in (None, plan_sport):
+            return NOUN.get(plan_sport, "session")
+        if plan_sport == eng.RUN and (phase in ("Base", "Recover", "") or sports.get(habit, [0] * 7)[wd] >= 0.5):
+            return f"{NOUN.get(habit, 'session')} or run"
+        return NOUN.get(plan_sport, "session")
+    return NOUN.get(habit, "session") if habit else "session"
+
+
 def _programs(p: Profile) -> list:
     progs = getattr(p, "programs", None)
     if progs:
@@ -454,7 +494,8 @@ def outlook(p: Profile, rx: Rx, start: date | None = None, end: date | None = No
     """Every day from start to end: the honest horizon as planned, then a sketch from the programme.
 
     A pencilled-in day comes from the programme's week (phase, hours, hard days, the long session
-    on the long day) and your habits: rest only on weekdays you train less than 10% of the time,
+    on the long day) and your habits: rest only on weekdays you train less than 10% of the time or when
+    the hours can't fill the week, never on your two most-trained weekdays and never three in a row;
     hard days on the days you usually train, never back to back. With no plan, your recent
     weekly hours as an easy and steady pattern."""
     start = start or date.fromisoformat(rx.date)
@@ -463,9 +504,11 @@ def outlook(p: Profile, rx: Rx, start: date | None = None, end: date | None = No
         plan = build(p, rx)
     firm = _firm(p, rx, plan) if plan.days else {}
     share = _weekday_share(p, rx.date)
-    rest_wd = {wd for wd in range(7) if share[wd] < 0.1}
+    top = _top_days(share)
+    rest_wd = {wd for wd in range(7) if share[wd] < 0.1 and wd not in top}
+    sports = _sport_share(p, rx.date)
     from .. import goals as gl
-    base_h = max(3.0, gl._recent_hours(p, date.fromisoformat(rx.date)))
+    base_h = gl.baseline_hours(p, date.fromisoformat(rx.date))
     has_plan = bool(_programs(p))
     today = date.fromisoformat(rx.date)
     done_today = sum((a.moving_s or 0) / 60 for a in p.activities
@@ -500,8 +543,16 @@ def outlook(p: Profile, rx: Rx, start: date | None = None, end: date | None = No
                 kinds[d], mins[d] = REST, None
             elif g.get("long_minutes"):
                 kinds[d], mins[d] = LONG, int(round(g["long_minutes"] / 5) * 5)
-        for d in open_:
-            if d not in kinds and d.weekday() in rest_wd:
+        def is_rest(x: date) -> bool:
+            return (kinds.get(x) or (firm.get(x.isoformat()) or {}).get("kind")) == REST
+
+        def makes_three(x: date) -> bool:
+            """Would a rest on x make three days off in a row?"""
+            r = [is_rest(x + timedelta(days=k)) for k in (-2, -1, 1, 2)]
+            return (r[0] and r[1]) or (r[1] and r[2]) or (r[2] and r[3])
+
+        for d in open_:                                  # days you really never train, but never three in a row
+            if d not in kinds and d.weekday() in rest_wd and not makes_three(d):
                 kinds[d], mins[d] = REST, None
         # the day before a race is easy and short
         for d in open_:
@@ -538,13 +589,15 @@ def outlook(p: Profile, rx: Rx, start: date | None = None, end: date | None = No
                 used += done_today - (mins.get(today) or 0)
             todo = [d for d in open_ if kinds[d] in WEIGHT and d not in mins]
             left = hours * 60 - used
-            # too many sessions for the hours: drop the least useful (easy, then steady, on the days you
-            # train least) to rest, rather than shrink everything into 20-minute sessions
+            # too many sessions for the hours: drop the least useful to rest, rather than shrink everything
+            # into 20-minute sessions. Never on the days you train most, never three days off in a row, and
+            # spread out: a rest next to another only when nothing else is left.
             while todo and sum(FLOOR[kinds[d]] for d in todo) > max(0.0, left) * 1.1:
-                cand = [d for d in todo if kinds[d] == EASY] or [d for d in todo if kinds[d] == STEADY]
+                cand = [d for d in todo if kinds[d] in (EASY, STEADY) and d.weekday() not in top and not makes_three(d)]
                 if not cand:
                     break
-                d = min(cand, key=lambda d: (share[d.weekday()], -d.toordinal()))
+                d = min(cand, key=lambda d: (is_rest(d - timedelta(days=1)) + is_rest(d + timedelta(days=1)),
+                                             kinds[d] != EASY, share[d.weekday()], -d.toordinal()))
                 kinds[d], mins[d] = REST, None
                 todo.remove(d)
             for d, m in zip(todo, _share_minutes(left, [kinds[d] for d in todo])):
@@ -562,8 +615,10 @@ def outlook(p: Profile, rx: Rx, start: date | None = None, end: date | None = No
                 row["phase"] = row["phase"] or phase
             else:
                 k = kinds[d]
+                noun = wnoun if k == LONG else (_sketch_noun(k, d.weekday(), sport_w, phase, sports)
+                                                 if k in WEIGHT else "")
                 row = dict(date=d.isoformat(), kind=k, label=LABEL[k], minutes=mins.get(d), phase=phase,
-                           firm=False, title="", conf="Sketch", aim=_aim(p, k), noun=wnoun if k == LONG else "")
+                           firm=False, title="", conf="Sketch", aim=_aim(p, k), noun=noun)
             row.update(week_hours=hours, week_phase=phase, week_hard=hard_n, week_long=long_w, week_noun=wnoun,
                        today=d.isoformat() == rx.date)
             out.append(row)

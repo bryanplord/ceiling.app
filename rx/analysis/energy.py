@@ -124,7 +124,10 @@ def build(p, day: str, now: datetime | None = None, wake_h: float = 7.0) -> Ener
     wake = min(100, round(sp + hp + rp + fp))
 
     # drain
-    now = now or datetime.now()
+    if now is None:                       # the athlete's clock, not the server's (UTC)
+        from zoneinfo import ZoneInfo
+        from ..config import settings
+        now = datetime.now(ZoneInfo(settings().tz)).replace(tzinfo=None)
     h_now = now.hour + now.minute / 60 if now.date().isoformat() == day else 22.0
     awake = max(0.0, h_now - wake_h)
     drain = [("Awake", AWAKE_PER_H * awake)]

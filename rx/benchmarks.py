@@ -29,6 +29,7 @@ from datetime import date, timedelta
 import numpy as np
 
 from .analysis.hr import rolling_mean_full
+from .clock import local_today
 
 AGE = int(os.getenv("RX_AGE", "43"))
 ALT_FT = 6000
@@ -77,7 +78,7 @@ def percentile(x: float, pts: list[tuple[int, float]], lower_is_better=False) ->
 
 
 def _latest_raw(store, key: str, days: int = 120):
-    since = (date.today() - timedelta(days=days)).isoformat()
+    since = (local_today() - timedelta(days=days)).isoformat()
     for r in store.wellness_raw(since):
         try:
             raw = json.loads(r["raw"]) if r["raw"] else {}

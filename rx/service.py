@@ -97,16 +97,24 @@ def today_rx(store: Store, day: str | None = None):
         hit = _built.get(key)
         if hit is None:
             p = prof.build(store, day)
+            p.programs = []
             try:
                 from . import goals as _gl
                 from datetime import date as _date
                 d_ = _date.fromisoformat(day)
                 # Every committed plan live on this day. p.program is the lead one, so older callers
                 # keep working; anything that needs all of them uses goals.daily_all(p.programs, day).
-                p.programs = [_gl.build(p, g, d_) for g in _gl.active(store, d_)]
+                # One plan that fails to build must not take the others with it.
+                for g in _gl.active(store, d_):
+                    try:
+                        p.programs.append(_gl.build(p, g, d_))
+                    except Exception as e:
+                        import traceback
+                        print(f"goal failed: plan {g.id} ({g.kind} {g.event}): {e!r}\n{traceback.format_exc()}")
                 p.program = _gl.primary(p.programs, d_)
             except Exception as e:
-                print(f"goal failed: {e}")
+                import traceback
+                print(f"goal failed: {e!r}\n{traceback.format_exc()}")
             hit = (p, build_rx(p, day))
             while len(_built) > 120:                 # drop the oldest, never everything at once
                 _built.pop(next(iter(_built)))

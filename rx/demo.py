@@ -11,6 +11,7 @@ import random
 from datetime import date, timedelta
 
 from .store import Activity, Store, Wellness
+from .clock import local_today
 
 TRUE_MAX = 182
 TRUE_LTHR = 165
@@ -44,7 +45,7 @@ def steady_run(minutes: int, hr_target: float, fitness: float, rng: random.Rando
 
 def seed(store: Store, days: int = 120, end: date | None = None, rng_seed: int = 7) -> None:
     rng = random.Random(rng_seed)
-    end = end or date.today()
+    end = end or local_today()
     start = end - timedelta(days=days)
     d, i, prev_load_big, hrv_debt = start, 0, False, 0.0
     run_targets = [136, 141, 150, 138, 153, 143]

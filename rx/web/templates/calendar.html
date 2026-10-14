@@ -301,7 +301,7 @@
             <p class="soft">{{ DEP[c.conf] }}</p>
           </div></div>
           {% else %}
-          <p class="big"><span class="vb v-{{ c.kind }}"></span>{% if c.kind == 'long' %}Long {{ c.noun }}{% else %}{{ K[c.kind] }}{% endif %}{% if c.dur %}, {{ c.dur }}{% endif %}</p>
+          <p class="big"><span class="vb v-{{ c.kind }}"></span>{% if c.kind == 'long' %}Long {{ c.noun }}{% else %}{{ K[c.kind] }}{% if c.noun and c.noun != 'session' %} {{ c.noun }}{% endif %}{% endif %}{% if c.dur %}, {{ c.dur }}{% endif %}</p>
           <div class="body"><div>
             {% if c.kind == 'race' %}<p>Race day. Easy warm-up, start slower than you want to, and enjoy it.</p>
             {% elif c.kind == 'rest' %}<p>Nothing planned. Rest is part of the plan.</p>

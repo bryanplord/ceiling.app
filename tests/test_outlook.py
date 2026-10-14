@@ -160,3 +160,87 @@ def test_one_confidence_scale(built):
             assert r["aim"] and r["week_phase"]
         if r["conf"] != "Sketch":
             assert r["title"]
+
+
+# --- a weekend rider: rest follows his habits, hours follow all his training -------------------
+
+def _weekend_rider(p):
+    """12+ weeks of: Saturday 3 h and Sunday 2 h mountain bike, a Tuesday run, a Thursday ride, walks."""
+    import copy
+    from rx.store import Activity
+    q = copy.copy(p)
+    acts = []
+    d = TODAY - timedelta(days=100)
+    while d < TODAY:
+        wd, ds = d.weekday(), d.isoformat()
+        plan = {5: ("bike", 180), 6: ("bike", 120), 1: ("run", 50), 3: ("bike", 60), 2: ("walk", 60)}.get(wd)
+        if plan:
+            acts.append(Activity(f"w:{ds}", "test", ds, plan[0], plan[1] * 60, start_local=f"{ds}T09:00:00"))
+        d += timedelta(days=1)
+    q.activities = acts
+    return q
+
+
+def _no_three_rests(rows):
+    ks = [r["kind"] for r in rows]
+    for i in range(len(ks) - 2):
+        if ks[i] == ks[i + 1] == ks[i + 2] == "rest":
+            raise AssertionError(f"three rest days in a row from {rows[i]['date']}")
+
+
+def test_rest_never_on_most_trained_weekdays(built):
+    p, rx = built
+    q = _weekend_rider(p)
+    q.program = prog = gl.build(q, gl.parse_text("Run a marathon on February 1 2027", TODAY), TODAY)
+    q.programs = [prog]
+    share = pm._weekday_share(q, rx.date)
+    top = pm._top_days(share)
+    assert top == {5, 6}                                    # Saturday and Sunday
+    rows = pm.outlook(q, rx)
+    for r in rows:
+        if not r["firm"] and r["kind"] == "rest":
+            assert date.fromisoformat(r["date"]).weekday() not in top, r["date"]
+    _no_three_rests([r for r in rows if r["week_phase"] not in ("Taper", "Race")])
+
+
+def test_low_hours_spread_rests_not_three_in_a_row(built):
+    """Few hours for the week (the case that drew Friday, Saturday and Sunday off): the rests that make
+    room go mid-week, apart, and never on the weekend he trains most."""
+    p, rx = built
+    q = _weekend_rider(p)
+    q.program = prog = gl.build(q, gl.parse_text("Run a marathon on February 1 2027", TODAY), TODAY)
+    q.programs = [prog]
+    for w in prog.weeks:
+        w.hours, w.long_minutes = 3.1, None
+    rows = pm.outlook(q, rx)
+    _no_three_rests(rows)
+    for mon, rs in _weeks(rows).items():
+        sketch = [r for r in rs if not r["firm"]]
+        if len(sketch) < 7 or rs[0]["week_phase"] in ("Taper", "Recover", "Race"):
+            continue
+        assert not any(r["kind"] == "rest" and date.fromisoformat(r["date"]).weekday() >= 5 for r in sketch)
+        ks = [r["kind"] for r in sketch]
+        assert not any(a == b == "rest" for a, b in zip(ks, ks[1:])), (mon, ks)
+
+
+def test_marathon_hours_from_all_training_not_just_running(built):
+    p, rx = built
+    q = _weekend_rider(p)
+    total = gl.baseline_hours(q, TODAY)
+    run_only = gl._recent_hours(q, TODAY, "run")
+    assert 6.6 <= total <= 7.0 and run_only < 1.0           # 6.8 h a week, walks excluded
+    prog = gl.build(q, gl.parse_text("Run a marathon on February 1 2027", TODAY), TODAY)
+    assert abs(prog.weeks[0].hours - total) <= 0.15
+    q.program, q.programs = prog, [prog]
+    rows = pm.outlook(q, rx)
+    sat = [r for r in rows if not r["firm"] and date.fromisoformat(r["date"]).weekday() == 5
+           and r["week_phase"] == "Base" and r["kind"] in ("easy", "steady")]
+    assert sat and all("ride" in r["noun"] for r in sat)    # his Saturday ride stays a ride (or run)
+
+
+def test_no_plan_weeks_use_all_sports(built):
+    p, rx = built
+    q = _weekend_rider(p)
+    q.program, q.programs = None, []
+    rows = pm.outlook(q, rx)
+    assert all(abs(r["week_hours"] - round(gl.baseline_hours(q, TODAY), 1)) < 0.05 for r in rows)

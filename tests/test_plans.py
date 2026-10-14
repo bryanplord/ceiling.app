@@ -30,7 +30,9 @@ def test_commit_stop_delete(tmp_path):
     assert g.status == "draft" and gl.active(s, D) == []     # drafts drive nothing
     gl.commit(s, g.id, D)
     assert [x.id for x in gl.active(s, D)] == [g.id]
-    assert gl.active(s, D - timedelta(days=1)) == []         # not before you committed
+    assert gl.active(s, D - timedelta(days=2)) == []         # not before you committed
+    # (the day before counts: a commit stamped in UTC is already tomorrow after 5:00 PM Pacific)
+    assert [x.id for x in gl.active(s, D - timedelta(days=1))] == [g.id]
     stop_day = D + timedelta(days=10)
     gl.stop(s, g.id, stop_day)
     g2 = gl.get(s, g.id)
@@ -113,3 +115,33 @@ def test_plan_pages_flow(tmp_path, monkeypatch):
     assert p.program is None and p.programs == []
     c.post(f"/plan/{pid}/delete", headers=form)
     assert gl.all_plans(open_store()) == []
+
+
+def test_plan_committed_tomorrow_utc_is_live_today(tmp_path):
+    """After 5:00 PM Pacific the server's date is tomorrow: a plan stamped then must still drive today."""
+    s = _store(tmp_path)
+    s.set_meta("plans", json.dumps([{"kind": "event", "event": "marathon", "sport": "run", "id": "m1",
+                                     "target_date": "2027-02-01", "status": "active",
+                                     "committed": (D + timedelta(days=1)).isoformat()}]))
+    assert [g.id for g in gl.active(s, D)] == ["m1"]
+    assert gl.active(s, D - timedelta(days=1)) == []
+
+
+def test_today_rx_attaches_plan_committed_tomorrow(tmp_path, monkeypatch):
+    from rx import service
+    s = _store(tmp_path)
+    demo.seed(s, days=60, end=D)
+    s.set_meta("plans", json.dumps([{"kind": "event", "event": "marathon", "sport": "run", "id": "m1",
+                                     "target_date": "2027-02-01", "status": "active",
+                                     "committed": (D + timedelta(days=1)).isoformat()}]))
+    service.bust()
+    p, _ = service.today_rx(s, D.isoformat())
+    assert [x.goal.id for x in p.programs] == ["m1"] and p.program is p.programs[0]
+
+
+def test_migration_and_new_plans_use_local_date(tmp_path, monkeypatch):
+    s = _store(tmp_path)
+    monkeypatch.setattr(gl, "local_today", lambda: D)
+    s.set_meta("goal", json.dumps({"kind": "event", "event": "marathon", "sport": "run", "target_date": "2027-02-01"}))
+    assert gl.all_plans(s)[0].committed == D.isoformat()
+    assert gl.save_plan(s, gl.Goal("best_shape")).created == D.isoformat()
