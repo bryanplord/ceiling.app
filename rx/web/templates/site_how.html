@@ -6,24 +6,70 @@
   .step .n { font-size:64px; font-weight:600; font-stretch:125%; line-height:1; }
   .step h2 { color:var(--ink); font-size:clamp(26px, 3vw, 36px); margin:0 0 12px; font-weight:600; }
   .step p { font-size:19px; line-height:1.55; max-width:58ch; margin:0 0 10px; color:#2a2a2d; }
-  @media (max-width: 700px) { .step { grid-template-columns:1fr; gap:10px; } .step .n { font-size:44px; } }
+  .reads { padding:88px 0 96px; border-top:1px solid var(--rule); }
+  .reads h2 { color:var(--ink); font-size:clamp(34px, 5vw, 64px); font-weight:600; letter-spacing:-0.025em; line-height:1.04; margin:0; }
+  .rcols { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); gap:56px; margin-top:44px; }
+  .rk { font-size:15px; font-weight:700; color:var(--lichen); margin:0 0 12px; }
+  .reads ul { list-style:none; margin:0; padding:0; border-top:2px solid var(--ink); }
+  .reads li { font-size:20px; line-height:1.35; padding:14px 0; border-bottom:1px solid var(--rule); }
+  .reads ul.no { border-top-color:var(--rule); }
+  .reads ul.no li { color:var(--lichen); }
+  .rn { font-size:17px; line-height:1.5; color:#2a2a2d; margin:18px 0 0; max-width:44ch; }
+  .reads .next { margin-top:56px; max-width:62ch; }
+  .reads .next p:last-child { font-size:19px; line-height:1.55; margin:0; color:#2a2a2d; }
+  @media (max-width: 700px) { .step { grid-template-columns:1fr; gap:10px; } .step .n { font-size:44px; }
+    .rcols { grid-template-columns:1fr; gap:40px; } .reads { padding:64px 0 72px; } }
 </style>
 {% endblock %}
 {% block page %}
 <section class="hero"><h1>How it works.</h1>
   <p class="lede">Four steps. You do one of them once.</p></section>
 <div class="steps">
-  <div class="step"><span class="n">1</span><div><h2>Connect your watch</h2>
-    <p>Link your Garmin account once. Ceiling reads your workouts, heart rate, sleep and HRV from then on, and your history from the last year.</p></div></div>
+  <div class="step"><span class="n">1</span><div><h2>Connect Garmin</h2>
+    <p>Make a free intervals.icu account, connect it to Garmin Connect, and give Ceiling its key. You do this once.</p>
+    <p>Ceiling pulls about a year of history on day one, then keeps up on its own.</p></div></div>
   <div class="step"><span class="n">2</span><div><h2>Wake up to your prescription</h2>
-    <p>Before you're out of bed, last night is read against your normal: sleep, HRV, resting heart rate, and what you've done lately.</p>
-    <p>You get one call: day off, easy, steady or hard. Then the session, the heart rate to hold, the least that still counts, the most you can do, and what tomorrow looks like.</p></div></div>
+    <p>As soon as your watch syncs, last night is read against your normal: sleep, HRV, resting heart rate, and what you've done lately.</p>
+    <p>You get one call: day off, walk, easy, steady or hard. Then the session, the heart rate to hold, the least that still counts, the most you can do, and what tomorrow looks like.</p></div></div>
   <div class="step"><span class="n">3</span><div><h2>Train</h2>
-    <p>Ride, run or ski. The prescription gives you options for the activities you actually do, with the same heart rate whatever you pick.</p>
-    <p>Afterwards, the session is graded against what was prescribed: did you stay in range, and did you go too long.</p></div></div>
+    <p>Ride, run, hike or ski. The prescription gives you options from the activities you actually do, with the same heart rate whatever you pick.</p>
+    <p>Afterwards, the session is scored out of 100 against what was prescribed: under the ceiling, in the range, and the right length.</p></div></div>
   <div class="step"><span class="n">4</span><div><h2>It adapts</h2>
-    <p>Tomorrow is re-planned from what you actually did, how you slept and anything you logged: a few drinks, a scratchy throat, a long day.</p>
-    <p>Over weeks, Ceiling learns what those do to you, and tells you.</p></div></div>
+    <p>Tomorrow is re-planned from what you actually did and anything you logged, like three drinks or a sore throat. In the morning, last night's sleep and HRV have the final say.</p>
+    <p>Once there are a few nights of a kind, Ceiling shows you what they do to your next-morning HRV.</p></div></div>
 </div>
+
+<section class="reads" aria-labelledby="reads-h">
+  <h2 id="reads-h">What it reads</h2>
+  <div class="rcols">
+    <div>
+      <p class="rk">From Garmin, through intervals.icu</p>
+      <ul>
+        <li>Overnight HRV</li>
+        <li>Resting heart rate</li>
+        <li>Sleep: how long, and Garmin's sleep score</li>
+        <li>Every workout, with its heart rate second by second</li>
+        <li>Power, on rides with a power meter</li>
+        <li>About a year of history, on day one</li>
+      </ul>
+      <p class="rn">It checks every 15 minutes through the day, and every 10 in the morning until last night's data lands.</p>
+    </div>
+    <div>
+      <p class="rk">Not read</p>
+      <ul class="no">
+        <li>Body Battery</li>
+        <li>Garmin's stress score</li>
+        <li>All-day heart rate</li>
+        <li>Breathing rate</li>
+        <li>Steps</li>
+      </ul>
+      <p class="rn">Your data stays yours: it's kept in your own account and never sold.</p>
+    </div>
+  </div>
+  <div class="next">
+    <p class="rk">Other watches</p>
+    <p>Garmin doesn't send HRV to Apple Health, so Garmin connects directly. Apple Watch does, so Apple Watch through Apple Health is next. A 2-minute morning HRV reading with a chest strap, in the iPhone app, is planned too.</p>
+  </div>
+</section>
 <a class="pager" href="/morning"><small>Next</small><span>The morning</span></a>
 {% endblock %}

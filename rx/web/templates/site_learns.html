@@ -10,11 +10,14 @@
   .tags { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
   .tp { font-size:14px; font-weight:600; padding:4px 12px; border-radius:999px; }
   .tp-drink { background:#efeafb; color:#5a3ea3; } .tp-warn { background:#fbf1dc; color:#87570c; } .tp-good { background:#e6f4ec; color:#1d6141; }
+  .tp-plain { background:var(--frost2); color:var(--ink); }
+  .tags .jt { font-size:14px; font-weight:600; color:var(--lichen); margin-right:4px; align-self:center; }
   .jnote { margin:18px 0 0; font-size:17px; line-height:1.45; max-width:44ch; }
 
   .fx { border-top:2px solid var(--ink); }
   .fxr { display:grid; grid-template-columns:minmax(0, 4fr) minmax(0, 6fr) 72px; gap:24px; align-items:center; padding:18px 0; border-bottom:1px solid var(--rule); }
   .fxr b { font-size:19px; font-weight:600; }
+  .fxr b small { display:block; font-size:14px; font-weight:500; color:var(--lichen); margin-top:2px; }
   .fxr .fxb { position:relative; height:16px; }
   .fxr .fxb::before { content:""; position:absolute; left:50%; top:-8px; bottom:-8px; width:1.5px; background:var(--ink); }
   .fxr .fxb i { position:absolute; top:0; bottom:0; }
@@ -35,9 +38,9 @@
   .skey span { display:inline-flex; align-items:center; gap:8px; } .skey i { width:12px; height:12px; border-radius:3px; display:inline-block; }
 
   .zones { display:flex; height:22px; margin:0 0 10px; }
-  .zones span:nth-child(1){flex:9;background:var(--s-rec)} .zones span:nth-child(2){flex:13;background:var(--s-end)}
-  .zones span:nth-child(3){flex:9;background:var(--s-aer)} .zones span:nth-child(4){flex:9;background:var(--s-tem)}
-  .zones span:nth-child(5){flex:9;background:var(--s-thr)} .zones span:nth-child(6){flex:24;background:var(--s-max)}
+  .zones span:nth-child(1){flex:12;background:var(--s-rec)} .zones span:nth-child(2){flex:22;background:var(--s-end)}
+  .zones span:nth-child(3){flex:10;background:var(--s-aer)} .zones span:nth-child(4){flex:10;background:var(--s-tem)}
+  .zones span:nth-child(5){flex:10;background:var(--s-thr)} .zones span:nth-child(6){flex:20;background:var(--s-max)}
   .zl { display:flex; justify-content:space-between; font-size:13px; color:var(--lichen); }
   .not { margin-top:40px; font-size:17px; color:var(--lichen); }
   .not s { color:var(--ink); text-decoration-color:var(--ceiling); text-decoration-thickness:2px; }
@@ -60,45 +63,46 @@
 
 <section class="ch split">
   <div><h2>One tap. One line.</h2>
-    <p class="say">Check in when you like. Write it the way you'd text a friend. Ceiling reads it, tags it, and adjusts tomorrow when it should.</p></div>
-  <div class="show sheet" aria-label="An example check-in">
+    <p class="say">Check in as often as you like. Write it the way you'd text a friend. Ceiling reads it, tags it, and adjusts tomorrow when it should: three or more drinks caps it at steady, feeling sick at easy.</p></div>
+  <div class="show"><div class="sheet" aria-label="An example check-in">
     <div class="jr">
       <div class="jrow"><span class="jk">Feeling</span><span class="pill">Energized</span><span class="pill on">Normal</span><span class="pill">Tired</span><span class="pill">Sick</span></div>
       <div class="jrow"><span class="jk">Drinks</span><span class="pill">None</span><span class="pill on">1 or 2</span><span class="pill">3 or more</span></div>
       <div class="jrow"><span class="jk">Food</span><span class="pill">Ate well</span><span class="pill">OK</span><span class="pill">Ate poorly</span></div>
-      <div class="jline">Two IPAs after the ride, dinner at 9</div>
+      <div class="jline">Two IPAs after the ride, stressful day at work</div>
     </div>
-    <div class="tags"><span class="tp tp-drink">2 drinks</span><span class="tp tp-warn">Ate late</span><span class="tp tp-good">Feeling normal</span></div>
-    <p class="jnote">After nights like this your HRV runs 6% under your normal. Tomorrow's call will allow for it.</p>
+    <div class="tags"><span class="jt">8:40 PM</span><span class="tp tp-plain">Normal</span><span class="tp tp-drink">1 or 2 drinks</span><span class="tp tp-warn">Stressed</span></div>
+    <p class="jnote">A drink or two usually shows up as a small HRV dip. Tomorrow stands, but expect the morning numbers to read a little low.</p>
   </div>
+  <p class="cap">An example.</p></div>
 </section>
 
 <section class="ch">
   <h2>What actually moves your next morning.</h2>
-  <p class="say">After a few weeks of check-ins, your own patterns. Next-morning HRV against your normal.</p>
+  <p class="say">Your next-morning HRV after nights like these, against your other mornings. A pattern shows once there are three nights of a kind and the gap is more than 5%.</p>
   <div class="show">
     <div class="fx">
-      <div class="fxr"><b>3 or more drinks</b><div class="fxb"><i class="neg" style="width:35%"></i></div><span class="v neg">−14%</span></div>
-      <div class="fxr"><b>Late night</b><div class="fxb"><i class="neg" style="width:22.5%"></i></div><span class="v neg">−9%</span></div>
-      <div class="fxr"><b>Ate late</b><div class="fxb"><i class="neg" style="width:15%"></i></div><span class="v neg">−6%</span></div>
-      <div class="fxr"><b>1 or 2 drinks</b><div class="fxb"><i class="neg" style="width:10%"></i></div><span class="v neg">−4%</span></div>
-      <div class="fxr"><b>Stressful day</b><div class="fxb"></div><span class="v nil">0%</span></div>
-      <div class="fxr"><b>Ate well</b><div class="fxb"><i class="pos" style="width:7.5%"></i></div><span class="v pos">+3%</span></div>
+      <div class="fxr"><b>After 3 or more drinks <small>6 nights</small></b><div class="fxb"><i class="neg" style="width:35%"></i></div><span class="v neg">−14%</span></div>
+      <div class="fxr"><b>After drinking <small>17 nights</small></b><div class="fxb"><i class="neg" style="width:22.5%"></i></div><span class="v neg">−9%</span></div>
+      <div class="fxr"><b>After a late night <small>5 nights</small></b><div class="fxb"><i class="neg" style="width:17.5%"></i></div><span class="v neg">−7%</span></div>
+      <div class="fxr"><b>After eating well <small>11 nights</small></b><div class="fxb"><i class="pos" style="width:15%"></i></div><span class="v pos">+6%</span></div>
     </div>
-    <div class="fxk"><span>Worse</span><span>Better</span></div>
+    <div class="fxk"><span>Lower</span><span>Higher</span></div>
+    <p class="cap">An example. Stress and eating poorly show up too, once they make a real difference.</p>
   </div>
 </section>
 
 <section class="ch">
   <h2>It checks itself.</h2>
-  <p class="say">Every call is tracked. Did you follow it, and did you wake up recovered? Here's the last 30 days.</p>
+  <p class="say">Every call is tracked. Did you do what the morning called for, and did you wake up recovered? If following the call doesn't leave you more recovered, the call is wrong, not you.</p>
   <div class="show kept">
-    <div class="yes"><b>81<small>%</small></b><p>Woke up recovered when you did what the morning called for.</p></div>
-    <div class="no"><b>46<small>%</small></b><p>When you went over or off plan.</p></div>
+    <div class="yes"><b>81<small>%</small></b><p>Woke up recovered when you did what the morning called for. 21 of the last 30 days.</p></div>
+    <div class="no"><b>44<small>%</small></b><p>When you went over or off plan. The other 9.</p></div>
   </div>
-  {% set S = 'fffrfxffffrffxffffrfxffrfffxfr' %}
-  <div class="strip" role="img" aria-label="30 days: followed or not, and whether you woke recovered">{% for c in S %}<i class="{{ 'x' if c == 'x' else 'f' }}{{ ' r' if c == 'r' }}"></i>{% endfor %}</div>
-  <div class="skey"><span><i style="background:var(--good)"></i>Followed, woke recovered</span><span><i style="background:#a8d5bc"></i>Followed, didn't</span><span><i style="background:var(--ceiling)"></i>Went over</span></div>
+  {% set S = 'ffgfxffyfffgffxyffgfyffxfyfxgy' %}
+  <div class="strip" role="img" aria-label="30 days: followed or not, and whether you woke recovered">{% for c in S %}<i class="{{ 'f' if c in 'fg' else 'x' }}{{ ' r' if c in 'gy' }}"></i>{% endfor %}</div>
+  <div class="skey"><span><i style="background:var(--good)"></i>Followed, woke recovered</span><span><i style="background:#a8d5bc"></i>Followed, didn't</span><span><i style="background:var(--ceiling)"></i>Off plan, woke recovered</span><span><i style="background:#f6b0aa"></i>Off plan, didn't</span></div>
+  <p class="cap">An example.</p>
 </section>
 
 <section class="ch split">
@@ -106,7 +110,7 @@
   <div class="show">
     <div class="zones" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span></div>
     <div class="zl"><span>Recovery</span><span>Endurance</span><span>Aerobic</span><span>Tempo</span><span>Threshold</span><span>Max</span></div>
-    <p class="say">Zones from your own threshold, measured in your own sessions. A 6% HRV drop means something different for you than for anyone else, so you're only ever compared to you.</p>
+    <p class="say">Zones from your own threshold, measured in your own sessions. HRV, resting heart rate and sleep are read against your own normal, so you're only ever compared to you.</p>
     <p class="not">Not <s>220 minus your age</s>.</p>
   </div>
 </section>

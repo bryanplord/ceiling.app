@@ -34,8 +34,8 @@
   .built .s { color:var(--lichen); font-size:17px; margin:6px 0 0; }
   .phases { display:flex; height:46px; margin-top:22px; gap:3px; }
   .phases span { display:flex; align-items:flex-end; padding:0 0 6px 8px; font-size:13px; font-weight:650; color:#fff; overflow:hidden; white-space:nowrap; }
-  .ph-base { background:#7fa7d9; flex:6; } .ph-build { background:#46b07f; flex:5; } .ph-peak { background:#ec9550; flex:3; }
-  .ph-taper { background:#e3bd52; flex:2; color:var(--ink) !important; } .ph-race { background:var(--s-max); flex:.6; }
+  .ph-base { background:#7fa7d9; flex:7; } .ph-build { background:#46b07f; flex:5; } .ph-peak { background:#ec9550; flex:3; }
+  .ph-taper { background:#e3bd52; flex:1; color:var(--ink) !important; } .ph-race { background:var(--s-max); flex:1; }
   .weeks { display:flex; justify-content:space-between; font-size:14px; color:var(--lichen); margin-top:8px; }
   .verbs { margin:48px 0 0; padding:0; list-style:none; border-top:2px solid var(--ink); }
   .verbs li { display:grid; grid-template-columns:minmax(0, 4fr) minmax(0, 7fr); gap:24px; padding:20px 0; border-bottom:1px solid var(--rule); }
@@ -56,8 +56,8 @@
 </style>
 {% endblock %}
 {% block page %}
-{% set W1 = [(12,'easy','Easy','58 min','past'), (13,'easy','Easy','60 min','tod'), (14,'hard','Hard','4 × 8 min',''), (15,'easy','Easy','45 min',''), (16,'rest','Rest','',''), (17,'long','Long','3 hours',''), (18,'steady','Steady','90 min','')] %}
-{% set W2 = [(19,'easy','Easy','45 min','pen'), (20,'hard','Hard','5 × 6 min','pen'), (21,'easy','Easy','60 min','pen'), (22,'steady','Steady','75 min','pen'), (23,'rest','Rest','','pen'), (24,'long','Long','3½ hours','pen'), (25,'easy','Easy','45 min','pen')] %}
+{% set W1 = [(12,'','','','past'), (13,'easy','Easy','1 h','tod'), (14,'hard','Hard','1 h 15',''), (15,'easy','Easy','1 h',''), (16,'steady','Steady','1 h 30',''), (17,'easy','Easy','1 h',''), (18,'steady','Steady','1 h 15','pen')] %}
+{% set W2 = [(19,'rest','Rest','','pen'), (20,'steady','Steady','1 h 30','pen'), (21,'easy','Easy','1 h','pen'), (22,'steady','Steady','1 h 30','pen'), (23,'easy','Easy','1 h','pen'), (24,'easy','Easy','1 h','pen'), (25,'easy','Easy','1 h','pen')] %}
 <section class="hero">
   <h1>Calendar and plans.</h1>
   <p class="lede">Planned only as far as can honestly be seen. Firmer as each day comes into view.</p>
@@ -67,17 +67,18 @@
   <h2>Firm, then pencilled in.</h2>
   <p class="say">Nobody knows how you'll sleep next Thursday. So Ceiling commits to the days it can see and sketches the rest.</p>
   <div class="show">
-    <div class="cal" role="img" aria-label="Two weeks: six firm days from today, then pencilled-in days">
+    <div class="cal" role="img" aria-label="Two weeks: five firm days from today, then pencilled-in days">
       <div class="wk">{% for d in ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}<div class="dow">{{ d }}</div>{% endfor %}</div>
       {% for W in [W1, W2] %}<div class="wk">{% for n, v, k, m, s in W %}
-        <div class="c {{ s }}"><span class="n">{{ n }}</span><span class="vb v-{{ v }}"></span><span class="k">{{ k }}</span>{% if m %}<span class="m">{{ m }}</span>{% endif %}</div>{% endfor %}</div>{% endfor %}
+        <div class="c {{ s }}"><span class="n">{{ n }}</span>{% if v %}<span class="vb v-{{ v }}"></span><span class="k">{{ k }}</span>{% endif %}{% if m %}<span class="m">{{ m }}</span>{% endif %}</div>{% endfor %}</div>{% endfor %}
     </div>
     <div class="key"><span><i></i>Firm</span><span><i class="pen"></i>Pencilled in</span></div>
+    <p class="cap">An example, with no goal set. Pencilled-in days follow your usual weekly hours.</p>
   </div>
   <div class="facts">
     <div><b>4 to 8</b><p>Firm days, depending on how recovered you are. Tired means fewer.</p></div>
-    <div><b>Daily</b><p>Every morning the next day firms up from how you actually trained and slept.</p></div>
-    <div><b>Anywhere</b><p>Subscribe once in Apple, Google or Outlook Calendar. It stays current.</p></div>
+    <div><b>Daily</b><p>Rebuilt every morning from last night's sleep and what you actually did.</p></div>
+    <div><b>Anywhere</b><p>Subscribe once in Apple or Google Calendar, or any app that takes a calendar link. It changes when the plan does.</p></div>
   </div>
 </section>
 
@@ -85,19 +86,20 @@
   <h2>Goals in your own words.</h2>
   <p class="say">Pick one, or type it the way you'd say it. Ceiling builds the plan around your life.</p>
   <div class="show">
-    <div class="ask" aria-label="Example goal">A 4:20 marathon on Feb 1, no Wednesdays<span class="caret" aria-hidden="true"></span></div>
+    <div class="ask" aria-label="Example goal">A 4:20 marathon on Feb 7, no Wednesdays<span class="caret" aria-hidden="true"></span></div>
     <div class="built">
-      <p class="t">Marathon in 4:20. 16 weeks.</p>
-      <p class="s">Five days a week. Wednesdays off. Long runs on Saturday.</p>
-      <div class="phases" aria-label="Base 6 weeks, Build 5, Peak 3, Taper 2, then race day">
+      <p class="t">Marathon in 4:20 on February 7, 2027.</p>
+      <p class="s">17 weeks. Goal pace 9:55 a mile. No training on Wednesdays. Long runs on Sunday.</p>
+      <div class="phases" aria-label="Base 7 weeks, Build 5, Peak 3, Taper 1, then race week">
         <span class="ph-base">Base</span><span class="ph-build">Build</span><span class="ph-peak">Peak</span><span class="ph-taper">Taper</span><span class="ph-race"></span></div>
-      <div class="weeks"><span>October 13</span><span>February 1</span></div>
+      <div class="weeks"><span>October 13</span><span>February 7</span></div>
+      <p class="cap">An example.</p>
     </div>
     <ul class="verbs">
-      <li><b>Commit when it looks right</b><span>Nothing changes your days until you say so.</span></li>
-      <li><b>Edit it in plain words</b><span>“Move long runs to Sunday.” “I’m away the week of December 7.”</span></li>
-      <li><b>Run several at once</b><span>A marathon in February and a ski tour in March share one week.</span></li>
-      <li><b>Stop anytime</b><span>The plan goes. Your history stays.</span></li>
+      <li><b>Commit when it looks right</b><span>A plan starts as a draft. Nothing changes your days until you commit.</span></li>
+      <li><b>Edit it in plain words</b><span>“Move long runs to Saturday.” “Max 6 hours a week.” “Make it 4:10.”</span></li>
+      <li><b>Run several at once</b><span>A marathon and a ski-touring season, in one calendar.</span></li>
+      <li><b>Stop anytime</b><span>Its workouts come off your calendar from that day. What you’ve done stays in your history.</span></li>
     </ul>
   </div>
 </section>

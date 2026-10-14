@@ -9,6 +9,7 @@
   form.j button { font:inherit; font-weight:600; font-size:16px; padding:16px; border:0; border-radius:999px; background:var(--ink); color:#fff; cursor:pointer; margin-top:6px; }
   form.j button:hover { background:var(--ceiling); }
   .ok { font-size:22px; line-height:1.4; }
+  form.j .hint { font-size:14px; font-weight:400; color:var(--lichen); }
   @media (max-width: 860px) { .join { grid-template-columns:1fr; gap:36px; padding:40px 0 64px; } }
 </style>
 {% endblock %}
@@ -22,7 +23,8 @@
   <form class="j" method="post" action="/join">
     <label>Email<input type="email" name="email" required autocomplete="email"></label>
     <label>Your watch
-      <select name="device"><option>Garmin</option><option>Apple Watch</option><option>Whoop</option><option>Oura</option><option>Coros</option><option>Polar</option><option>Other</option></select></label>
+      <select name="device"><option>Garmin</option><option>Apple Watch</option><option>Whoop</option><option>Oura</option><option>Coros</option><option>Polar</option><option>Other</option></select>
+      <small class="hint">Ceiling works with Garmin today. This tells us what to add next.</small></label>
     <label>Hours a week you train
       <select name="hours"><option>Under 5</option><option selected>5 to 10</option><option>10 to 15</option><option>15 or more</option></select></label>
     <button type="submit">Join the waitlist</button>

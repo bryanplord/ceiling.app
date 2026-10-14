@@ -45,7 +45,7 @@
 {% block page %}
 <section class="hero">
   <h1>The morning.</h1>
-  <p class="lede">Before you're out of bed, last night is read against your normal. You get one call and everything you need to act on it.</p>
+  <p class="lede">As soon as your watch syncs, last night is read against your normal. You get one call and everything you need to act on it.</p>
 </section>
 
 <section class="ch">
@@ -54,53 +54,58 @@
   <div class="show calls">
     <div class="call"><i class="v-rest"></i><b>Day off</b><p>Rest. A slow walk at most.</p></div>
     <div class="call"><i class="v-light"></i><b>Walk</b><p>Move, nothing more.</p></div>
-    <div class="call on"><i class="v-easy"></i><b>Easy</b><p>Aerobic, under today's ceiling.</p></div>
-    <div class="call"><i class="v-steady"></i><b>Steady</b><p>Longer, no intervals.</p></div>
-    <div class="call"><i class="v-hard"></i><b>Hard</b><p>Long or hard. Your green light.</p></div>
+    <div class="call on"><i class="v-easy"></i><b>Easy</b><p>Easy enough to hold a phone call.</p></div>
+    <div class="call"><i class="v-steady"></i><b>Steady</b><p>Up to 90 minutes, no intervals.</p></div>
+    <div class="call"><i class="v-hard"></i><b>Hard</b><p>Intervals at threshold. Your green light.</p></div>
   </div>
 </section>
 
 <section class="ch">
   <h2>An exact number to hold.</h2>
-  <p class="say">Your zones come from your own threshold, found in your own sessions. Today's range moves with how recovered you are.</p>
+  <p class="say">Your zones come from your own threshold, found in your own sessions. Today's call sets the range. Last night's sleep sets how long.</p>
   <div class="show">{% include "_site_rail.html" %}
-    <p class="rail-say">Aim for <b>128</b>. Stay <b>123–133</b>. Over 133 and it's no longer an easy day.</p></div>
+    <p class="rail-say">Aim for <b>128</b>. Stay <b>123–133</b>. Over 133 and it's no longer an easy day.</p>
+    <p class="cap">An example. Your zones are measured from your own sessions.</p></div>
 </section>
 
 <section class="ch split">
   <div><h2>The least that counts. The most that's smart.</h2></div>
-  <div class="show bound">
-    <div><b>Minimum</b><p>30 minutes at 123–133.<small>Short days still hold your fitness, as long as the effort is right.</small></p></div>
-    <div><b>Maximum</b><p>75 minutes.<small>Past that, tomorrow drops from a hard day to a steady one.</small></p></div>
-    <div><b>Tonight</b><p>In bed by 9:30 PM.<small>Eight hours, and tomorrow's intervals are on.</small></p></div>
+  <div class="show"><div class="bound">
+    <div><b>Minimum</b><p>A 30-minute road ride at 123–133.<small>That holds your fitness. The full 60 builds it. Tomorrow doesn't change.</small></p></div>
+    <div><b>Maximum</b><p>75 minutes, still never over 133.<small>Past that, tomorrow drops from a hard day to a steady day.</small></p></div>
+    <div><b>Tonight</b><p>In bed by 9:30 PM for 8h 30m of sleep.<small>Do that, and sleep won't hold you back tomorrow.</small></p></div>
   </div>
+  <p class="cap">An example.</p></div>
 </section>
 
 <section class="ch split">
   <div><h2>Options that fit your terrain.</h2>
-    <p class="say">It knows what you actually do, and how your heart behaves doing it. The heart rate stays the same whatever you pick.</p></div>
-  <dl class="show paths">
-    <div class="good"><dt>Road ride: our pick</dt><dd>Smooth terrain lets you hold 128. Your road rides average 127.</dd></div>
-    <div><dt>Trainer ride</dt><dd>Total control. The one to pick if it's snowing.</dd></div>
-    <div><dt>Hike</dt><dd>Your hikes average 121, a little under. Choose one with a steady climb.</dd></div>
-    <div class="bad"><dt>Mountain bike</dt><dd>Your last 10 trail rides spent 31% of the time over 133. The climbs start at your door.</dd></div>
+    <p class="say">Picked from what you've actually done this year, and how your heart behaves doing it. The heart rate stays the same whatever you pick.</p></div>
+  <div class="show"><dl class="paths">
+    <div class="good"><dt>Road ride, 60 minutes at 128 (123–133): our pick</dt><dd>Your road rides average 127, right in range. Your recent ones stayed under 133 92% of the time.</dd></div>
+    <div><dt>Trainer ride, 60 minutes at 128 (123–133)</dt><dd>Your trainer rides average 126, right in range.</dd></div>
+    <div><dt>Hike, 60 minutes at 128 (123–133)</dt><dd>Your hikes average 116, under today's range: fine for an easy day.</dd></div>
+    <div class="bad"><dt>Mountain bike ride, 60 minutes at 128 (123–133)</dt><dd>Your last mountain bike rides spent 31% of the time over 133 and climb 1,500 ft an hour. Holding easy means walking every climb.</dd></div>
   </dl>
+  <p class="cap">An example. Yours come from your own sessions.</p></div>
 </section>
 
 <section class="ch">
   <h2>Tomorrow, three ways.</h2>
-  <p class="say">Every choice has a cost. You see it before you make it.</p>
+  <p class="say">Every choice has a cost. You see it before you make it. Each assumes a normal night, and is re-read in the morning.</p>
   <div class="show three">
-    <div class="good"><b>Do it as written</b><p>Tomorrow is a hard day: 4 × 8 minutes at 152–160.</p></div>
-    <div class="bad"><b>Overdo it</b><p>Three hours instead, and tomorrow is steady with no intervals.</p></div>
-    <div><b>Skip it</b><p>Tomorrow is still hard. You lose a day of aerobic work.</p></div>
+    <div class="good"><b>Do it as written</b><p>Tomorrow is a hard day: 4 × 8 minutes at 154–163.</p></div>
+    <div class="bad"><b>Overdo it</b><p>Go 90 minutes or drift over 133, and tomorrow drops to a steady day. Two days out you carry 18% more fatigue for 2% more fitness.</p></div>
+    <div><b>Skip it</b><p>Tomorrow is still a hard day, so you gain nothing by resting. Two days out you're 2% less fit.</p></div>
   </div>
+  <p class="cap">An example.</p>
 </section>
 
 <section class="ch">
   <h2>Why, in plain words.</h2>
   <div class="show">
-    <p class="why">HRV has been under your normal four nights running and resting heart rate is up 4. Easy work keeps the fitness. Anything harder digs the hole deeper.</p>
+    <p class="why">Train today, but take it easy. You're carrying 1h 40m of sleep debt and your last week is 22% above your normal training. But HRV and resting HR are both holding, so your body is coping. Today is about not tipping it over.</p>
+    <p class="cap">An example.</p>
   </div>
 </section>
 

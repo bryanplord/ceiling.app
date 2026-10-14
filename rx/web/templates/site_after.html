@@ -33,7 +33,7 @@
   .batt .n { font-size:clamp(88px, 11vw, 144px); font-weight:600; font-stretch:125%; line-height:.85; font-variant-numeric:tabular-nums; }
   .cell { position:relative; height:56px; border:2px solid var(--ink); border-radius:10px; padding:5px; max-width:360px; }
   .cell::after { content:""; position:absolute; right:-10px; top:16px; width:6px; height:20px; background:var(--ink); border-radius:0 3px 3px 0; }
-  .cell i { display:block; height:100%; width:39%; background:var(--s-tem); border-radius:5px; }
+  .cell i { display:block; height:100%; width:42%; background:var(--s-tem); border-radius:5px; }
   .batt p { grid-column:1 / -1; margin:0; font-size:18px; color:var(--lichen); }
   .ledger { margin-top:36px; border-top:2px solid var(--ink); font-variant-numeric:tabular-nums; }
   .ledger div { display:flex; justify-content:space-between; gap:16px; padding:12px 0; border-bottom:1px solid var(--rule); font-size:18px; }
@@ -60,69 +60,80 @@
 <section class="frost bleed" style="padding:72px 0 96px" aria-label="An example review">
   <div class="sheet review">
     <div>
-      <p class="meta">Road ride, 64 minutes, average 129.</p>
-      <p class="score">88<small>%</small></p>
-      <p class="word">Nailed it.</p>
-      <p class="diag">Held your range for 52 minutes and never went over your ceiling.</p>
-      <div class="zbar" aria-label="Time in each zone">
-        <span style="width:9%;background:#b3a6dc"></span><span style="width:81%;background:#7fa7d9">Endurance 52m</span><span style="width:10%;background:#46b07f"></span></div>
+      <p class="meta">Road ride, 65 min, average 127.</p>
+      <p class="score">82<small>%</small></p>
+      <p class="word">Good.</p>
+      <p class="diag">Good session. A bit harder than an easy day calls for.</p>
+      <div class="zbar" aria-label="Time in each zone: Endurance 59 minutes, Aerobic 6 minutes">
+        <span style="width:91%;background:var(--s-end)">Endurance 59m</span><span style="width:9%;background:var(--s-aer)"></span></div>
     </div>
     <div class="rf">
       <h3>What's good</h3>
-      <ul><li>52 of 64 minutes at 123–133.</li><li>No climb pushed you over 133.</li><li>Stopped inside the 75-minute maximum.</li></ul>
+      <ul><li>Held it easy: 91% of the time at or under 133.</li><li>Right length: 65 min of the 60 planned.</li></ul>
       <h3>What needs work</h3>
-      <ul class="fix"><li>The first 10 minutes ran 6 beats high. Start slower.</li></ul>
+      <ul class="fix"><li>6 min over 133, across 3 separate climbs or pushes, peak 141. Walk the steep pitches next time, or pick the road.</li></ul>
     </div>
   </div>
+  <p class="cap">An example. Yours is scored against your own prescription.</p>
 </section>
 
 <section class="ch split">
   <div><h2>Out of 100. Not a letter grade.</h2>
-    <p class="say">Each point is shown. A 15-second spike on a pitch doesn't count like a minute of threshold work.</p></div>
-  <div class="show parts">
-    <div class="part"><div><b>Ceiling</b><p>Time held under the day's ceiling.</p></div><div class="m"><i style="width:96%"></i></div><span class="pt">48<small>/50</small></span></div>
-    <div class="part"><div><b>Range</b><p>Time in the day's range.</p></div><div class="m"><i style="width:80%"></i></div><span class="pt">24<small>/30</small></span></div>
-    <div class="part"><div><b>Length</b><p>Close to the planned length.</p></div><div class="m"><i style="width:80%"></i></div><span class="pt">16<small>/20</small></span></div>
-    <div class="part tot"><div><b>Score</b></div><div></div><span class="pt">88</span></div>
+    <p class="say">Each point is shown. A 15-second spike on a pitch doesn't count like a minute of threshold work. Training on a day off or a walk day caps it at 50.</p>
+    <p class="say">90 and up is Nailed it. 75 is Good, 60 Close, 40 Off plan. Under that, Way off.</p></div>
+  <div class="show">
+    <div class="parts">
+      <div class="part"><div><b>Ceiling</b><p>Time held under the day's ceiling.</p></div><div class="m"><i style="width:72%"></i></div><span class="pt">36<small>/50</small></span></div>
+      <div class="part"><div><b>Range</b><p>Time in the day's range. On an easy day, a bit under still mostly counts.</p></div><div class="m"><i style="width:87%"></i></div><span class="pt">26<small>/30</small></span></div>
+      <div class="part"><div><b>Length</b><p>Close to the planned length: not cut short, not run long.</p></div><div class="m"><i style="width:100%"></i></div><span class="pt">20<small>/20</small></span></div>
+      <div class="part tot"><div><b>Score</b></div><div></div><span class="pt">82</span></div>
+    </div>
+    <p class="cap">An example.</p>
   </div>
 </section>
 
 <section class="ch">
   <h2>Numbers worth knowing.</h2>
-  <p class="say">A few, each against your own history. Never against a chart of people your age.</p>
+  <p class="say">A few, each against your own sessions of the same kind from the last year. Never against a chart of people your age.</p>
   <div class="show nums">
-    <div><b>18.2<small>mph</small></b><span>Speed at 128</span><p>Up from 17.4 in August. Same heart, more speed.</p></div>
-    <div><b>3<small>%</small></b><span>Heart rate drift</span><p>How far your heart rose at the same effort. Your best is 2.</p></div>
-    <div><b>−4<small>bpm</small></b><span>Average heart rate</span><p>Under your usual road ride at this pace.</p></div>
+    <div><b>127<small>bpm</small></b><span>Average heart rate</span><p>About your usual (127).</p></div>
+    <div><b>31<small>min</small></b><span>Longest stretch at 123–133</span><p>Unbroken. That's what builds the aerobic engine.</p></div>
+    <div><b>+3<small>bpm</small></b><span>Heart-rate drift, second half</span><p>Low: your aerobic base held for this long.</p></div>
   </div>
+  <p class="cap">An example. Also shown when they apply: climbing, distance and speed, pace, training load and calories.</p>
 </section>
 
 <section class="ch split">
   <div><h2>What more, and what it costs.</h2>
     <p class="say">Tomorrow is re-planned from what you actually did, not what you were told to do.</p></div>
-  <dl class="show paths">
-    <div class="good"><dt>If you want more</dt><dd>20 more minutes at 125 is free. Tomorrow stays hard.</dd></div>
-    <div><dt>If you stop here</dt><dd>You did the job. Tomorrow: 4 × 8 minutes at 152–160.</dd></div>
-    <div class="bad"><dt>If you go out again tonight</dt><dd>Anything over 133 and tomorrow becomes a steady day.</dd></div>
-  </dl>
+  <div class="show">
+    <dl class="paths">
+      <div class="good"><dt>An easy 20-minute spin or hike, under 133</dt><dd>Tomorrow stays a hard day.</dd></div>
+      <div class="good"><dt>20–30 minutes of strength</dt><dd>Squats, lunges, step-ups, core. Doesn't touch tomorrow.</dd></div>
+      <div class="bad"><dt>Not: another long or hard session</dt><dd>That turns tomorrow from a hard day into a steady day.</dd></div>
+      <div><dt>If you stop here</dt><dd>Nothing changes: today's session is done and done right. Tomorrow is a hard day, and tonight's sleep is what decides whether it stays that way.</dd></div>
+    </dl>
+    <p class="cap">An example.</p>
+  </div>
 </section>
 
 <section class="ch split">
   <div><h2>Energy you can check.</h2>
     <p class="say">It charges overnight and drains through the day. Ceiling's own formula, every point shown, so you can do the math yourself.</p></div>
   <div class="show">
-    <div class="batt"><span class="n">39</span><div class="cell" role="img" aria-label="Energy 39 of 100"><i></i></div>
-      <p>Now. You woke at 77.</p></div>
+    <div class="batt"><span class="n">42</span><div class="cell" role="img" aria-label="Energy 42 of 100"><i></i></div>
+      <p>Now. You woke at 81. Running low: anything more today should be easy.</p></div>
     <div class="ledger">
-      <div><span>Sleep</span><span>31 of 40</span></div>
-      <div><span>HRV</span><span>26 of 35</span></div>
-      <div><span>Resting heart rate</span><span>13 of 15</span></div>
-      <div><span>Freshness</span><span>7 of 10</span></div>
-      <div class="sub"><span>At 6:12 AM</span><span>77</span></div>
-      <div class="dr"><span>Eight hours awake</span><span>−20</span></div>
-      <div class="dr"><span>Road ride</span><span>−18</span></div>
-      <div class="end"><span>Now</span><span>39</span></div>
+      <div><span>Sleep</span><span>34 of 40</span></div>
+      <div><span>HRV</span><span>28 of 35</span></div>
+      <div><span>Resting HR</span><span>13 of 15</span></div>
+      <div><span>Freshness</span><span>6 of 10</span></div>
+      <div class="sub"><span>When you woke</span><span>81</span></div>
+      <div class="dr"><span>Awake, 8 hours</span><span>−20</span></div>
+      <div class="dr"><span>Road ride</span><span>−19</span></div>
+      <div class="end"><span>Now</span><span>42</span></div>
     </div>
+    <p class="cap">An example. Each hour awake costs 2.5. Each session costs 0.3 × its load × how hard it was. Ceiling doesn't read all-day heart rate or stress, so daytime life is a flat rate.</p>
   </div>
 </section>
 
