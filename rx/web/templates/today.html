@@ -81,6 +81,13 @@
   .cv small { font-size:15px; color:var(--lichen); font-weight:500; }
   .card.dr { background:#fff; border:1px solid var(--rule); }
   .card.t-good { background:#e6f4ec; } .card.t-ok { background:#fbf1dc; } .card.t-bad { background:#fde8e5; }
+  .why3 { margin-top:28px; }
+  .why3g { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:20px; }
+  .w3 { display:flex; flex-direction:column; gap:4px; border-top:3px solid var(--rule); padding-top:10px; font-size:15px; line-height:1.4; color:#3c3c40; }
+  .w3 b { font-size:17px; color:var(--ink); } .w3l { color:var(--lichen); font-size:14px; }
+  .w3-good { border-top-color:var(--good); } .w3-ok { border-top-color:#ee7a30; } .w3-bad { border-top-color:var(--ceiling); }
+  .tells { margin-top:24px; } .tells p { margin:0 0 8px; font-size:17px; line-height:1.45; max-width:60ch; }
+  @media (max-width:700px) { .why3g { grid-template-columns:1fr; } }
   .jr { margin-top:36px; }
   .jform { display:grid; gap:12px; }
   .jrow { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
@@ -356,7 +363,10 @@
       {% if M.right %}<div><p class="dlab">What's good</p><ul class="rfl rgood">{% for x in M.right %}<li>{{ x }}</li>{% endfor %}</ul></div>{% endif %}
       {% if M.fix %}<div><p class="dlab">What needs work</p><ul class="rfl rbad">{% for x in M.fix %}<li>{{ x }}</li>{% endfor %}</ul></div>{% endif %}
     </div>
-    <p class="parts">Score: {% for k, v in M.parts.items() %}{{ k }} {{ v }}/{{ {'Ceiling':50,'Range':30,'Length':20}[k] }}{{ ', ' if not loop.last }}{% endfor %}.</p>
+    {% if M.why %}<section class="why3" aria-label="Why this score"><p class="dlab">{{ 'Why ' ~ M.score ~ ', not 100' if M.score < 100 else 'Why 100' }}</p>
+      <div class="why3g">{% for lab, ttl, body, tn in M.why %}<div class="w3 w3-{{ tn }}"><span class="w3l">{{ lab }}</span><b>{{ ttl }}</b><span>{{ body }}</span></div>{% endfor %}</div></section>{% endif %}
+    {% if M.tells %}<section class="tells" aria-label="What the session tells us"><p class="dlab">What the {{ 'run' if 'Run' in M.name else 'session' }} tells us</p>
+      {% for x in M.tells %}<p>{{ x }}</p>{% endfor %}</section>{% endif %}
     {% if M.stats %}<div class="cards">{% for v, l, n in M.stats %}<div class="card"><span class="cl">{{ l }}</span><span class="cv">{{ v }}</span>{% if n %}<span class="cn">{{ n }}</span>{% endif %}</div>{% endfor %}</div>{% endif %}
     {% else %}
     <h1 class="verdict">Done.</h1>

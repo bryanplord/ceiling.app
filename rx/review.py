@@ -56,6 +56,9 @@ class Review:
     peak: int | None = None
     picked: str = ""
     target: int | None = None
+    ceil_frac: float = 1.0
+    why: list = field(default_factory=list)     # (label, title, body, tone): each part of the score
+    tells: list = field(default_factory=list)   # what the session tells us, in sentences
 
 
 def _kind(a) -> str:
@@ -155,22 +158,27 @@ def review(p, rx, a, stream, raw: dict | None = None) -> Review | None:
         picked = ""
     off_menu = bool(opts) and not chosen and not as_planned and not walkday
 
-    # points
-    # a 2% grace: one short push on a climb isn't a breach of the day
-    ceiling_pts = 50 * max(0.0, 1 - max(0.0, share_over - 0.02) * 4)
+    # points: what matters depends on the day. Easy days: stay easy. Hard days: do the hard work.
+    #   easy / walk  stayed under the ceiling 70, not too long 30 (short is fine)
+    #   steady       in the range 50, under the ceiling 30, length 20
+    #   hard         the efforts done at threshold 60, not past it 20, length 20
+    c_frac = max(0.0, 1 - max(0.0, share_over - 0.02) * 4)     # a 2% grace for one short push
     if rx.verdict == HARD:
-        range_pts = 30 * min(1.0, in_min / 28)                     # 4 x 8 at threshold, a little slack
+        r_frac = min(1.0, in_min / 28)                            # 4 x 8 at threshold, a little slack
     elif rx.verdict == STEADY:
-        range_pts = 30 * np.sum(inr) / valid_s
+        r_frac = np.sum(inr) / valid_s
     else:
-        range_pts = 30 * (np.sum(inr) + 0.85 * np.sum(below)) / valid_s
+        r_frac = 0.0
     ratio = minutes / max(1, target)
-    if ratio < 0.75:
-        dur_pts = 20 * max(0.0, ratio / 0.75)
+    easyish = rx.verdict not in (STEADY, HARD)
+    if ratio < 0.75 and not easyish:
+        l_frac = max(0.0, ratio / 0.75)
     elif ratio <= 1.1:
-        dur_pts = 20.0
+        l_frac = 1.0
     else:
-        dur_pts = 20 * max(0.0, 1 - (ratio - 1.1) * 1.5)
+        l_frac = max(0.0, 1 - (ratio - 1.1) * 1.5)
+    W = {HARD: (20, 60, 20), STEADY: (30, 50, 20)}.get(rx.verdict, (70, 0, 30))
+    ceiling_pts, range_pts, dur_pts = W[0] * c_frac, W[1] * r_frac, W[2] * l_frac
     s = ceiling_pts + range_pts + dur_pts
     if off_menu:
         s -= 5
@@ -204,7 +212,7 @@ def review(p, rx, a, stream, raw: dict | None = None) -> Review | None:
     elif rx.verdict == EASY:
         bl = np.sum(sm < lo - 10) / valid_s
         if bl > 0.5:
-            fix.append(f"Over half the time under {lo - 10}: easier than it needed to be. Fine for recovery, light for fitness.")
+            right.append(f"Slower than the range most of the way. No cost on an easy day.")
         else:
             right.append(f"Held it easy: {round(100 * np.sum(sm <= ceil) / valid_s)}% of the time at or under {ceil}.")
     if walkday and a.sport != WALK:
@@ -234,6 +242,7 @@ def review(p, rx, a, stream, raw: dict | None = None) -> Review | None:
         stats.append((f"{hold} min", f"Longest stretch at {lo}–{ceil}",
                       "Unbroken. That's what builds the aerobic engine." if hold >= 20 else "Terrain or effort kept breaking it up."))
     # drift: same effort, does the heart climb? Only meaningful where you control the effort.
+    dr = 0.0
     if kind in CONTROLLED and minutes >= 30 and rx.verdict in (EASY, STEADY, LIGHT):
         half = len(fill) // 2
         d1, d2 = float(np.nanmean(h[:half])), float(np.nanmean(h[half:]))
@@ -279,7 +288,7 @@ def review(p, rx, a, stream, raw: dict | None = None) -> Review | None:
         head = "A training day on a recovery day."
     else:
         # name the one thing that cost the most points, without repeating the list below
-        lost = {"over": 50 - ceiling_pts, "range": 30 - range_pts, "length": 20 - dur_pts}
+        lost = {"over": W[0] - ceiling_pts, "range": W[1] - range_pts, "length": W[2] - dur_pts}
         worst = max(lost, key=lost.get)
         if worst == "over":
             head = f"Harder than {DAY.get(rx.verdict, 'today')} calls for." if rx.verdict != HARD else "The efforts went past threshold."
@@ -292,9 +301,61 @@ def review(p, rx, a, stream, raw: dict | None = None) -> Review | None:
             head = {"easy": "Easy, as asked.", "steady": "Steady, as asked.", "hard": "The work got done."}.get(rx.verdict, "As asked.")
         elif s >= 75:
             head = "Good session. " + head.replace("Harder than", "A bit harder than").replace("Easier than", "A bit easier than")
+    # why the score is what it is, part by part (only the parts that matter for this kind of day)
+    why = []
+    lp, cp, rp = round(dur_pts), round(ceiling_pts), round(range_pts)
+    c_name = f"Under {ceil}" if rx.verdict != HARD else f"Not past {ceil}"
+    if rx.verdict == HARD:
+        why.append((f"The work, {rp} of {W[1]}", f"{in_min} min at {lo}–{ceil}",
+                    "The session called for 32. That's the whole point of a hard day." if in_min < 28 else "Done. That's the whole point of a hard day.",
+                    "good" if in_min >= 28 else "bad" if in_min < 16 else "ok"))
+    elif rx.verdict == STEADY:
+        pct_ = round(100 * np.sum(inr) / valid_s)
+        mostly_over = np.sum(over) > np.sum(below)
+        why.append((f"In range, {rp} of {W[1]}", f"{pct_}% at {lo}–{ceil}",
+                    "Where a steady day should live." if pct_ >= 60 else
+                    ("Most of it was above: that's a hard day, not a steady one." if mostly_over else
+                     "Most of it was below: steady means in the range, not under it."),
+                    "good" if pct_ >= 60 else "ok"))
+    if over_min == 0:
+        why.append((f"{c_name}, {cp} of {W[0]}", f"Never over {ceil}",
+                    "Easy, kept easy. The whole point of the day." if easyish else "Held it.", "good"))
+    elif share_over < 0.05:
+        why.append((f"{c_name}, {cp} of {W[0]}", f"One push to {peak}" if bouts <= 1 else f"{bouts} short pushes, peak {peak}",
+                    "Walk or spin the next one and this is full marks." if rx.verdict != HARD else "Ease off sooner on the efforts.", "ok"))
+    else:
+        why.append((f"{c_name}, {cp} of {W[0]}", f"{over_min} min over {ceil}",
+                    (f"Peak {peak}. On an easy day this is the only thing that really matters." if easyish else f"Peak {peak}."), "bad"))
+    if ratio > 1.1:
+        why.append((f"Length, {lp} of {W[2]}", "Long", f"{minutes} minutes against {target} planned.", "bad"))
+    elif ratio < 0.75 and not easyish:
+        why.append((f"Length, {lp} of {W[2]}", "Short", f"{minutes} of {target} minutes.", "ok"))
+    else:
+        why.append((f"Length, {lp} of {W[2]}", "Right length" if ratio >= 0.75 else "Short, and that's fine",
+                    f"{minutes} of {target} minutes." + (" A short easy day costs nothing." if ratio < 0.75 else ""), "good"))
+    # what the session tells us
+    tells = []
+    if kind in CONTROLLED and minutes >= 30 and rx.verdict in (EASY, STEADY, LIGHT):
+        if dr <= -2:
+            tells.append(f"Your heart rate fell {abs(dr):.0f} beats in the second half at the same effort. "
+                         f"Your aerobic base covers {minutes} minutes of this easily.")
+        elif dr <= 4:
+            tells.append(f"Your heart rate held steady from the first half to the second. Your aerobic base covers this.")
+        else:
+            tells.append(f"Your heart rate climbed {dr:.0f} beats in the second half at the same effort: heat, fuel, "
+                         f"or {minutes} minutes is past what your base covers right now.")
+    if a.sport == RUN and a.distance_m and a.moving_s and a.distance_m > 500 and a.avg_hr and rx.verdict in (EASY, LIGHT):
+        mi = a.distance_m / 1609.34
+        pace = a.moving_s / 60 / mi
+        tells.append(f"{int(pace)}:{round(pace % 1 * 60):02d} a mile at {a.avg_hr:.0f} is your easy running pace today. "
+                     "It's the number that gets faster as you get fitter, and Ceiling tracks it.")
+    rank = next((n for v, l, n in stats if l == "Average heart rate" and n and not n.startswith("About")), "")
+    if rank:
+        tells.append(rank)
     return Review(s, w, tone, head.strip(), right[:4], fix[:4], stats[:6],
-                  {"Ceiling": round(ceiling_pts), "Range": round(range_pts), "Length": round(dur_pts)},
-                  round(100 * np.sum(inr) / valid_s), over_min, peak, picked, target)
+                  {k: (v, m) for k, v, m in ((c_name, cp, W[0]), ("The work" if rx.verdict == HARD else "In range", rp, W[1]),
+                                             ("Length", lp, W[2])) if m},
+                  round(100 * np.sum(inr) / valid_s), over_min, peak, picked, target, c_frac, why, tells[:3])
 
 
 class LiteRx:

@@ -85,7 +85,7 @@
       <div class="g {{ r.tone or 'none' }}">{% if r.score is not none %}{{ r.score }}<span class="pc">%</span>{% else %}–{% endif %}</div>
       {% if r.word %}<div class="gw {{ r.tone }}">{{ r.word }}</div>{% endif %}
       <div class="wd">{{ 'Today' if r.date == today_iso else dd.strftime('%a %b %-d') }}</div>
-      {% if r.parts %}<div class="parts">{% for k, v in r.parts.items() %}<span>{{ k }} {{ v }}/{{ maxp.get(k, '') }}</span>{% endfor %}</div>{% endif %}
+      {% if r.parts %}<div class="parts">{% for k, vm in r.parts.items() %}<span>{{ k }} {{ vm[0] }}/{{ vm[1] }}</span>{% endfor %}</div>{% endif %}
     </div>
     <div>
       <div class="pd">

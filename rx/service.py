@@ -331,7 +331,7 @@ def today_after(store: Store, p, rx) -> dict | None:
             if rv:
                 mins = zone_minutes(p, st[0], st[1])
                 tot = sum(mins) or 1
-                row.update(target=rv.target, score=rv.score, word=rv.word, tone=rv.tone, head=rv.headline, right=rv.right,
+                row.update(ceil_frac=rv.ceil_frac, why=rv.why, tells=rv.tells, target=rv.target, score=rv.score, word=rv.word, tone=rv.tone, head=rv.headline, right=rv.right,
                            fix=rv.fix, stats=rv.stats, parts=rv.parts,
                            zones=[(n, c, round(mm), mm / tot * 100) for (n, c, _, _), mm in zip(bands(p), mins)])
         out["sessions"].append(row)
@@ -365,7 +365,7 @@ def _more_today(p, rx, load: float, done_min: int, tomorrow_now: str, nxt: str, 
     from .prescribe import engine as eng
     ceil = rx.hr_ceiling or 130
     easy_top = eng.easy_band(p.zones)[1]
-    hot = main and main.get("score") is not None and main["parts"]["Ceiling"] < 30
+    hot = main and main.get("score") is not None and main.get("ceil_frac", 1.0) < 0.6
     if rx.verdict in (eng.REST, eng.LIGHT) or hot:
         return {"ideas": [("A walk", f"As long as you like, under {min(ceil, easy_top)}. Free: no cost to tomorrow.", "good"),
                           ("15 minutes of mobility", "Hips, calves, upper back.", "good")],
@@ -393,7 +393,7 @@ def _stop_here(p, rx, tomorrow_now: str, nxt: str, main: dict | None, done_min: 
     """If you do nothing more today: what that means. Plainly, no guilt."""
     from .prescribe import engine as eng
     score = main["score"] if main and main.get("score") is not None else None
-    hot = main and main.get("parts") and main["parts"]["Ceiling"] < 30
+    hot = main and main.get("parts") and main.get("ceil_frac", 1.0) < 0.6
     if rx.verdict in (eng.REST, eng.LIGHT):
         return f"The right call: today was for recovering. Tomorrow is {_aday(tomorrow_now)} as it stands."
     if hot:
