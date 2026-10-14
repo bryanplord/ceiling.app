@@ -19,7 +19,7 @@ NUM = {"a": 1, "an": 1, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "s
 DRINK = r"(beers?|ipas?|lagers?|pints?|wines?|glass(?:es)? of wine|reds?|whites?|gin(?: and tonics?| & tonics?|s)?|g&ts?|" \
         r"whiske?ys?|bourbons?|scotch(?:es)?|tequilas?|margaritas?|vodkas?|cocktails?|martinis?|shots?|drinks?|seltzers?|old fashioneds?|negronis?)"
 SICK = ["sick", "sore throat", "fever", "chills", "congested", "congestion", "cold", "flu", "run down", "rundown",
-        "stuffy", "cough", "coughing", "achy", "aches", "headache", "nauseous", "feel like crap", "feel like shit", "covid"]
+        "stuffy", "cough", "coughing", "achy", "aches", "nauseous", "feel like crap", "feel like shit", "covid"]
 POOR = ["junk", "fast food", "pizza", "burger", "fries", "candy", "dessert", "ice cream", "chips", "ate like shit",
         "ate like crap", "ate badly", "ate bad", "ate poorly", "skipped dinner", "skipped lunch", "didn't eat", "barely ate",
         "late dinner", "ate late"]
@@ -37,6 +37,15 @@ OTHER_PARTS = ["back", "lower back", "neck", "shoulder", "shoulders", "wrist", "
 HURT = r"(hurts?|hurting|sore|pain|painful|aches?|aching|tweaked|strained|pulled|injured|tender|niggle|twinge|blister(?:s|ed)?)"
 HUNGRY = ["hungry", "starving", "famished", "bonked", "bonk", "hangry", "ravenous", "empty tank"]
 SHOES = re.compile(r"\b(shoes?|trainers|sneakers|insoles?)\b")
+CAFFEINE = ["over caffeinated", "overcaffeinated", "over-caffeinated", "too much coffee", "too much caffeine", "jittery",
+            "wired", "jacked up", "espresso", "energy drink", "pre-workout", "preworkout", "coffees", "red bull", "celsius"]
+HEADACHE = ["headache", "head ache", "migraine", "head hurts", "head is pounding", "pounding head"]
+BAD_SLEEP = ["slept badly", "slept bad", "slept poorly", "slept like crap", "slept like shit", "bad sleep", "terrible sleep",
+             "couldn't sleep", "could not sleep", "can't sleep", "insomnia", "woke up a lot", "woke up all night",
+             "kids woke", "baby woke", "up all night", "restless night"]
+NERVES = ["anxious", "nervous", "wired and tired", "on edge", "can't switch off", "mind racing"]
+TRAVEL = ["flight", "flew", "flying", "jet lag", "jetlag", "jet lagged", "red eye", "red-eye", "long drive", "time zone"]
+HEAT = ["hot out", "so hot", "heat", "humid", "sweltering", "dehydrated", "didn't drink", "not enough water"]
 DRANK = re.compile(r"\b(drank|drinking|drunk|hungover|hangover|booze|boozy|wine|beer)\b")
 
 
@@ -79,6 +88,19 @@ def parse(text: str) -> dict:
             tags["shoes"] = True
     if any(re.search(r"\b" + re.escape(w) + r"\b", t) for w in HUNGRY):
         tags["hungry"] = True
+    has = lambda ws: any(re.search(r"\b" + re.escape(w) + r"\b", t) for w in ws)
+    if has(CAFFEINE) or re.search(r"\b(\d|three|four|five|six)\s+(?:cups of )?coffees?\b", t):
+        tags["caffeine"] = True
+    if has(HEADACHE):
+        tags["headache"] = True
+    if has(BAD_SLEEP):
+        tags["bad_sleep"] = True
+    if has(NERVES):
+        tags["stress"] = True
+    if has(TRAVEL):
+        tags["travel"] = True
+    if has(HEAT):
+        tags["heat"] = True
     return tags
 
 
@@ -111,6 +133,10 @@ def label(tags: dict) -> list[str]:
         out.append(f"Sore {x}")
     if tags.get("hungry"):
         out.append("Hungry")
+    for k, l in (("caffeine", "Lots of caffeine"), ("headache", "Headache"), ("bad_sleep", "Slept badly"),
+                 ("travel", "Travel"), ("heat", "Heat")):
+        if tags.get(k):
+            out.append(l)
     return out
 
 
@@ -150,6 +176,19 @@ def effect(tags: dict, hrv_low: bool = False) -> tuple[str | None, str]:
         notes.append("Hungry on a training day means you're under-fuelled. Eat a real meal now: carbs and protein, "
                      "about 0.5 g of carbs per pound of body weight in the next couple of hours. Tomorrow's session "
                      "needs it in the tank.")
+    if tags.get("caffeine"):
+        notes.append("Lots of caffeine lifts your heart rate 5 to 10 beats for hours and cuts deep sleep. No more after "
+                     "2 PM; expect tonight's HRV to read a little low, and today's heart-rate ceiling to arrive sooner.")
+    if tags.get("headache") and not tags.get("sick"):
+        notes.append("A headache: drink a big glass of water now and eat. If it's still there in the morning with your "
+                     "resting heart rate up, tomorrow goes easy.")
+    if tags.get("bad_sleep"):
+        notes.append("A bad night shows up in tomorrow's numbers. Ceiling reads them in the morning; aim for an early night.")
+    if tags.get("travel"):
+        notes.append("Travel days are stress your watch doesn't see. Keep anything today easy and drink more than you think.")
+    if tags.get("heat"):
+        notes.append("Heat pushes heart rate up 5 to 10 beats at the same effort: go by heart rate, not pace or power, "
+                     "and drink before you're thirsty.")
     if tags.get("late") and not notes:
         notes.append("A late night is a short night. Tomorrow depends on how much sleep you actually get.")
     if tags.get("food") == "poor" and not tags.get("hungry"):
@@ -171,7 +210,15 @@ def hrv_low(wellness, day: str, morning: bool = False) -> bool:
     return statistics.mean(week) < base * 0.95
 
 
-def signals(store, day: str, hrv_low: bool = False) -> dict:
+def rhr_up(wellness, day: str) -> bool:
+    """This morning's resting HR 5+ beats over your 30-day median."""
+    ws = sorted((w for w in wellness if w.rhr and w.date <= day), key=lambda w: w.date)
+    if len(ws) < 14 or ws[-1].date != day:
+        return False
+    return ws[-1].rhr >= statistics.median([w.rhr for w in ws[-31:-1]]) + 5
+
+
+def signals(store, day: str, hrv_low: bool = False, rhr_up: bool = False) -> dict:
     """What the journal means for the morning of `day`: last night's check-ins (yesterday's entries)
     and anything logged so far today. Pain in the feet or legs keeps you off running for 3 days."""
     from datetime import date as _d
@@ -182,9 +229,14 @@ def signals(store, day: str, hrv_low: bool = False) -> dict:
         e = load(store, (d0 - timedelta(days=back)).isoformat())
         if not e:
             continue
-        c, n = effect(e.get("tags") or {}, hrv_low)
+        tg = e.get("tags") or {}
+        c, n = effect(tg, hrv_low)
         if c:
             caps.append((c, n))
+        if tg.get("headache") and rhr_up:
+            caps.append(("easy", "A headache yesterday and your resting heart rate up this morning: easy today, in case it's the start of something."))
+        if back == 1 and tg.get("travel") and hrv_low:
+            caps.append(("steady", "A travel day yesterday and your HRV still under normal: no hard work today."))
     order = ["rest", "light", "easy", "steady", "hard"]
     if caps:
         c, n = min(caps, key=lambda x: order.index(x[0]))
@@ -214,7 +266,7 @@ def save(store, day: str, text: str, taps: dict | None = None, at: str = "") -> 
     for e in log:                                     # oldest first: later check-ins win
         t = parse(e.get("text") or "")
         tp = e.get("taps") or {}
-        for k in ("sick", "stress", "late", "hungry", "shoes"):
+        for k in ("sick", "stress", "late", "hungry", "shoes", "caffeine", "headache", "bad_sleep", "travel", "heat"):
             if t.get(k):
                 tags[k] = True
         for x in t.get("pain") or []:
@@ -281,6 +333,10 @@ def view(e: dict) -> dict:
         pills.append((f"Sore {x}", "bad" if x in IMPACT else "warn"))
     if t.get("hungry"):
         pills.append(("Hungry", "warn"))
+    for k, l, tone in (("caffeine", "Lots of caffeine", "warn"), ("headache", "Headache", "warn"),
+                       ("bad_sleep", "Slept badly", "warn"), ("travel", "Travel", "plain"), ("heat", "Heat", "warn")):
+        if t.get(k):
+            pills.append((l, tone))
     return {"at": e.get("at") or "", "pills": [{"label": l, "tone": c} for l, c in pills],
             "text": (e.get("text") or "").strip()}
 
@@ -327,7 +383,11 @@ def patterns(store, wellness) -> list[str]:
                        ("eating poorly", lambda t: t.get("food") == "poor"),
                        ("eating well", lambda t: t.get("food") == "good"),
                        ("a stressful day", lambda t: t.get("stress")),
-                       ("a late night", lambda t: t.get("late"))):
+                       ("a late night", lambda t: t.get("late")),
+                       ("a lot of caffeine", lambda t: t.get("caffeine")),
+                       ("a headache", lambda t: t.get("headache")),
+                       ("travel", lambda t: t.get("travel")),
+                       ("feeling tired", lambda t: t.get("feel") == "tired")):
         hit = [x for t, x in rows if test(t)]
         rest = [x for t, x in rows if not test(t)]
         if len(hit) >= 3 and len(rest) >= 3:

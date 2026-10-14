@@ -452,7 +452,7 @@
         <div class="jrow"><span class="jk">Food</span>
           {% for v, l in [('good','Ate well'),('ok','OK'),('poor','Ate poorly')] %}
           <button type="submit" class="pill" name="food" value="{{ v }}">{{ l }}</button>{% endfor %}</div>
-        <div class="jnoteRow"><input class="jtext" name="text" id="jtext" value="" autocomplete="off" placeholder="Anything else?" aria-label="Anything else">
+        <div class="jnoteRow"><input class="jtext" name="text" id="jtext" value="" autocomplete="off" placeholder="Tell your coach anything: over-caffeinated, feet hurt, headache, slept badly…" aria-label="Tell your coach anything">
           <button type="submit" class="jsave">Save</button></div>
       </form>
       <p class="jsaved" id="jsaved" role="status" aria-live="polite"></p>

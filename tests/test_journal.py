@@ -72,3 +72,18 @@ def test_journal_reaches_morning_prescription(tmp_path, monkeypatch):
     p.journal = jr.signals(s, day, False)
     rx = build_rx(p, day)
     assert rx.sport != "run"
+
+
+def test_more_things_people_say(tmp_path):
+    from datetime import date, timedelta
+    from rx import journal as jr
+    from rx.store import Store
+    for text, tag in [("way over caffeinated", "caffeine"), ("bad headache", "headache"), ("slept badly", "bad_sleep"),
+                      ("flew home tonight", "travel"), ("so hot and humid", "heat")]:
+        assert jr.parse(text).get(tag), text
+    assert not jr.parse("bad headache").get("sick")
+    s = Store(str(tmp_path / "rx.db"))
+    y = (date.today() - timedelta(days=1)).isoformat()
+    jr.save(s, y, "headache all afternoon", {}, "4:00 PM")
+    assert jr.signals(s, date.today().isoformat(), False, rhr_up=True)["cap"] == "easy"
+    assert jr.signals(s, date.today().isoformat(), False, rhr_up=False)["cap"] is None

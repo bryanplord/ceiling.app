@@ -119,7 +119,7 @@ def today_rx(store: Store, day: str | None = None):
                 print(f"goal failed: {e!r}\n{traceback.format_exc()}")
             try:                                 # last night's and this morning's check-ins
                 from . import journal as _jr
-                p.journal = _jr.signals(store, day, _jr.hrv_low(p.wellness, day, morning=True))
+                p.journal = _jr.signals(store, day, _jr.hrv_low(p.wellness, day, morning=True), _jr.rhr_up(p.wellness, day))
             except Exception as e:
                 print(f"journal signals failed: {e}")
             rx_ = build_rx(p, day)
