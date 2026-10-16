@@ -184,6 +184,17 @@ class _Prefixed:
         pass
 
 
+last_store_error = ""
+
+
+def _clean(e: Exception) -> str:
+    """An error message safe to show on /healthz: no tokens, no query strings, short."""
+    m = f"{type(e).__name__}: {e}"
+    m = _re.sub(r"eyJ[\w.-]+", "[token]", m)
+    m = _re.sub(r"\?\S*", "", m)
+    return m[:200]
+
+
 class Store:
     """Local SQLite by default. With TURSO_DATABASE_URL set, a local replica of the
     hosted Turso database: reads are local and fast, writes go to Turso, so the data
@@ -199,7 +210,28 @@ class Store:
                     if turso_url else libsql.connect(self.path))
             self.db = _Locked(conn)
             if turso_url:
-                self.db.sync()
+                try:
+                    self.db.sync()
+                except Exception as e:
+                    # A stale or half-written local replica can refuse to sync. The replica is only a
+                    # cache of Turso, so throw it away and pull a fresh copy once.
+                    global last_store_error
+                    last_store_error = _clean(e)
+                    print(f"replica sync failed, rebuilding: {last_store_error}")
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
+                    import glob, os
+                    for f in glob.glob(self.path + "*"):
+                        try:
+                            os.remove(f)
+                        except OSError:
+                            pass
+                    conn = libsql.connect(self.path, sync_url=turso_url, auth_token=turso_token)
+                    self.db = _Locked(conn)
+                    self.db.sync()
+                    last_store_error = ""
         else:
             self.db = sqlite3.connect(self.path, check_same_thread=False)
             self.db.row_factory = sqlite3.Row

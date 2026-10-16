@@ -416,7 +416,8 @@ def _healthz() -> str:
                 f"{sum(1 for w in s.wellness((local_today() - timedelta(days=30)).isoformat()) if w.breathing)}\n"
                 + "recent pages (server ms): " + ", ".join(f"{t} {p} {ms}" for t, p, ms in _timings[-15:]))
     except Exception as e:
-        return f"ok\nstore unavailable: {type(e).__name__}"
+        from ..store import _clean
+        return f"ok\nstore unavailable: {_clean(e)}"
 
 
 def _page(request: Request, name: str, **ctx):
